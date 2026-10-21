@@ -1,0 +1,41 @@
+name: Probe data sources
+
+# Phase 1: run every source check from a GitHub Actions runner (datacenter IP),
+# so we can see which providers throttle or block cloud IPs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r jobs/requirements.txt
+      - name: Run probes
+        env:
+          PROBE_ENV: runner
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          STOOQ_API_KEY: ${{ secrets.STOOQ_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          BARGO_API_KEY: ${{ secrets.BARGO_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python jobs/probe/probe_sources.py --out probe-results
+      - name: Summary
+        if: always()
+        run: cat probe-results/probe-runner.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-results
+          path: probe-results/

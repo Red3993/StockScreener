@@ -1,0 +1,30 @@
+# Ordered provider fallback per capability (see jobs/providers/base.py).
+# First entry is primary; the registry falls through on any failure and logs it.
+# STATUS: provisional — set from web research on 2026-10-20. Not yet confirmed by
+# live probes (workspace network blocked; no GitHub runner yet). Update after probing.
+
+capabilities:
+  universe_constituents: [ishares_csv]                 # backup: none free & equivalent; keep last good copy
+  sector_gics:            [ishares_csv, sec_sic_map]   # SIC fallback only for out-of-universe watchlist names
+  industry_sic:           [sec_submissions]
+  fundamentals_bulk:      [sec_companyfacts_zip, sec_frames]
+  fundamentals_incremental: [sec_companyfacts]
+  daily_prices:           [yfinance, tiingo, stooq]    # Stooq requires an API key since Mar 2026
+  analyst_snapshot:       [yfinance, finnhub, fmp]     # backups partial: see CLAUDE.md
+  earnings_dates:         [yfinance, finnhub]
+  dividend_dates:         [yfinance]
+  insider_trades:         [sec_form4]
+  institutional_13f:      [sec_13f]
+  stakes_13d_13g:         [sec_13dg]
+  congress_trades:        [house_clerk_senate_efd, bargo]   # parse primary filings ourselves (LuxAlgo toolkit as reference)
+  committee_membership:   [congress_legislators]
+  macro_calendar:         [fed_fomc_page, bls_ics, fred]
+  executive_trades:       []                           # dropped: no free structured source (see CLAUDE.md)
+
+rate_limits:          # requests per second we allow ourselves
+  sec: 8              # SEC fair-access ceiling is 10/s; stay under
+  yfinance: 1.5
+  finnhub: 0.9        # free: ~60/min
+  fmp: 0.05           # free: 250/day -> budget, not speed, is the limit
+  tiingo: 0.3
+  alphavantage: 0.08  # free: 25/day, 5/min
