@@ -48,6 +48,8 @@ Blocked:
 - **No GitHub repo yet** (session had no linked GitHub account). Runner tests not run.
 - **Build workspace network only reaches GitHub/package registries**, so live probes of SEC, Yahoo, iShares,
   Finnhub, etc. all failed from the workspace (expected; not a verdict on the sources).
+  Re-confirmed 2026-10-20 22:45 ET: 1 ok (congress-legislators), 29 proxy-blocked, 17 skipped (no keys).
+  This workspace cannot stand in for a runner. Real verification needs a GitHub Actions runner or Tom's machine.
 
 Live-verified from the workspace (GitHub-hosted):
 - `unitedstates/congress-legislators`: 49 committees, 181 subcommittees, 531 members with assignments; last commit 2026-09-24.
