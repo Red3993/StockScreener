@@ -4,9 +4,18 @@ name: Probe data sources
 # so we can see which providers throttle or block cloud IPs.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "jobs/probe/**"
+      - ".github/workflows/probe-sources.yml"
 
 permissions:
-  contents: read
+  contents: write   # to publish results to the probe-results branch
+
+concurrency:
+  group: probe
+  cancel-in-progress: false
 
 jobs:
   probe:
@@ -21,7 +30,7 @@ jobs:
       - name: Run probes
         env:
           PROBE_ENV: runner
-          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT || 'StockScreener personal research github.com/Red3993' }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
@@ -34,6 +43,20 @@ jobs:
       - name: Summary
         if: always()
         run: cat probe-results/probe-runner.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Publish results to probe-results branch
+        if: always()
+        run: |
+          cp -r probe-results /tmp/pr
+          git config user.name "probe-bot"
+          git config user.email "probe-bot@users.noreply.github.com"
+          git fetch origin probe-results || true
+          git checkout -B probe-results
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/pr probe-results
+          git add probe-results
+          git commit -qm "probe ${{ github.run_id }} ($(date -u +%FT%TZ))"
+          git push -f origin probe-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
