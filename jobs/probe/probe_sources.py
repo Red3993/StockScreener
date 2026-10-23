@@ -55,11 +55,11 @@ ANALYST_TICKERS = [
     "CALM", "AAON", "WDFC", "PLMR", "ALG",
 ]
 
-ISHARES = {
-    "IWB": "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf/1467271812596.ajax?fileType=csv&fileName=IWB_holdings&dataType=fund",
-    "IVV": "https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf/1467271812596.ajax?fileType=csv&fileName=IVV_holdings&dataType=fund",
-    "IJH": "https://www.ishares.com/us/products/239763/ishares-core-sp-midcap-etf/1467271812596.ajax?fileType=csv&fileName=IJH_holdings&dataType=fund",
-    "IJR": "https://www.ishares.com/us/products/239774/ishares-core-sp-smallcap-etf/1467271812596.ajax?fileType=csv&fileName=IJR_holdings&dataType=fund",
+ISHARES = {  # 2026 URL pattern: /us/products/<id>/x/latest-holdings.csv
+    "IWB": "https://www.ishares.com/us/products/239707/x/latest-holdings.csv",
+    "IVV": "https://www.ishares.com/us/products/239726/x/latest-holdings.csv",
+    "IJH": "https://www.ishares.com/us/products/239763/x/latest-holdings.csv",
+    "IJR": "https://www.ishares.com/us/products/239774/x/latest-holdings.csv",
 }
 
 results: list[dict] = []
