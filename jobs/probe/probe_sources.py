@@ -164,10 +164,12 @@ def run_ishares() -> None:
             r = get(url, headers={"User-Agent": "Mozilla/5.0"})
             if not r.ok:
                 return False, http_detail(r)
-            lines = r.text.splitlines()
-            hdr = next((i for i, ln in enumerate(lines) if ln.startswith("Ticker,")), None)
+            text = r.content.decode("utf-8-sig", errors="replace").lstrip("\ufeff")
+            lines = text.splitlines()
+            hdr = next((i for i, ln in enumerate(lines) if ln.replace('"', '').lstrip("\ufeff ").startswith("Ticker,")), None)
             if hdr is None:
-                return False, f"{http_detail(r)}, header row not found (format changed?)"
+                head = " || ".join(lines[:12])[:380]
+                return False, f"{http_detail(r)}, ctype={r.headers.get('Content-Type')}, header row not found; head: {head!r}"
             rows = list(csv.DictReader(io.StringIO("\n".join(lines[hdr:]))))
             eq = [x for x in rows if x.get("Asset Class") == "Equity"]
             sectors = sorted({x.get("Sector", "") for x in eq})
