@@ -44,8 +44,15 @@ Done:
 - Committee → sector/SIC conflict mapping seeded (`config/committee_sectors.yaml`, all 49 current committees checked).
 - Web research on free tiers (table below).
 
+Repo: **github.com/Red3993/StockScreener** (pushed 2026-10-23). Probe workflow runs on push to `jobs/probe/**`
+and publishes results to the `probe-results` branch (this workspace has no GitHub API token, so results come back via git).
+
+Runner probe 2026-10-23 (run 3): yfinance fully works, incl. all analyst fields; iShares works with new URL;
+Fed, House Clerk, Senate eFD, congress-legislators work. SEC 403 (needs email UA), BLS 403, Bargo Cloudflare-blocked.
+No local-runner fallback needed for yfinance so far (re-check once the weekly ~15k-call job runs at volume).
+
 Blocked:
-- **No GitHub repo yet** (session had no linked GitHub account). Runner tests not run.
+- `SEC_USER_AGENT` repo secret (with Tom's contact email) not yet set → all EDGAR checks 403.
 - **Build workspace network only reaches GitHub/package registries**, so live probes of SEC, Yahoo, iShares,
   Finnhub, etc. all failed from the workspace (expected; not a verdict on the sources).
   Re-confirmed 2026-10-20 22:45 ET: 1 ok (congress-legislators), 29 proxy-blocked, 17 skipped (no keys).
@@ -58,7 +65,7 @@ Live-verified from the workspace (GitHub-hosted):
   parses House Clerk + Senate eFD keylessly and is a good reference for our own parser.
 
 Next (in order):
-1. Tom: create repo + link GitHub; sign up for free keys (Finnhub, FMP, Tiingo, FRED; optional AV, Stooq, Bargo).
+1. Tom: add `SEC_USER_AGENT` secret; sign up for free keys (Finnhub, FMP, Tiingo, FRED; optional AV, Stooq, Bargo).
 2. Run the probe on a runner and locally on Tom's machine; fill in the "verified" columns below.
 3. Decide public vs private repo (see Actions estimate).
 4. Supabase project, schema, single-user auth; Next.js PWA shell on Vercel.
@@ -70,19 +77,19 @@ Next (in order):
 
 | Need | Primary | Backup | Free-tier facts (research) | Runner | Local |
 |---|---|---|---|---|---|
-| Universe | iShares CSVs (IWB, IVV, IJH, IJR) | last good stored copy | Free, unofficial endpoint; format can change | pending | pending |
-| GICS sector | iShares `Sector` column | SIC → sector map | — | pending | pending |
-| Industry routing | EDGAR `submissions` SIC | — | Free; User-Agent with email; ≤10 req/s | pending | pending |
-| Fundamentals | `companyfacts.zip` (init) + `frames` | per-company `companyfacts` | Free, same SEC limits | pending | pending |
-| Daily prices | yfinance | Tiingo, then Stooq | yfinance: unofficial, IP rate-limits (maintainer: fetch less, cache). Tiingo: free "Starter" plan (limits to confirm). **Stooq: API key required since Mar 2026.** Alpha Vantage: 25 req/day — too small, not used. | pending | pending |
-| **Analyst** | yfinance (all 8 fields) | Finnhub (recommendation trends), FMP (grades/targets/estimates — tier unclear) | Finnhub free ~60 calls/min, personal use; which analyst endpoints are free must be confirmed by probe. FMP free = 250 calls/day; whether analyst endpoints work on small caps must be probed. | pending | pending |
-| Earnings / dividend dates | yfinance `.calendar` | Finnhub earnings calendar | — | pending | pending |
-| Insider trades | EDGAR Form 4 (parse) | — | Free | pending | pending |
-| 13F / 13D / 13G | EDGAR | — | Free | pending | pending |
-| Congress trades | Parse House Clerk + Senate eFD ourselves | Bargo free API | Bargo: free JSON API, anonymous or free key, attribution required, no bulk redistribution (fine for personal). **Disclosed Capitol: no permanent free tier** (750 trial credits, then $6+/mo) → not used. LuxAlgo dump too thin. | pending | pending |
+| Universe | iShares CSVs (IWB, IVV, IJH, IJR) via `/us/products/<id>/x/latest-holdings.csv` | last good stored copy | Free, unofficial endpoint; **old `.ajax?fileType=csv` URL now returns HTML** | ✅ 1023/504/406/637 equities, **union 1,654** | pending |
+| GICS sector | iShares `Sector` column | SIC → sector map | — | ✅ 11 sectors | pending |
+| Industry routing | EDGAR `submissions` SIC | — | Free; User-Agent with email; ≤10 req/s | ❌ 403 — UA had no email; retest once `SEC_USER_AGENT` secret is set | pending |
+| Fundamentals | `companyfacts.zip` (init) + `frames` | per-company `companyfacts` | Free, same SEC limits | ❌ 403 (same cause) | pending |
+| Daily prices | yfinance (✅ runner: 3y AAPL 753 rows; 20/20 batch) | Tiingo, then Stooq | yfinance: unofficial, IP rate-limits (maintainer: fetch less, cache). Tiingo: free "Starter" plan (limits to confirm). **Stooq: API key required since Mar 2026.** Alpha Vantage: 25 req/day — too small, not used. | pending | pending |
+| **Analyst** | yfinance (all 8 fields) — **✅ runner: 8/8 fields populated for 20/20 tickers; analyst counts 3–58 (CALM/WDFC = 3, AAON/ALG = 4)** | Finnhub (recommendation trends), FMP (grades/targets/estimates — tier unclear) | Finnhub free ~60 calls/min, personal use; which analyst endpoints are free must be confirmed by probe. FMP free = 250 calls/day; whether analyst endpoints work on small caps must be probed. | pending | pending |
+| Earnings / dividend dates | yfinance `.calendar` | Finnhub earnings calendar | — | ✅ | pending |
+| Insider trades | EDGAR Form 4 (parse) | — | Free | ❌ 403 (SEC UA) | pending |
+| 13F / 13D / 13G | EDGAR | — | Free | ❌ 403 (SEC UA) | pending |
+| Congress trades | Parse House Clerk + Senate eFD ourselves (✅ both reachable from runner) | ~~Bargo~~ (❌ Cloudflare challenge from runner — dropped as backup) | Bargo: free JSON API, anonymous or free key, attribution required, no bulk redistribution (fine for personal). **Disclosed Capitol: no permanent free tier** (750 trial credits, then $6+/mo) → not used. LuxAlgo dump too thin. | pending | pending |
 | Committees | `unitedstates/congress-legislators` | — | Free, CC0 | ✅ | ✅ |
 | Executive branch trades | **dropped** | — | OGE 278-Ts are PDFs; only structured source found (Disclosed Capitol) is paid. | — | — |
-| Macro calendar | Fed FOMC page, BLS `.ics` | FRED release dates (free key) | Free | pending | pending |
+| Macro calendar | Fed FOMC page; **FRED release dates** for CPI/jobs/PCE/GDP | BLS `.ics` | Free | Fed ✅; **BLS ❌ 403 from runner** → FRED promoted to primary; FRED needs key | pending |
 
 ## Free-tier budgets (preliminary estimates)
 Limits verified 2026-10-20: Supabase free = 500 MB DB, 5 GB egress/mo, **pauses after 7 days inactive**, 2 projects.
