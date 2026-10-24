@@ -1,0 +1,31 @@
+name: Dev fixtures
+# Dev only: fetch sample raw files to the `fixtures` branch for offline parser development.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/dev/**", ".github/workflows/dev-fixtures.yml"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt
+      - env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python jobs/dev/fetch_fixtures.py
+      - name: Publish to fixtures branch
+        run: |
+          cp -r fixtures /tmp/fx
+          git config user.name "fixtures-bot"; git config user.email "fixtures-bot@users.noreply.github.com"
+          git checkout --orphan fixtures
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/fx fixtures
+          git add fixtures && git commit -qm "fixtures ${{ github.run_id }}"
+          git push -f origin fixtures
