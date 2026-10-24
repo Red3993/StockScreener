@@ -221,6 +221,7 @@ function fmtMetric(k, v) {
   if (["altman_z"].includes(k)) return v.toFixed(2);
   return v.toFixed(v >= 100 ? 0 : 1) + "×";
 }
+const ord = n => { n = Math.round(n); const t = n % 100; return n + (t >= 11 && t <= 13 ? "th" : ["th","st","nd","rd"][n % 10] || "th"); };
 function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2200); }
 
 // ---------------------------------------------------------------- state
@@ -363,7 +364,7 @@ function viewWatch() {
         a.ceo ? `<span class="badge acc">CEO/CFO buy</span>` : "", a.cluster ? `<span class="badge acc">Cluster buy</span>` : "",
         a.disc ? `<span class="badge bad" title="Insider sales not under a 10b5-1 plan, last 30 days">▼ ${a.disc} discretionary sale${a.disc > 1 ? "s" : ""}</span>` : "",
         (DATA.notesBadge && Store.state.notes[s.ticker]?.length) ? `<span class="badge">${Store.state.notes[s.ticker].length} note</span>` : ""].join("");
-      return stockRow(s, `<div class="nm"><span class="${cls(ch)} num">${ch >= 0 ? "+" : "−"}${fmtMoney(Math.abs(ch))} (${pct(chp)})</span> since ${esc(fmtDate(it.added))}</div>${icons ? `<div class="icons">${icons}</div>` : ""}`);
+      return stockRow(s, `<div class="nm" style="white-space:normal"><span class="${cls(ch)} num">${ch >= 0 ? "+" : "−"}${fmtMoney(Math.abs(ch))} (${pct(chp)})</span> since ${esc(fmtDate(it.added))}</div>${icons ? `<div class="icons">${icons}</div>` : ""}`);
     }).join("")}</div>` : `<div class="card empty"><p><b>This list is empty.</b></p><p>Open any stock and tap <b>Add to watchlist</b>. The date and closing price are saved so you can track the change since you added it.</p><button class="btn primary" id="goStocks">Browse stocks</button></div>`}
     ${missing.length ? `<p class="callout">Not in this data snapshot: ${missing.map(m => esc(m.ticker)).join(", ")}</p>` : ""}
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
@@ -491,7 +492,7 @@ function priceChart(s, range) {
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" id="pchart" role="img" aria-label="${esc(s.ticker)} price chart with 50- and 200-day moving averages">
     <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".16"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
     ${ticks.map(t => `<line x1="${padL}" x2="${W - padR}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${W - padR + 6}" y="${Y(t) + 4}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t >= 1000 ? Math.round(t).toLocaleString() : t.toFixed(t < 20 ? 2 : 0)}</text>`).join("")}
-    ${xt.map(([k, d]) => `<text x="${X(k)}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="${k === 0 ? "start" : k === idx.length - 1 ? "end" : "middle"}">${new Date(d + "T12:00:00").toLocaleDateString(undefined, range === "3y" ? {month: "short", year: "2-digit"} : {month: "short", day: "numeric"})}</text>`).join("")}
+    ${xt.map(([k, d]) => `<text x="${X(k)}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="${k === 0 ? "start" : k === idx.length - 1 ? "end" : "middle"}">${new Date(d + "T12:00:00").toLocaleDateString(undefined, range === "3m" ? {month: "short", day: "numeric"} : {month: "short", year: "2-digit"})}</text>`).join("")}
     <path d="${area}" fill="url(#ga)" stroke="none"/>
     <path d="${path(s200)}" fill="none" stroke="var(--sma200)" stroke-width="1.6"/>
     <path d="${path(s50)}" fill="none" stroke="var(--sma50)" stroke-width="1.6"/>
@@ -618,7 +619,7 @@ function metricTable(s, c) {
     const basis = m.basis === "sector" ? `vs ${m.peers} ${esc(s.sector)} stocks` : `vs all ${m.peers} stocks with data`;
     return `<tr><td>${esc(m.label)}</td><td class="r num">${fmtMetric(m.key, m.value)}</td><td style="min-width:140px">
       <div class="pctbar" title="${p.toFixed(0)}th percentile"><i style="width:${p}%;background:${sc(p / 10 + 0.5)}"></i></div>
-      <div class="faint" style="font-size:11.5px;margin-top:3px">${Math.round(m.pct_peer)}th pct ${basis}${m.pct_own != null ? ` · ${Math.round(m.pct_own)}th vs own 3y` : m.own_na ? ` · own history N/A` : ""}</div></td></tr>`; }).join("")}</tbody></table>
+      <div class="faint" style="font-size:11.5px;margin-top:3px">${ord(m.pct_peer)} pct ${basis}${m.pct_own != null ? ` · ${ord(m.pct_own)} vs own 3y` : m.own_na ? ` · own history N/A` : ""}</div></td></tr>`; }).join("")}</tbody></table>
     <p class="faint" style="font-size:11.5px;margin:6px 0 0">Higher rank is better. ${c === "Valuation" ? "Ratios blend sector rank and own-history rank 50/50; 100 means cheapest. " : ""}Category score ${k.score ?? "N/A"} = average rank ${k.avg_pct != null ? k.avg_pct.toFixed(0) : "—"}${k.n_used ? ` across ${k.n_used} of ${k.n_total} metrics` : ""}.</p>`;
 }
 

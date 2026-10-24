@@ -35,6 +35,27 @@ Full spec: `docs/BUILD_PROMPT.md`. Owner: Tom (single user, personal, never shar
 | 7. Calendar | not started | |
 | 8. Sector divergence | not started | |
 
+### Prototype track (2026-10-23) — Tom's call: "see it and refine first, top 100, decide on the rest later"
+Built a working prototype ahead of Supabase/Vercel (no signups needed):
+- `jobs/demo/build.py` + `.github/workflows/demo-build.yml` (push to jobs/lib|demo|config, weekdays 22:41 UTC).
+  Output → `demo-data` branch (`demo.json` ~4.7 MB, `validation.json`, `health.json`, `build.log`). ~37 min/run
+  (Form 4 fetch ≈ 24 min of it, ~10k SEC calls; companyfacts.zip pass for 1,642 cos ≈ 2 min).
+- Universe 1,645 tickers (IWB 1016, IVV 502, IJH 405, IJR 635); 1,642 with XBRL fundamentals → sector peers.
+  Top 100 by IVV weight (one share class per CIK) get full detail.
+- `jobs/lib/xbrl.py` (TTM rules, YTD→quarter derivation, split-safe share chain via 10-K comparatives,
+  predecessor-CIK merge), `metrics.py` (formulas + N/A reasons; largest current revenue tag wins; banks use
+  NII + noninterest income when larger), `scoring.py` (sector percentiles, min 8 peers else universe,
+  valuation 50/50 own-history blend), `form4.py` (P/S only, 10b5-1 checkbox + footnote scan, cluster buys).
+  Config: `config/scoring.yaml` (metrics, sets, SIC routing, concept fallbacks), `config/overrides.yaml`.
+- UI: `web/index.html`, published as a claude.ai artifact https://claude.ai/artifact/3VYTL4hWjrBNYiMYhYsvtG
+  with `demo.json` as a supporting file. Watchlists/notes in the artifact db doc `app/state`
+  (rules: read/write owner only); localStorage fallback. Refresh = republish `demo.json`.
+- Validation run 1: TTM revenue within 2% of Yahoo for 76/98, within 5% for 87/98; NI within 5% for 83/98.
+  Worst were COF/AXP/WELL (narrow revenue tag) → fixed in metrics.py, rerun pending.
+- Known gaps: politician trades, tracked people, 13F, score history, divergence, Telegram not in prototype.
+  Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
+  19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
+
 ### Phase 1 progress (2026-10-20)
 Done:
 - Project scaffold, provider fallback layer (`jobs/providers/base.py`), `config/providers.yaml`.
