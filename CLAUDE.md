@@ -51,8 +51,10 @@ Runner probe 2026-10-23 (run 3): yfinance fully works, incl. all analyst fields;
 Fed, House Clerk, Senate eFD, congress-legislators work. SEC 403 (needs email UA), BLS 403, Bargo Cloudflare-blocked.
 No local-runner fallback needed for yfinance so far (re-check once the weekly ~15k-call job runs at volume).
 
-Blocked:
-- `SEC_USER_AGENT` repo secret (with Tom's contact email) not yet set → all EDGAR checks 403.
+Runner probe 2026-10-24 00:09Z (run 4, with secrets): **all SEC EDGAR endpoints ✅**, Tiingo ✅, FRED ✅ (50 release dates).
+FMP free: **402 premium-gated for small-cap symbols** (WDFC) on grades, price targets, estimates and EOD prices;
+only earnings-calendar works → FMP is at most a large-cap analyst backup.
+Finnhub: skipped — `FINNHUB_API_KEY` secret not seen by the runner (check name).
 - **Build workspace network only reaches GitHub/package registries**, so live probes of SEC, Yahoo, iShares,
   Finnhub, etc. all failed from the workspace (expected; not a verdict on the sources).
   Re-confirmed 2026-10-20 22:45 ET: 1 ok (congress-legislators), 29 proxy-blocked, 17 skipped (no keys).
@@ -79,13 +81,13 @@ Next (in order):
 |---|---|---|---|---|---|
 | Universe | iShares CSVs (IWB, IVV, IJH, IJR) via `/us/products/<id>/x/latest-holdings.csv` | last good stored copy | Free, unofficial endpoint; **old `.ajax?fileType=csv` URL now returns HTML** | ✅ 1023/504/406/637 equities, **union 1,654** | pending |
 | GICS sector | iShares `Sector` column | SIC → sector map | — | ✅ 11 sectors | pending |
-| Industry routing | EDGAR `submissions` SIC | — | Free; User-Agent with email; ≤10 req/s | ❌ 403 — UA had no email; retest once `SEC_USER_AGENT` secret is set | pending |
-| Fundamentals | `companyfacts.zip` (init) + `frames` | per-company `companyfacts` | Free, same SEC limits | ❌ 403 (same cause) | pending |
+| Industry routing | EDGAR `submissions` SIC | — | Free; User-Agent with email; ≤10 req/s | ✅ (after `SEC_USER_AGENT` secret) | pending |
+| Fundamentals | `companyfacts.zip` (init) + `frames` | per-company `companyfacts` | Free, same SEC limits | ✅ frames 2,508 filers; companyfacts.zip 1.41 GB | pending |
 | Daily prices | yfinance (✅ runner: 3y AAPL 753 rows; 20/20 batch) | Tiingo, then Stooq | yfinance: unofficial, IP rate-limits (maintainer: fetch less, cache). Tiingo: free "Starter" plan (limits to confirm). **Stooq: API key required since Mar 2026.** Alpha Vantage: 25 req/day — too small, not used. | pending | pending |
 | **Analyst** | yfinance (all 8 fields) — **✅ runner: 8/8 fields populated for 20/20 tickers; analyst counts 3–58 (CALM/WDFC = 3, AAON/ALG = 4)** | Finnhub (recommendation trends), FMP (grades/targets/estimates — tier unclear) | Finnhub free ~60 calls/min, personal use; which analyst endpoints are free must be confirmed by probe. FMP free = 250 calls/day; whether analyst endpoints work on small caps must be probed. | pending | pending |
 | Earnings / dividend dates | yfinance `.calendar` | Finnhub earnings calendar | — | ✅ | pending |
-| Insider trades | EDGAR Form 4 (parse) | — | Free | ❌ 403 (SEC UA) | pending |
-| 13F / 13D / 13G | EDGAR | — | Free | ❌ 403 (SEC UA) | pending |
+| Insider trades | EDGAR Form 4 (parse) | — | Free | ✅ | pending |
+| 13F / 13D / 13G | EDGAR | — | Free | ✅ | pending |
 | Congress trades | Parse House Clerk + Senate eFD ourselves (✅ both reachable from runner) | ~~Bargo~~ (❌ Cloudflare challenge from runner — dropped as backup) | Bargo: free JSON API, anonymous or free key, attribution required, no bulk redistribution (fine for personal). **Disclosed Capitol: no permanent free tier** (750 trial credits, then $6+/mo) → not used. LuxAlgo dump too thin. | pending | pending |
 | Committees | `unitedstates/congress-legislators` | — | Free, CC0 | ✅ | ✅ |
 | Executive branch trades | **dropped** | — | OGE 278-Ts are PDFs; only structured source found (Disclosed Capitol) is paid. | — | — |
