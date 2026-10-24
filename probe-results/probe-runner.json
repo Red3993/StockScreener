@@ -1,0 +1,556 @@
+{
+ "env": "runner",
+ "host": "runnervm8k3b6",
+ "started": "2026-10-24T00:14:23.322683+00:00",
+ "results": [
+  {
+   "need": "Ticker\u2192CIK map",
+   "source": "SEC company_tickers.json",
+   "status": "ok",
+   "detail": "HTTP 200, 797,862 bytes, 10,425 tickers",
+   "seconds": 0.08
+  },
+  {
+   "need": "Industry (SIC)",
+   "source": "EDGAR submissions",
+   "status": "ok",
+   "detail": "HTTP 200, 163,917 bytes, AAPL SIC=3571 Electronic Computers",
+   "seconds": 0.05
+  },
+  {
+   "need": "Fundamentals",
+   "source": "EDGAR companyfacts (per co.)",
+   "status": "ok",
+   "detail": "HTTP 200, 3,789,099 bytes, 503 us-gaap concepts for AAPL",
+   "seconds": 0.1
+  },
+  {
+   "need": "Fundamentals",
+   "source": "EDGAR frames API",
+   "status": "ok",
+   "detail": "HTTP 200, 383,777 bytes, 2,508 filers report Revenues CY2024",
+   "seconds": 0.16
+  },
+  {
+   "need": "Fundamentals (bulk)",
+   "source": "EDGAR companyfacts.zip",
+   "status": "ok",
+   "detail": "HTTP 200, 1.41 GB, Last-Modified Fri, 23 Oct 2026 23:48:08 GMT",
+   "seconds": 0.16
+  },
+  {
+   "need": "Insider trades",
+   "source": "EDGAR Form 4 (current feed)",
+   "status": "ok",
+   "detail": "HTTP 200, 22,792 bytes, 40 recent Form 4 entries",
+   "seconds": 0.24
+  },
+  {
+   "need": "Insider/13F/13D index",
+   "source": "EDGAR daily form index",
+   "status": "ok",
+   "detail": "2026-10-22: Form4=507, 13F-HR=203, 13D=0, 13G=0",
+   "seconds": 0.18
+  },
+  {
+   "need": "Universe + GICS sector",
+   "source": "iShares IWB holdings CSV",
+   "status": "ok",
+   "detail": "1023 equities, 11 sectors",
+   "seconds": 0.11
+  },
+  {
+   "need": "Universe + GICS sector",
+   "source": "iShares IVV holdings CSV",
+   "status": "ok",
+   "detail": "504 equities, 11 sectors",
+   "seconds": 0.05
+  },
+  {
+   "need": "Universe + GICS sector",
+   "source": "iShares IJH holdings CSV",
+   "status": "ok",
+   "detail": "406 equities, 11 sectors",
+   "seconds": 0.1
+  },
+  {
+   "need": "Universe + GICS sector",
+   "source": "iShares IJR holdings CSV",
+   "status": "ok",
+   "detail": "637 equities, 11 sectors",
+   "seconds": 0.06
+  },
+  {
+   "need": "Daily prices",
+   "source": "yfinance history (3y)",
+   "status": "ok",
+   "detail": "753 rows, last 2026-10-23",
+   "seconds": 0.37
+  },
+  {
+   "need": "Daily prices (batch)",
+   "source": "yfinance download 20 tickers",
+   "status": "ok",
+   "detail": "20/20 tickers returned closes",
+   "seconds": 3.31
+  },
+  {
+   "need": "Daily prices",
+   "source": "Tiingo",
+   "status": "ok",
+   "detail": "HTTP 200, 1,851 bytes",
+   "seconds": 0.09
+  },
+  {
+   "need": "Daily prices",
+   "source": "Stooq (API key since 2026)",
+   "status": "skipped",
+   "detail": "no STOOQ_API_KEY set"
+  },
+  {
+   "need": "Daily prices",
+   "source": "Alpha Vantage",
+   "status": "skipped",
+   "detail": "no ALPHAVANTAGE_API_KEY set"
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "Finnhub stock/recommendation",
+   "status": "ok",
+   "detail": "HTTP 200, 393 bytes, 4 monthly periods of history",
+   "seconds": 0.29,
+   "history_months": 4
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "Finnhub stock/price-target",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 403, 51 bytes, items=0, '{\"error\":\"You don\\'t have access to this resource.\"}'",
+   "seconds": 0.07
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "Finnhub stock/upgrade-downgrade",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 403, 51 bytes, items=0, '{\"error\":\"You don\\'t have access to this resource.\"}'",
+   "seconds": 0.05
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "Finnhub stock/eps-estimate",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 403, 51 bytes, items=0, '{\"error\":\"You don\\'t have access to this resource.\"}'",
+   "seconds": 0.06
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "Finnhub calendar/earnings",
+   "status": "ok",
+   "detail": "HTTP 200, 237,188 bytes, items=1500, '{\"earningsCalendar\":[{\"symbol\":\"AEI\",\"date\":\"2026-11-07\",\"hour\":\"\",\"quarter\":3,\"year\":2026,\"epsEstimate\":null,\"epsActual'",
+   "seconds": 0.11
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP grades-consensus (WDFC)",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 402, 215 bytes, items=0, \"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our s\"",
+   "seconds": 0.12
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP price-target-consensus (WDFC)",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 402, 215 bytes, items=0, \"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our s\"",
+   "seconds": 0.06
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP grades (WDFC)",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 402, 215 bytes, items=0, \"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our s\"",
+   "seconds": 0.11
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP analyst-estimates (WDFC)",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 402, 215 bytes, items=0, \"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our s\"",
+   "seconds": 0.42
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP earnings-calendar (all)",
+   "status": "ok",
+   "detail": "HTTP 200, 16,255 bytes, items=78, '[\\n  {\\n    \"symbol\": \"META\",\\n    \"date\": \"2026-10-21\",\\n    \"epsActual\": 7.4,\\n    \"epsEstimated\": 6.54,\\n    \"revenueActual\": 64601000000,\\n    '",
+   "seconds": 0.05
+  },
+  {
+   "need": "Analyst / earnings",
+   "source": "FMP historical-price-eod/light (WDFC)",
+   "status": "FAIL",
+   "detail": "PREMIUM-GATED: HTTP 402, 215 bytes, items=0, \"Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our s\"",
+   "seconds": 0.04
+  },
+  {
+   "need": "Analyst",
+   "source": "Alpha Vantage OVERVIEW (target + ratings)",
+   "status": "skipped",
+   "detail": "no ALPHAVANTAGE_API_KEY set"
+  },
+  {
+   "need": "Committee membership",
+   "source": "unitedstates/congress-legislators",
+   "status": "ok",
+   "detail": "HTTP 200, 292,419 bytes",
+   "seconds": 0.04
+  },
+  {
+   "need": "Congress trades",
+   "source": "LuxAlgo market-trackers-data",
+   "status": "FAIL",
+   "detail": "rows=175, lastIngested=2026-09-07T15:11:27.497Z, generated=2026-09-07T15:13:09.121Z",
+   "seconds": 0.03
+  },
+  {
+   "need": "Congress trades (raw)",
+   "source": "House Clerk FD zip",
+   "status": "ok",
+   "detail": "HTTP 200, 64,502 bytes",
+   "seconds": 0.06
+  },
+  {
+   "need": "Congress trades (raw)",
+   "source": "Senate eFD search",
+   "status": "ok",
+   "detail": "HTTP 200, 11,880 bytes, needs agreement+CSRF session",
+   "seconds": 0.35
+  },
+  {
+   "need": "Congress trades",
+   "source": "Bargo free API",
+   "status": "FAIL",
+   "detail": "HTTP 403, 5,515 bytes, '<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm'",
+   "seconds": 0.05
+  },
+  {
+   "need": "Executive branch trades",
+   "source": "OGE 278-T index",
+   "status": "ok",
+   "detail": "HTTP 200, 97,967 bytes, 0 PDF links on index page (PDF-only, no structured feed)",
+   "seconds": 0.31
+  },
+  {
+   "need": "Macro calendar",
+   "source": "Fed FOMC calendar page",
+   "status": "ok",
+   "detail": "HTTP 200, 165,751 bytes",
+   "seconds": 0.11
+  },
+  {
+   "need": "Macro calendar",
+   "source": "BLS release schedule (ics)",
+   "status": "FAIL",
+   "detail": "HTTP 403, 1,325 bytes",
+   "seconds": 0.07
+  },
+  {
+   "need": "Macro calendar",
+   "source": "FRED release dates",
+   "status": "ok",
+   "detail": "HTTP 200, 6,717 bytes, 50 upcoming release dates",
+   "seconds": 0.67
+  },
+  {
+   "need": "Earnings dates",
+   "source": "yfinance .calendar",
+   "status": "ok",
+   "detail": "MSFT next earnings [datetime.date(2026, 10, 28)], ex-div 2026-11-19",
+   "seconds": 0.17
+  },
+  {
+   "need": "Notifications",
+   "source": "Telegram getMe",
+   "status": "skipped",
+   "detail": "no TELEGRAM_BOT_TOKEN set"
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .recommendations",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .recommendations_summary",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .analyst_price_targets",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .upgrades_downgrades",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .earnings_estimate",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .revenue_estimate",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .eps_trend",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  },
+  {
+   "need": "Analyst",
+   "source": "yfinance .eps_revisions",
+   "status": "ok",
+   "detail": "populated 20/20",
+   "populated": 20
+  }
+ ],
+ "analyst_matrix": {
+  "AAPL": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 39
+  },
+  "MSFT": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 53
+  },
+  "NVDA": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 58
+  },
+  "JPM": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 23
+  },
+  "XOM": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 22
+  },
+  "JNJ": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 22
+  },
+  "O": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 21
+  },
+  "NEE": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 19
+  },
+  "PGR": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 21
+  },
+  "WFC": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 24
+  },
+  "TOL": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 18
+  },
+  "RRX": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 10
+  },
+  "SAIA": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 21
+  },
+  "EXP": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 10
+  },
+  "WING": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 26
+  },
+  "CALM": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 3
+  },
+  "AAON": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 4
+  },
+  "WDFC": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 3
+  },
+  "PLMR": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 6
+  },
+  "ALG": {
+   "recommendations": true,
+   "recommendations_summary": true,
+   "analyst_price_targets": true,
+   "upgrades_downgrades": true,
+   "earnings_estimate": true,
+   "revenue_estimate": true,
+   "eps_trend": true,
+   "eps_revisions": true,
+   "numberOfAnalystOpinions": 4
+  }
+ },
+ "universe_count": 1654
+}
