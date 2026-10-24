@@ -54,7 +54,12 @@ No local-runner fallback needed for yfinance so far (re-check once the weekly ~1
 Runner probe 2026-10-24 00:09Z (run 4, with secrets): **all SEC EDGAR endpoints ✅**, Tiingo ✅, FRED ✅ (50 release dates).
 FMP free: **402 premium-gated for small-cap symbols** (WDFC) on grades, price targets, estimates and EOD prices;
 only earnings-calendar works → FMP is at most a large-cap analyst backup.
-Finnhub: skipped — `FINNHUB_API_KEY` secret not seen by the runner (check name).
+Finnhub free (run 5): recommendation trends ✅ (**4 monthly periods only**), earnings calendar ✅ (1,500 items);
+price-target, upgrade-downgrade, eps-estimate ❌ 403 premium.
+**Analyst decision:** yfinance primary for all 8 fields. Backups: Finnhub recommendation trends (rating mix only),
+FMP large caps only. No free backup for targets/upgrades/revisions → if yfinance breaks, those metrics show N/A
+and the Analyst score is computed from rating mix alone with a "partial data" badge.
+**Earnings dates decision:** yfinance `.calendar` primary, Finnhub earnings calendar backup.
 - **Build workspace network only reaches GitHub/package registries**, so live probes of SEC, Yahoo, iShares,
   Finnhub, etc. all failed from the workspace (expected; not a verdict on the sources).
   Re-confirmed 2026-10-20 22:45 ET: 1 ok (congress-legislators), 29 proxy-blocked, 17 skipped (no keys).
