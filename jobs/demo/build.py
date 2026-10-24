@@ -226,6 +226,7 @@ def yahoo_detail(t: str) -> dict:
         out.setdefault("_errors", []).append(f"{name}: rate limited")
 
     grab("info", lambda: tk.info)
+    grab("news", lambda: (tk.get_news(count=12) if hasattr(tk, "get_news") else tk.news))
     for name in ["recommendations_summary", "analyst_price_targets", "upgrades_downgrades", "earnings_estimate",
                  "eps_trend", "eps_revisions", "calendar"]:
         grab(name, lambda n=name: getattr(tk, n))
@@ -288,6 +289,40 @@ def analyst_block(y: dict, price: float | None) -> tuple[dict, dict]:
             metrics["net_upgrades_90d"] = (ups - downs) / n
     block["thin_coverage"] = bool(n is not None and n < CFG["thin_coverage_analysts"])
     return block, metrics
+
+
+def news_block(y: dict) -> list[dict]:
+    """Yahoo news items -> {title, publisher, date, url, summary}. Handles old and new yfinance shapes."""
+    out = []
+    for it in (y.get("news") or [])[:12]:
+        if not isinstance(it, dict):
+            continue
+        c = it.get("content") if isinstance(it.get("content"), dict) else it
+        title = c.get("title")
+        if not title:
+            continue
+        url = ((c.get("canonicalUrl") or {}).get("url") or (c.get("clickThroughUrl") or {}).get("url")
+               or c.get("link"))
+        pub = (c.get("provider") or {}).get("displayName") or c.get("publisher")
+        d = c.get("pubDate") or c.get("displayTime")
+        if not d and c.get("providerPublishTime"):
+            d = datetime.fromtimestamp(c["providerPublishTime"], timezone.utc).isoformat()
+        out.append({"title": title, "publisher": pub, "date": (d or "")[:10], "url": url,
+                    "summary": (c.get("summary") or c.get("description") or "")[:500]})
+    return out
+
+
+PROFILE_KEYS = ["longBusinessSummary", "industry", "website", "fullTimeEmployees", "beta", "fiftyTwoWeekHigh",
+                "fiftyTwoWeekLow", "trailingPE", "forwardPE", "dividendYield", "averageVolume", "city", "state",
+                "country", "regularMarketPrice", "regularMarketTime", "previousClose"]
+
+
+def profile_block(y: dict) -> dict:
+    info = y.get("info") or {}
+    p = {k: info.get(k) for k in PROFILE_KEYS}
+    if p.get("longBusinessSummary"):
+        p["longBusinessSummary"] = p["longBusinessSummary"][:1500]
+    return p
 
 
 def calendar_block(y: dict) -> dict:
@@ -597,6 +632,7 @@ def main() -> int:
                                                    "fcf", "ebitda", "ffo", "dividends_paid", "debt", "cash_total", "equity",
                                                    "total_assets"]},
                     "yahoo_errors": (ydata.get(t) or {}).get("_errors", []),
+                    "news": news_block(ydata.get(t, {})), "profile": profile_block(ydata.get(t, {})),
                 }
                 yr, yn = yinfo.get("totalRevenue"), yinfo.get("netIncomeToCommon")
                 validation.append({"ticker": t, "rev_xbrl": g.get("revenue"), "rev_yahoo": yr,
@@ -616,6 +652,25 @@ def main() -> int:
 
     # common trading calendar for the top-N price arrays
     tdates = [d.date().isoformat() for d in tclose.index]
+    # Yahoo's daily bar for the latest session can lag; use regularMarketPrice for that session.
+    extra_close: dict[str, float] = {}
+    if tdates:
+        last = tdates[-1]
+        rmt = {}
+        for t in top:
+            info = (ydata.get(t) or {}).get("info") or {}
+            ts, px = info.get("regularMarketTime"), info.get("regularMarketPrice")
+            if ts and px:
+                d = datetime.fromtimestamp(int(ts), timezone(timedelta(hours=-4))).date().isoformat()
+                rmt[t] = (d, float(px))
+        newer = sorted({d for d, _ in rmt.values() if d > last})
+        if newer:
+            nd = newer[-1]
+            n_have = sum(1 for d, _ in rmt.values() if d == nd)
+            if n_have >= 0.8 * len(top):
+                tdates.append(nd)
+                extra_close = {t: px for t, (d, px) in rmt.items() if d == nd}
+                log(f"appended latest session {nd} from regularMarketPrice for {len(extra_close)} stocks")
     stocks = []
     for t in top:
         if t not in detail:
@@ -623,6 +678,8 @@ def main() -> int:
         u, d, sc = mapped[t], detail[t], scores.get(t, {})
         yt = ytick[t]
         closes = [None if pd.isna(v) else round(float(v), 2) for v in tclose[yt]] if yt in tclose.columns else []
+        if len(tdates) > len(tclose.index):
+            closes.append(round(extra_close[t], 2) if t in extra_close else None)
         prev = next((c for c in reversed(closes[:-1]) if c is not None), None) if closes else None
         stocks.append({"ticker": t, "yahoo": yt, "name": u["name"], "sector": u["sector"], "sic": u.get("sic"),
                        "sic_desc": u.get("sic_desc"), "cik": u["cik"], "metric_set": rowmap[t]["set"],
