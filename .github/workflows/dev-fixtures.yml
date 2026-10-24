@@ -18,6 +18,7 @@ jobs:
       - run: pip install -r jobs/requirements.txt
       - env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python jobs/dev/fetch_fixtures.py
       - name: Publish to fixtures branch
         run: |

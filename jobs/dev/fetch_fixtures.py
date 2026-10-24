@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Dev only: dump raw yfinance news shapes for a few tickers to the `fixtures` branch."""
-import json, pickle
+"""Dev only: test Finnhub company-news from the runner."""
+import json, os, time
+from datetime import date, timedelta
 from pathlib import Path
-import yfinance as yf
+import requests
 OUT = Path("fixtures"); OUT.mkdir(exist_ok=True)
-res = {"yfinance_version": yf.__version__}
-for t in ["AAPL", "JPM", "WDFC"]:
-    tk = yf.Ticker(t)
-    for name, fn in [("news", lambda: tk.news), ("get_news", lambda: tk.get_news(count=5))]:
-        try:
-            v = fn(); res[f"{t}.{name}"] = {"type": type(v).__name__, "len": len(v) if hasattr(v, "__len__") else None, "sample": v[:2] if isinstance(v, list) else str(v)[:2000]}
-        except Exception as e:
-            res[f"{t}.{name}"] = f"ERR {type(e).__name__}: {e}"
+k = os.environ.get("FINNHUB_API_KEY"); res = {"has_key": bool(k)}
+for t in ["AAPL", "JPM", "WDFC", "BRK.B"]:
+    r = requests.get("https://finnhub.io/api/v1/company-news", params={"symbol": t, "from": str(date.today() - timedelta(days=14)), "to": str(date.today()), "token": k}, timeout=30)
+    j = r.json() if r.ok else r.text[:300]
+    res[t] = {"status": r.status_code, "n": len(j) if isinstance(j, list) else None, "sample": j[:2] if isinstance(j, list) else j}
+    time.sleep(1.1)
 (OUT / "news.json").write_text(json.dumps(res, indent=1, default=str))
-print(json.dumps(res, default=str)[:3000])
