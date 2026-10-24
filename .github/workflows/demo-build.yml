@@ -26,6 +26,7 @@ jobs:
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python jobs/demo/build.py --top 100 2>&1 | tee build.log
       - name: Publish to demo-data branch
         if: always()

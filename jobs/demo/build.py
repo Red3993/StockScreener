@@ -312,6 +312,60 @@ def news_block(y: dict) -> list[dict]:
     return out
 
 
+def finnhub_news(t: str, name: str, days: int = 14, keep: int = 12) -> list[dict]:
+    """Company news from Finnhub's free tier. Feeds include loosely related stories, so prefer items
+    whose headline or summary mentions the ticker or the company's first name word."""
+    key = os.environ.get("FINNHUB_API_KEY")
+    if not key:
+        return []
+    sym = t.replace("-", ".")
+    try:
+        r = requests.get("https://finnhub.io/api/v1/company-news", timeout=30,
+                         params={"symbol": sym, "from": str(TODAY - timedelta(days=days)), "to": str(TODAY), "token": key})
+        time.sleep(1.05)   # free tier: 60 calls/min
+        items = r.json() if r.ok else []
+    except Exception as e:  # noqa: BLE001
+        health("news", f"{t}: {e}")
+        return []
+    if not isinstance(items, list):
+        return []
+    words = [w for w in re.split(r"[^A-Za-z0-9&]+", name) if len(w) > 2 and w.lower() not in {"inc", "corp", "the", "class", "company", "holdings", "group"}]
+    pat = re.compile(r"\b(" + "|".join(map(re.escape, [t.split("-")[0]] + words[:1])) + r")\b", re.I)
+    seen, rel, other = set(), [], []
+    for it in sorted(items, key=lambda x: -(x.get("datetime") or 0)):
+        h = (it.get("headline") or "").strip()
+        if not h or h.lower() in seen:
+            continue
+        seen.add(h.lower())
+        row = {"title": h, "publisher": it.get("source"), "url": it.get("url"),
+               "date": datetime.fromtimestamp(it.get("datetime") or 0, timezone.utc).date().isoformat(),
+               "summary": (it.get("summary") or "")[:500]}
+        (rel if pat.search(h + " " + (it.get("summary") or "")) else other).append(row)
+    return (rel + other)[:keep]
+
+
+ITEMS_8K = {"1.01": "Material agreement", "1.02": "Agreement terminated", "1.05": "Cybersecurity incident",
+            "2.01": "Acquisition or disposal completed", "2.02": "Earnings results", "2.03": "New debt obligation",
+            "2.05": "Restructuring / exit costs", "2.06": "Impairment", "3.01": "Listing notice", "3.02": "Unregistered share sale",
+            "4.01": "Auditor change", "4.02": "Prior financials unreliable", "5.01": "Change in control",
+            "5.02": "Executive or director change", "5.03": "Charter or bylaw change", "5.07": "Shareholder vote results",
+            "7.01": "Reg FD disclosure", "8.01": "Other events"}
+
+
+def filings_block(cik: int, sub: dict, days: int = 120) -> list[dict]:
+    rec = sub.get("filings", {}).get("recent", {})
+    cutoff = (TODAY - timedelta(days=days)).isoformat()
+    out = []
+    for form, accn, filed, doc, items in zip(rec.get("form", []), rec.get("accessionNumber", []), rec.get("filingDate", []),
+                                            rec.get("primaryDocument", []), rec.get("items", [""] * len(rec.get("form", [])))):
+        if filed < cutoff or form not in ("8-K", "10-K", "10-Q", "SC 13D", "SC 13D/A", "DEF 14A"):
+            continue
+        labels = [ITEMS_8K.get(i.strip(), "") for i in (items or "").split(",") if i.strip() and i.strip() != "9.01"]
+        out.append({"form": form, "date": filed, "items": [l for l in labels if l],
+                    "url": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accn.replace('-', '')}/{doc}"})
+    return out[:15]
+
+
 PROFILE_KEYS = ["longBusinessSummary", "industry", "website", "fullTimeEmployees", "beta", "fiftyTwoWeekHigh",
                 "fiftyTwoWeekLow", "trailingPE", "forwardPE", "dividendYield", "averageVolume", "city", "state",
                 "country", "regularMarketPrice", "regularMarketTime", "previousClose"]
@@ -632,7 +686,8 @@ def main() -> int:
                                                    "fcf", "ebitda", "ffo", "dividends_paid", "debt", "cash_total", "equity",
                                                    "total_assets"]},
                     "yahoo_errors": (ydata.get(t) or {}).get("_errors", []),
-                    "news": news_block(ydata.get(t, {})), "profile": profile_block(ydata.get(t, {})),
+                    "news": news_block(ydata.get(t, {})) or finnhub_news(t, u["name"]),
+                    "filings": filings_block(u["cik"], subs.get(t, {})), "profile": profile_block(ydata.get(t, {})),
                 }
                 yr, yn = yinfo.get("totalRevenue"), yinfo.get("netIncomeToCommon")
                 validation.append({"ticker": t, "rev_xbrl": g.get("revenue"), "rev_yahoo": yr,
