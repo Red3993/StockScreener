@@ -52,6 +52,15 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (rules: read/write owner only); localStorage fallback. Refresh = republish `demo.json`.
 - Validation run 1: TTM revenue within 2% of Yahoo for 76/98, within 5% for 87/98; NI within 5% for 83/98.
   Worst were COF/AXP/WELL (narrow revenue tag) → fixed in metrics.py, rerun pending.
+- 2026-10-24 v3 (Tom's feedback): multi-filter builder (score ranges incl. "every category ≥ X", every metric
+  with min/max, 52-week distance/position, price/size/returns, RSI/MA distance, technical flags within N trading
+  days, insider/analyst states, sectors), presets + saved screens (db `app/state.screens`), all 7 sub-scores on
+  each list row, tabbed stock sheet with Overview first, AI analyst (`sample` capability: synopsis saved to
+  db `app/syn_<TICKER>`, per-stock chat with get_stock/list_sector page tools). Flags computed client-side
+  from closes (50/200 SMA, RSI-14, MACD 12/26/9, 252-day high/low).
+- News: **yfinance news returns [] from runners** (verified 2026-10-24) → Finnhub `company-news` (free, 14 days,
+  relevance-filtered by ticker/name). Plus recent SEC filings from submissions with 8-K item labels.
+  Profiles (description, industry, 52w hi/lo, beta, fwd P/E) from yfinance `info`.
 - Known gaps: politician trades, tracked people, 13F, score history, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
