@@ -731,7 +731,7 @@ function viewAbout() {
       <p class="muted small">AI status in this view: ${AI.sample ? "available" : AI.ready ? "not available here" : "checking…"}.</p></div>
     <div class="card"><h3>Data in this snapshot</h3>
       <dl class="kv"><dt>Built</dt><dd>${esc(new Date(DATA.generated).toLocaleString())}</dd><dt>Latest prices</dt><dd>${esc(fmtDate(DATA.lastDate))}</dd><dt>Universe</dt><dd>${DATA.universe_count.toLocaleString()} tickers</dd><dt>With fundamentals</dt><dd>${DATA.fundamentals_rows.toLocaleString()}</dd><dt>Detailed stocks</dt><dd>${DATA.top_n}</dd></dl>
-      <p class="muted" style="font-size:13px">Sources: SEC EDGAR (financial statements, insider Form 4s), iShares fund holdings (universe and sectors), Yahoo Finance via yfinance (prices, analyst data, news, earnings dates), Federal Reserve and FRED (macro calendar).</p></div>
+      <p class="muted" style="font-size:13px">Sources: SEC EDGAR (financial statements, insider Form 4s), iShares fund holdings (universe and sectors), Yahoo Finance via yfinance (prices, analyst data, company profiles, earnings dates), Finnhub (news), Federal Reserve and FRED (macro calendar).</p></div>
     <div class="card"><h3>Cross-check against Yahoo</h3>
       <p>Trailing-twelve-month revenue computed from SEC filings matched Yahoo within 2% for <b>${v.rev_within_2pct ?? "—"} of ${v.rev_compared ?? "—"}</b> stocks (within 5%: ${v.rev_within_5pct ?? "—"}). Net income matched within 5% for <b>${v.ni_within_5pct ?? "—"} of ${v.ni_compared ?? "—"}</b>.</p>
       ${(v.worst || []).length ? `<div style="overflow-x:auto"><table><thead><tr><th>Biggest gaps</th><th class="r">SEC (TTM)</th><th class="r">Yahoo</th><th class="r">Gap</th></tr></thead><tbody>${v.worst.slice(0, 8).map(w => `<tr><td>${esc(w.ticker)}</td><td class="r num">${fmtBig(w.rev_xbrl)}</td><td class="r num">${fmtBig(w.rev_yahoo)}</td><td class="r num">${pct(w.rev_diff)}</td></tr>`).join("")}</tbody></table></div>` : ""}
@@ -823,7 +823,9 @@ function stockContext(s, full = true) {
     const c = s.calendar || {}; L.push(`Next earnings: ${(c.earnings || [])[0] || "not announced"}${c.ex_dividend ? `; last/next ex-dividend ${c.ex_dividend}` : ""}.`);
     if (p.longBusinessSummary) L.push("Business: " + p.longBusinessSummary.slice(0, 900));
     const news = (s.news || []).slice(0, 10).map(n => `- ${n.date} · ${n.publisher || ""}: ${n.title}${n.summary ? " — " + n.summary.slice(0, 260) : ""}`).join("\n");
-    L.push(news ? "Recent news headlines (Yahoo Finance):\n" + news : "No recent news headlines in the data.");
+    L.push(news ? "Recent news headlines (last 2 weeks):\n" + news : "No recent news headlines in the data.");
+    const fil = (s.filings || []).slice(0, 10).map(f => `- ${f.date} ${f.form}${f.items.length ? ": " + f.items.join(", ") : ""}`).join("\n");
+    if (fil) L.push("Recent SEC filings:\n" + fil);
   }
   return L.join("\n");
 }
@@ -1044,8 +1046,9 @@ function overviewHtml(s) {
         <dt>Next earnings</dt><dd>${nextE ? esc(fmtDate(nextE)) + (d.daysToEarnings >= 0 ? ` (${d.daysToEarnings}d)` : "") : "Not announced"}</dd>
       </dl>
     </div>
-    <div class="card"><h3>Recent news <span class="label">Yahoo Finance</span></h3>
-      ${news.length ? `<div class="news">${news.map(n => `<a href="${esc(n.url || "#")}" target="_blank" rel="noopener"><b>${esc(n.title)}</b><span class="faint small">${esc(n.publisher || "")}${n.date ? " · " + esc(fmtDate(n.date)) : ""}</span></a>`).join("")}</div>` : `<p class="muted">No headlines in this snapshot.</p>`}</div>
+    <div class="card"><h3>Recent news <span class="label">last 2 weeks</span></h3>
+      ${news.length ? `<div class="news">${news.map(n => `<a href="${esc(n.url || "#")}" target="_blank" rel="noopener"><b>${esc(n.title)}</b><span class="faint small">${esc(n.publisher || "")}${n.date ? " · " + esc(fmtDate(n.date)) : ""}</span></a>`).join("")}</div>` : `<p class="muted">No headlines in this snapshot.</p>`}
+      ${(s.filings || []).length ? `<div class="label" style="margin-top:14px">SEC filings, last 4 months</div><div class="news">${s.filings.slice(0, 6).map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener"><b>${esc(f.form)}${f.items.length ? " · " + esc(f.items.join(", ")) : ""}</b><span class="faint small">Filed ${esc(fmtDate(f.date))}</span></a>`).join("")}</div>` : ""}</div>
     <div class="card wide">${chartInner(s)}</div>
   </div>`;
 }
