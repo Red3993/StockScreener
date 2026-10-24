@@ -1,0 +1,210 @@
+# Scoring configuration (section 3). Everything here is meant to be tuned.
+#
+# Concept fallbacks: for each derived input, an ordered list of XBRL concepts.
+# Concepts are MERGED by priority: for each period, the highest-priority concept
+# that reports it wins. This handles companies that switch tags over time
+# (e.g. SalesRevenueNet before 2018 -> RevenueFromContractWithCustomer... after).
+#
+# kind: flow     -> duration item; TTM = sum of last 4 quarters (Q4 = FY - 9M YTD)
+#       instant  -> balance-sheet item; latest point-in-time value
+#       average  -> duration item that is NOT summed (e.g. weighted shares, EPS-per-share
+#                   handled as flow); latest quarter value
+
+valuation_blend:
+  sector_weight: 0.5        # (a) percentile within sector
+  own_history_weight: 0.5   # (b) percentile vs the stock's own 3-year history
+  own_history_min_days: 365 # less history than this -> own-history half is N/A
+
+min_sector_peers: 8          # fewer peers with a value -> rank against the whole universe instead
+cost_of_capital: 0.09        # assumed, for ROIC-minus-cost-of-capital (Management)
+tax_rate_default: 0.21       # used for NOPAT when effective rate is unavailable or odd
+thin_coverage_analysts: 3    # fewer analysts -> "thin coverage" badge
+
+concepts:
+  revenue:            {kind: flow, unit: USD, tags: [RevenueFromContractWithCustomerExcludingAssessedTax, Revenues, SalesRevenueNet, RevenueFromContractWithCustomerIncludingAssessedTax, RevenuesNetOfInterestExpense, SalesRevenueGoodsNet, SalesRevenueServicesNet]}
+  cost_of_revenue:    {kind: flow, unit: USD, tags: [CostOfRevenue, CostOfGoodsAndServicesSold, CostOfGoodsSold, CostOfServices]}
+  gross_profit:       {kind: flow, unit: USD, tags: [GrossProfit]}
+  operating_income:   {kind: flow, unit: USD, tags: [OperatingIncomeLoss]}
+  pretax_income:      {kind: flow, unit: USD, tags: [IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest, IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments, IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic]}
+  income_tax:         {kind: flow, unit: USD, tags: [IncomeTaxExpenseBenefit]}
+  net_income:         {kind: flow, unit: USD, tags: [NetIncomeLoss, NetIncomeLossAvailableToCommonStockholdersBasic, ProfitLoss]}
+  eps_diluted:        {kind: flow, unit: USD/shares, tags: [EarningsPerShareDiluted, EarningsPerShareBasicAndDiluted, EarningsPerShareBasic]}
+  ocf:                {kind: flow, unit: USD, tags: [NetCashProvidedByUsedInOperatingActivities, NetCashProvidedByUsedInOperatingActivitiesContinuingOperations]}
+  capex:              {kind: flow, unit: USD, tags: [PaymentsToAcquirePropertyPlantAndEquipment, PaymentsToAcquireProductiveAssets, PaymentsForCapitalImprovements]}
+  da:                 {kind: flow, unit: USD, tags: [DepreciationDepletionAndAmortization, DepreciationAndAmortization, DepreciationAmortizationAndAccretionNet, Depreciation, RealEstateDepreciation, DepreciationAndAmortizationOfRealEstate]}
+  interest_expense:   {kind: flow, unit: USD, tags: [InterestExpense, InterestExpenseNonoperating, InterestExpenseDebt, InterestAndDebtExpense]}
+  dividends_paid:     {kind: flow, unit: USD, tags: [PaymentsOfDividendsCommonStock, PaymentsOfDividends, DividendsCommonStockCash, DividendsCommonStock]}
+  dps:                {kind: flow, unit: USD/shares, tags: [CommonStockDividendsPerShareDeclared, CommonStockDividendsPerShareCashPaid]}
+  property_sale_gain: {kind: flow, unit: USD, tags: [GainLossOnSaleOfRealEstateInvestmentProperty, GainsLossesOnSalesOfInvestmentRealEstate, GainLossOnSaleOfPropertiesNetOfApplicableIncomeTaxes, GainLossOnDispositionOfAssets]}
+  noninterest_expense: {kind: flow, unit: USD, tags: [NoninterestExpense]}
+  noninterest_income: {kind: flow, unit: USD, tags: [NoninterestIncome]}
+  net_interest_income: {kind: flow, unit: USD, tags: [InterestIncomeExpenseNet, InterestIncomeExpenseAfterProvisionForLoanLoss]}
+  diluted_shares:     {kind: average, unit: shares, tags: [WeightedAverageNumberOfDilutedSharesOutstanding, WeightedAverageNumberOfShareOutstandingBasicAndDiluted, WeightedAverageNumberOfSharesOutstandingBasic]}
+
+  total_assets:       {kind: instant, unit: USD, tags: [Assets]}
+  current_assets:     {kind: instant, unit: USD, tags: [AssetsCurrent]}
+  current_liabilities: {kind: instant, unit: USD, tags: [LiabilitiesCurrent]}
+  total_liabilities:  {kind: instant, unit: USD, tags: [Liabilities]}
+  liabilities_and_equity: {kind: instant, unit: USD, tags: [LiabilitiesAndStockholdersEquity]}
+  equity:             {kind: instant, unit: USD, tags: [StockholdersEquity, StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest]}
+  retained_earnings:  {kind: instant, unit: USD, tags: [RetainedEarningsAccumulatedDeficit]}
+  cash:               {kind: instant, unit: USD, tags: [CashAndCashEquivalentsAtCarryingValue, CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents, Cash, CashAndDueFromBanks]}
+  st_investments:     {kind: instant, unit: USD, tags: [ShortTermInvestments, MarketableSecuritiesCurrent, AvailableForSaleSecuritiesDebtSecuritiesCurrent]}
+  lt_debt_total:      {kind: instant, unit: USD, tags: [LongTermDebt, DebtLongtermAndShorttermCombinedAmount, LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities]}
+  lt_debt_noncurrent: {kind: instant, unit: USD, tags: [LongTermDebtNoncurrent, LongTermDebtAndCapitalLeaseObligations]}
+  lt_debt_current:    {kind: instant, unit: USD, tags: [LongTermDebtCurrent, DebtCurrent, LongTermDebtAndCapitalLeaseObligationsCurrent]}
+  st_borrowings:      {kind: instant, unit: USD, tags: [ShortTermBorrowings, CommercialPaper]}
+  goodwill:           {kind: instant, unit: USD, tags: [Goodwill]}
+  intangibles:        {kind: instant, unit: USD, tags: [IntangibleAssetsNetExcludingGoodwill, FiniteLivedIntangibleAssetsNet]}
+  shares_outstanding: {kind: instant, unit: shares, tags: [CommonStockSharesOutstanding]}   # dei cover-page value preferred (see xbrl.py)
+
+# SIC -> metric set. First matching range wins. Anything unmatched uses "default".
+sic_routing:
+  - {set: bank,      ranges: [[6020, 6036], [6111, 6199], [6211, 6211]]}
+  - {set: insurance, ranges: [[6311, 6411]]}
+  - {set: reit,      ranges: [[6798, 6798]]}
+  - {set: utility,   ranges: [[4900, 4991]]}
+
+# Metric definitions live in jobs/lib/metrics.py (formulas). Here: which metrics feed
+# which category for each set, and the scoring direction (+1 higher is better, -1 lower is better).
+directions:
+  pe: -1
+  pfcf: -1
+  ps: -1
+  ev_ebitda: -1
+  pb: -1
+  ptbv: -1
+  pffo: -1
+  peg: -1
+  gross_margin: 1
+  operating_margin: 1
+  net_margin: 1
+  fcf_margin: 1
+  roe: 1
+  roa: 1
+  roic: 1
+  op_margin_trend: 1
+  efficiency_ratio: -1
+  nii_to_assets: 1
+  current_ratio: 1
+  debt_to_equity: -1
+  interest_coverage: 1
+  altman_z: 1
+  net_cash_to_mcap: 1
+  tangible_equity_ratio: 1
+  rev_growth_1y: 1
+  rev_growth_3y: 1
+  rev_growth_5y: 1
+  eps_growth_1y: 1
+  eps_growth_3y: 1
+  eps_growth_5y: 1
+  fcf_growth_1y: 1
+  fcf_growth_3y: 1
+  ffo_growth_1y: 1
+  ffo_growth_3y: 1
+  growth_consistency: 1
+  div_yield: 1
+  payout_earnings: -1
+  payout_fcf: -1
+  payout_ffo: -1
+  div_growth_streak: 1
+  div_fcf_coverage: 1
+  share_change_1y: -1
+  share_change_3y: -1
+  roic_minus_coc: 1
+  insider_net_buy_pct: 1
+  rating_mean: -1          # 1 = strong buy ... 5 = strong sell
+  target_upside: 1
+  eps_rev_90d: 1
+  eps_revisions_net_30d: 1
+  net_upgrades_90d: 1
+
+valuation_metrics_with_own_history: [pe, pfcf, ps, ev_ebitda, pb, ptbv, pffo]
+
+metric_sets:
+  default:
+    Valuation:        [pe, pfcf, ps, ev_ebitda, peg]
+    Profitability:    [gross_margin, operating_margin, net_margin, fcf_margin, roic, roe, op_margin_trend]
+    Financial Health: [current_ratio, debt_to_equity, interest_coverage, altman_z, net_cash_to_mcap]
+    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, fcf_growth_1y, fcf_growth_3y, growth_consistency]
+    Dividends:        [div_yield, payout_earnings, payout_fcf, div_growth_streak, div_fcf_coverage]
+    Management:       [share_change_1y, share_change_3y, roic_minus_coc, insider_net_buy_pct]
+    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+  utility:            # same as default; percentiles are within-sector, so high D/E isn't penalized vs other sectors
+    inherit: default
+  bank:
+    Valuation:        [pb, ptbv, pe, peg]
+    Profitability:    [roe, roa, efficiency_ratio, nii_to_assets, net_margin]
+    Financial Health: [tangible_equity_ratio, debt_to_equity]
+    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, growth_consistency]
+    Dividends:        [div_yield, payout_earnings, div_growth_streak]
+    Management:       [share_change_1y, share_change_3y, insider_net_buy_pct]
+    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+  insurance:
+    Valuation:        [pb, pe, ps, peg]
+    Profitability:    [roe, roa, net_margin]          # combined ratio: not reliably tagged in XBRL -> N/A
+    Financial Health: [debt_to_equity, interest_coverage, tangible_equity_ratio]
+    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, growth_consistency]
+    Dividends:        [div_yield, payout_earnings, payout_fcf, div_growth_streak]
+    Management:       [share_change_1y, share_change_3y, roic_minus_coc, insider_net_buy_pct]
+    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+  reit:
+    Valuation:        [pffo, ev_ebitda, pb]
+    Profitability:    [operating_margin, fcf_margin, roe]
+    Financial Health: [debt_to_equity, interest_coverage, net_cash_to_mcap]
+    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, ffo_growth_1y, ffo_growth_3y, growth_consistency]
+    Dividends:        [div_yield, payout_ffo, div_growth_streak]
+    Management:       [share_change_1y, share_change_3y, insider_net_buy_pct]
+    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+
+labels:
+  pe: P/E
+  pfcf: Price / free cash flow
+  ps: Price / sales
+  ev_ebitda: EV / EBITDA
+  pb: Price / book
+  ptbv: Price / tangible book
+  pffo: Price / FFO (approx.)
+  peg: PEG (P/E ÷ 3y EPS growth)
+  gross_margin: Gross margin
+  operating_margin: Operating margin
+  net_margin: Net margin
+  fcf_margin: FCF margin
+  roe: Return on equity
+  roa: Return on assets
+  roic: ROIC
+  op_margin_trend: Operating margin change (1y)
+  efficiency_ratio: Efficiency ratio
+  nii_to_assets: Net interest income / assets (NIM proxy)
+  current_ratio: Current ratio
+  debt_to_equity: Debt / equity
+  interest_coverage: Interest coverage
+  altman_z: Altman Z-score
+  net_cash_to_mcap: Net cash / market cap
+  tangible_equity_ratio: Tangible equity / assets
+  rev_growth_1y: Revenue growth 1y
+  rev_growth_3y: Revenue growth 3y (CAGR)
+  rev_growth_5y: Revenue growth 5y (CAGR)
+  eps_growth_1y: EPS growth 1y
+  eps_growth_3y: EPS growth 3y (CAGR)
+  eps_growth_5y: EPS growth 5y (CAGR)
+  fcf_growth_1y: FCF growth 1y
+  fcf_growth_3y: FCF growth 3y (CAGR)
+  ffo_growth_1y: FFO growth 1y (approx.)
+  ffo_growth_3y: FFO growth 3y (approx.)
+  growth_consistency: Quarters with YoY revenue growth (last 12)
+  div_yield: Dividend yield
+  payout_earnings: Payout ratio (earnings)
+  payout_fcf: Payout ratio (FCF)
+  payout_ffo: Payout ratio (FFO, approx.)
+  div_growth_streak: Dividend growth streak (years)
+  div_fcf_coverage: FCF / dividends
+  share_change_1y: Share count change 1y
+  share_change_3y: Share count change 3y
+  roic_minus_coc: ROIC minus cost of capital
+  insider_net_buy_pct: Insider net open-market buying (12m, % of mkt cap)
+  rating_mean: Consensus rating (1 = strong buy)
+  target_upside: Upside to mean price target
+  eps_rev_90d: Current-year EPS estimate change (90d)
+  eps_revisions_net_30d: EPS revisions up minus down (30d)
+  net_upgrades_90d: Upgrades minus downgrades (90d)

@@ -1,0 +1,12 @@
+# Data overrides. Each entry needs a reason.
+
+# Ticker -> extra CIKs whose XBRL history should be merged in (predecessor entities).
+predecessor_ciks:
+  XOM: [34088]   # 2026 holding-company reorganization: XOM now maps to CIK 2115436 with almost no history
+
+# iShares ticker spelling -> SEC / Yahoo spelling (applied automatically for "BRKB"-style tickers
+# when the plain ticker isn't found; list explicit exceptions here)
+ticker_aliases: {}
+
+# Market cap from Yahoo instead of XBRL shares x price (share classes with very different prices)
+market_cap_from_yahoo: [BRK-B]

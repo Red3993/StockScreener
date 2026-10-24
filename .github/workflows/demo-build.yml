@@ -1,0 +1,41 @@
+name: Build demo data
+# Prototype: full-universe fundamentals for peer ranking + full detail for the top 100.
+# Output is committed to the `demo-data` branch (JSON only, no database yet).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/demo/**", "jobs/lib/**", "config/**", ".github/workflows/demo-build.yml"]
+  schedule:
+    - cron: "41 22 * * 1-5"   # weekdays ~6:40pm ET, after the close
+permissions:
+  contents: write
+concurrency:
+  group: demo-build
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt
+      - name: Build
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python jobs/demo/build.py --top 100 2>&1 | tee build.log
+      - name: Publish to demo-data branch
+        if: always()
+        run: |
+          mkdir -p demo-data && cp build.log demo-data/ || true
+          cp -r demo-data /tmp/dd
+          git config user.name "demo-bot"; git config user.email "demo-bot@users.noreply.github.com"
+          git checkout --orphan demo-data-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/dd demo-data
+          git add demo-data && git commit -qm "demo data ${{ github.run_id }} ($(date -u +%FT%TZ))"
+          git push -f origin HEAD:demo-data
