@@ -61,7 +61,28 @@ class Fundamentals:
         t, u = self._tags(k)
         return self.cf.ttm_series(t, u, self.asof)
 
+    def _pick_revenue_tag(self) -> None:
+        """Companies often tag a partial revenue line (e.g. contract revenue only) alongside the
+        total. Among revenue tags whose latest TTM is current, use the largest as primary for this
+        company, so the per-period merge prefers the total. Banks: also consider net interest
+        income + noninterest income ("total net revenue")."""
+        tags, unit = self.c["revenue"]["tags"], self.c["revenue"]["unit"]
+        best, best_end = None, None
+        cands = []
+        for t in tags:
+            r = self.cf.ttm([t], unit, self.asof)
+            if r:
+                cands.append((r[1], r[0], t))
+        if cands:
+            latest = max(e for e, _, _ in cands)
+            cur = [(v, t) for e, v, t in cands if (latest - e).days <= 100]
+            best = max(cur)[1]
+        if best:
+            self.c = dict(self.c)
+            self.c["revenue"] = {**self.c["revenue"], "tags": [best] + [t for t in tags if t != best]}
+
     def _load(self) -> None:
+        self._pick_revenue_tag()
         g = self.inputs
         for k in ["revenue", "cost_of_revenue", "gross_profit", "operating_income", "pretax_income", "income_tax",
                   "net_income", "ocf", "capex", "da", "interest_expense", "dividends_paid", "dps",
@@ -71,6 +92,12 @@ class Fundamentals:
                   "equity", "retained_earnings", "cash", "st_investments", "lt_debt_total", "lt_debt_noncurrent",
                   "lt_debt_current", "st_borrowings", "goodwill", "intangibles"]:
             g[k] = self.inst(k)
+        if g["net_interest_income"] is not None and g["noninterest_income"] is not None:
+            total_net_rev = g["net_interest_income"] + g["noninterest_income"]
+            if g["revenue"] is None or total_net_rev > g["revenue"] * 1.15:
+                g["revenue"] = total_net_rev
+                self.periods["revenue"] = self.periods.get("net_interest_income", self.periods.get("revenue", ""))
+                self.revenue_note = "net interest income + noninterest income"
         if g["gross_profit"] is None and g["revenue"] is not None and g["cost_of_revenue"] is not None:
             g["gross_profit"] = g["revenue"] - g["cost_of_revenue"]
         if g["total_liabilities"] is None and g["liabilities_and_equity"] is not None and g["equity"] is not None:

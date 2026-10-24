@@ -1,0 +1,715 @@
+<title>StockScreener</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: phone-first app shell. Sticky top bar, one scrolling view, bottom tab bar; detail opens as a full sheet. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --sunk:#e8ecf2; --line:#d5dbe5; --fg:#151b26; --muted:#5b6575; --faint:#8a93a3;
+  --accent:#2b47c9; --accent-ink:#ffffff; --up:#13795b; --down:#b83a2e; --warn:#a86a00;
+  --s1:#b3392c; --s2:#c4512b; --s3:#cf6d2c; --s4:#c98a2a; --s5:#b49c33; --s6:#8fa23f; --s7:#5f9b4f; --s8:#348f5f; --s9:#1d7f68; --s10:#0f6d6f;
+  --sma50:#c47a12; --sma200:#7b4bb8; --price:#151b26;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px; --gut:max(16px,env(safe-area-inset-left,0px));
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1319; --surface:#171c24; --sunk:#1f2530; --line:#2c3441; --fg:#e7ebf1; --muted:#9aa4b4; --faint:#6f7a8b;
+  --accent:#8099ff; --accent-ink:#0b1020; --up:#45c08f; --down:#ef7a6c; --warn:#e3a640;
+  --s1:#e06352; --s2:#e2774c; --s3:#e08d48; --s4:#d9a446; --s5:#c9b450; --s6:#a8bd5a; --s7:#7fbb6c; --s8:#55b082; --s9:#3fa391; --s10:#3b9aa3;
+  --sma50:#e3a640; --sma200:#b48cf0; --price:#e7ebf1; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --surface:#171c24; --sunk:#1f2530; --line:#2c3441; --fg:#e7ebf1; --muted:#9aa4b4; --faint:#6f7a8b;
+  --accent:#8099ff; --accent-ink:#0b1020; --up:#45c08f; --down:#ef7a6c; --warn:#e3a640;
+  --s1:#e06352; --s2:#e2774c; --s3:#e08d48; --s4:#d9a446; --s5:#c9b450; --s6:#a8bd5a; --s7:#7fbb6c; --s8:#55b082; --s9:#3fa391; --s10:#3b9aa3;
+  --sma50:#e3a640; --sma200:#b48cf0; --price:#e7ebf1; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .muted{color:var(--muted)} .faint{color:var(--faint)}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin:0}
+.label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* shell */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-block:10px;padding-left:var(--gut);padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top-row{display:flex;align-items:center;gap:12px;max-width:1100px;margin:0 auto}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-.02em}
+.brand b{color:var(--accent)}
+.asof{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
+main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--gut);padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs button{background:none;border:0;padding:10px 4px 9px;font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-current="page"]{color:var(--accent)}
+.disclaimer{font-size:12px;color:var(--faint);margin-top:28px;text-align:center}
+
+/* controls */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.search{flex:1 1 180px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.sel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:5px 9px;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 11px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--sunk);color:var(--fg)}
+
+/* score chip + ruler */
+.chip{display:inline-grid;place-items:center;min-width:30px;height:24px;padding:0 6px;border-radius:6px;font:600 13px var(--f-mono);color:#fff}
+.chip.na{background:var(--sunk)!important;color:var(--faint)}
+.ruler{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;height:8px}
+.ruler i{border-radius:2px;background:var(--sunk)}
+.overall{font-family:var(--f-display);font-weight:700;font-size:44px;line-height:1;letter-spacing:-.03em}
+.overall small{font-size:16px;color:var(--muted);font-weight:500;letter-spacing:0}
+
+/* list (screener + watchlist) */
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left}
+.row:first-child{border-top:0}
+.row:hover{background:var(--sunk)}
+.tk{font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:-.01em}
+.nm{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.px{text-align:right;font-family:var(--f-mono);font-size:14px}
+.px small{display:block;font-size:12px}
+.cats{display:none;gap:3px}
+.cats .chip{min-width:24px;height:20px;font-size:11px;padding:0 4px}
+.head{display:none}
+@media (min-width:760px){
+  .row{grid-template-columns:minmax(0,1.4fr) 110px auto minmax(0,250px)}
+  .cats{display:flex}
+  .head{display:grid;grid-template-columns:minmax(0,1.4fr) 110px auto minmax(0,250px);gap:10px;padding:8px 14px;background:var(--sunk)}
+  .head span:nth-child(2){text-align:right}
+}
+.icons{display:flex;gap:4px;margin-top:3px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.badge.good{color:var(--up)} .badge.bad{color:var(--down)} .badge.warn{color:var(--warn)} .badge.acc{color:var(--accent)}
+
+/* sheet (detail) */
+.sheet{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-block:calc(env(safe-area-inset-top,0px) + 8px) 8px;padding-left:var(--gut);padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet-top .top-row{gap:10px}
+.back{background:none;border:0;padding:6px 8px 6px 0;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:4px}
+.sheet main{padding-bottom:60px}
+.hero{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.hero{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.card h3{font-size:17px;margin-bottom:10px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.card h3 .label{font-family:var(--f-body)}
+.stack{display:grid;gap:14px;margin-top:14px}
+.two{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.title-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.title-row h1{font-size:30px}
+.price-big{font:500 26px var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* chart */
+.chart{width:100%;height:auto;display:block;touch-action:pan-y}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+
+/* categories */
+.catlist{display:grid;gap:2px}
+.cat{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:4px 10px;align-items:center;padding:9px 8px;border-radius:8px;background:none;border:0;width:100%;text-align:left}
+.cat:hover,.cat[aria-expanded="true"]{background:var(--sunk)}
+.cat .ruler{grid-column:1/-1}
+.cat-name{font-weight:600}
+.cat-na{font-size:12px;color:var(--faint)}
+.metrics{grid-column:1/-1;margin:4px 0 6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:600;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right}
+tr:last-child td{border-bottom:0}
+.pctbar{position:relative;height:6px;border-radius:3px;background:var(--sunk);min-width:60px}
+.pctbar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+
+/* analyst */
+.distbar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--sunk);margin:6px 0}
+.distbar span{display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-family:var(--f-mono)}
+.rangebar{position:relative;height:30px;margin:8px 4px 20px}
+.rangebar .track{position:absolute;left:0;right:0;top:13px;height:4px;background:var(--sunk);border-radius:2px}
+.rangebar .mark{position:absolute;top:6px;width:2px;height:18px;background:var(--fg)}
+.rangebar .mean{position:absolute;top:8px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--accent)}
+.rangebar .tick{position:absolute;top:32px;font:11px var(--f-mono);color:var(--muted);transform:translateX(-50%);white-space:nowrap}
+.feed{display:grid;gap:0;max-height:340px;overflow-y:auto}
+.feed>div{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;align-items:baseline}
+.feed>div:first-child{border-top:0}
+
+/* calendar */
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:16px}
+.month .dow{font-size:11px;color:var(--muted);text-align:center;padding:4px 0;font-weight:600}
+.day{min-height:52px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px;font-size:12px;display:flex;flex-direction:column;gap:2px;text-align:left}
+.day.out{opacity:.4}
+.day.today{border-color:var(--accent)}
+.day .dots{display:flex;flex-wrap:wrap;gap:2px}
+.dot{width:7px;height:7px;border-radius:50%}
+.agenda{display:grid;gap:12px}
+.agenda .date{font-weight:700;font-family:var(--f-display);font-size:15px;margin-bottom:4px}
+.ev{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-top:4px;font-size:14px}
+.ev .dot{flex:none}
+
+/* notes */
+textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:8px;padding:9px;background:var(--bg);resize:vertical}
+.note{border-top:1px solid var(--line);padding:8px 0;font-size:14px;white-space:pre-wrap}
+.note .meta{font-size:12px;color:var(--faint);display:flex;gap:10px;align-items:center}
+.link{background:none;border:0;color:var(--accent);padding:0;font-size:12px;font-weight:600}
+
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.callout{border:1px dashed var(--line);border-radius:var(--r);padding:12px 14px;color:var(--muted);font-size:14px}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:14px;z-index:60}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);padding:16px;max-width:min(420px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(10,14,20,.45)}
+@media (prefers-reduced-motion:no-preference){.row,.cat,.btn{transition:background-color .12s}}
+</style>
+
+<div class="top"><div class="top-row">
+  <div class="brand">Stock<b>Screener</b></div>
+  <div class="asof" id="asof">Loading data…</div>
+</div></div>
+
+<main id="view"><div class="empty">Loading…</div></main>
+
+<nav class="tabs" aria-label="Sections">
+  <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
+  <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
+  <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
+  <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
+</nav>
+
+<div id="sheet" class="sheet" hidden></div>
+<dialog id="dlg"></dialog>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- helpers
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const CATS = ["Valuation","Profitability","Financial Health","Growth","Dividends","Management","Analyst"];
+const CAT_SHORT = {"Valuation":"Val","Profitability":"Prof","Financial Health":"Health","Growth":"Grow","Dividends":"Div","Management":"Mgmt","Analyst":"Anl"};
+const sc = n => n == null ? "var(--sunk)" : `var(--s${Math.max(1, Math.min(10, Math.round(n)))})`;
+const chip = (n, title = "") => n == null ? `<span class="chip na" title="${esc(title)}">–</span>` : `<span class="chip" style="background:${sc(n)}" title="${esc(title)}">${typeof n === "number" && n % 1 ? n.toFixed(1) : n}</span>`;
+const ruler = n => `<div class="ruler" aria-hidden="true">${Array.from({length: 10}, (_, i) => `<i style="${n != null && i < Math.round(n) ? `background:${sc(n)}` : ""}"></i>`).join("")}</div>`;
+const fmtMoney = (v, d = 2) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
+  return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
+const pct = (v, d = 1, sign = true) => v == null ? "—" : (sign && v > 0 ? "+" : "") + (v * 100).toFixed(d) + "%";
+const cls = v => v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
+const fmtDate = s => { if (!s) return "—"; const d = new Date(s + "T12:00:00"); return d.toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}); };
+const fmtDay = s => new Date(s + "T12:00:00").toLocaleDateString(undefined, {weekday: "short", month: "short", day: "numeric"});
+const PCT_KEYS = new Set(["gross_margin","operating_margin","net_margin","fcf_margin","roe","roa","roic","efficiency_ratio","nii_to_assets","net_cash_to_mcap","tangible_equity_ratio","rev_growth_1y","rev_growth_3y","rev_growth_5y","eps_growth_1y","eps_growth_3y","eps_growth_5y","fcf_growth_1y","fcf_growth_3y","ffo_growth_1y","ffo_growth_3y","growth_consistency","div_yield","payout_earnings","payout_fcf","payout_ffo","share_change_1y","share_change_3y","roic_minus_coc","target_upside","eps_rev_90d"]);
+function fmtMetric(k, v) {
+  if (v == null) return "N/A";
+  if (k === "op_margin_trend") return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + " pts";
+  if (k === "insider_net_buy_pct") return (v * 100).toFixed(3) + "%";
+  if (PCT_KEYS.has(k)) return (v * 100).toFixed(1) + "%";
+  if (k === "div_growth_streak") return v + (v === 1 ? " yr" : " yrs");
+  if (k === "rating_mean") return v.toFixed(2);
+  if (["eps_revisions_net_30d","net_upgrades_90d"].includes(k)) return (v > 0 ? "+" : "") + v.toFixed(2) + " / analyst";
+  if (["altman_z"].includes(k)) return v.toFixed(2);
+  return v.toFixed(v >= 100 ? 0 : 1) + "×";
+}
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2200); }
+
+// ---------------------------------------------------------------- state
+let DATA = null, BY = {};
+const UI = {tab: "stocks", q: "", sector: "", sort: "overall", list: null, calFilter: "all", calMonth: null, range: "1y", openCat: null, insiderFilter: "buys"};
+try { Object.assign(UI, JSON.parse(localStorage.getItem("ss-ui") || "{}")); } catch (e) {}
+const saveUI = () => { try { localStorage.setItem("ss-ui", JSON.stringify({tab: UI.tab, sort: UI.sort, sector: UI.sector, range: UI.range, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
+
+// Watchlists + notes: the page's own database (owner-only), falling back to this browser.
+const Store = {
+  state: {watchlists: [{id: "main", name: "Main", items: []}], notes: {}},
+  mode: "loading", ref: null, timer: null, pending: false,
+  async init() {
+    let db = null;
+    try { db = window.claude?.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+    if (db) {
+      try {
+        this.ref = db.doc("app/state");
+        this.mode = "synced";
+        this.ref.onSnapshot(snap => {
+          if (this.pending) return;
+          if (snap.exists) { const d = snap.data(); this.state = JSON.parse(JSON.stringify(d)); this.normalize(); }
+          rerender();
+        }, () => { this.mode = "local"; this.loadLocal(); rerender(); });
+        return;
+      } catch (e) { this.ref = null; }
+    }
+    this.mode = "local"; this.loadLocal();
+  },
+  normalize() {
+    if (!Array.isArray(this.state.watchlists) || !this.state.watchlists.length) this.state.watchlists = [{id: "main", name: "Main", items: []}];
+    this.state.notes ||= {};
+  },
+  loadLocal() { try { const s = JSON.parse(localStorage.getItem("ss-state") || "null"); if (s) { this.state = s; this.normalize(); } } catch (e) {} },
+  save() {
+    clearTimeout(this.timer);
+    this.pending = true;
+    this.timer = setTimeout(async () => {
+      const body = JSON.parse(JSON.stringify(this.state));
+      if (this.ref) {
+        try { await this.ref.set(body); }
+        catch (e) { toast(e?.code === "quota_exceeded" ? "Storage is full. Delete some notes." : "Couldn’t save. Saved in this browser instead."); try { localStorage.setItem("ss-state", JSON.stringify(body)); } catch (_) {} }
+      } else { try { localStorage.setItem("ss-state", JSON.stringify(body)); } catch (e) {} }
+      this.pending = false;
+    }, 350);
+  },
+};
+const lists = () => Store.state.watchlists;
+const inLists = t => lists().filter(l => l.items.some(i => i.ticker === t));
+
+// ---------------------------------------------------------------- data
+async function load() {
+  try {
+    const r = await fetch("demo.json", {cache: "no-cache"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    DATA = await r.json();
+  } catch (e) {
+    $("#view").innerHTML = `<div class="empty">Couldn’t load the data file (${esc(e.message)}). Reload the page to try again.</div>`;
+    $("#asof").textContent = "No data";
+    return;
+  }
+  DATA.stocks.forEach(s => BY[s.ticker] = s);
+  const lastDate = DATA.dates[DATA.dates.length - 1];
+  DATA.lastDate = lastDate;
+  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(lastDate))}<br><span class="faint">${DATA.top_n} stocks · ranked vs ${DATA.fundamentals_rows.toLocaleString()}</span>`;
+  await Store.init();
+  render();
+}
+const lastClose = s => { for (let i = s.closes.length - 1; i >= 0; i--) if (s.closes[i] != null) return s.closes[i]; return s.price; };
+function recentActivity(s, days = 30) {
+  const cut = new Date(DATA.lastDate); cut.setDate(cut.getDate() - days); const c = cut.toISOString().slice(0, 10);
+  const tr = (s.insiders?.trades || []).filter(t => (t.date || "") >= c);
+  return {buys: tr.filter(t => t.code === "P").length, disc: tr.filter(t => t.code === "S" && !t.plan_10b5_1).length,
+          ceo: tr.some(t => t.code === "P" && (t.ceo || t.cfo)), cluster: (s.insiders?.clusters || []).some(x => x.end >= c)};
+}
+
+// ---------------------------------------------------------------- views
+function setTab(t) { UI.tab = t; saveUI(); document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === t ? "page" : "false")); render(); window.scrollTo(0, 0); }
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+function render() {
+  if (!DATA) return;
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === UI.tab ? "page" : "false"));
+  ({stocks: viewStocks, watch: viewWatch, cal: viewCal, about: viewAbout})[UI.tab]();
+}
+function rerender() { if (!DATA) return; render(); if (!$("#sheet").hidden && Sheet.t) Sheet.renderNotesAndLists(); }
+
+function stockRow(s, extra = "") {
+  const px = lastClose(s);
+  const cats = CATS.map(c => chip(s.categories?.[c]?.score, c + (s.categories?.[c]?.na ? ": " + s.categories[c].na : ""))).join("");
+  return `<button class="row" data-t="${esc(s.ticker)}">
+    <div style="min-width:0"><div class="tk">${esc(s.ticker)}</div><div class="nm">${esc(s.name)}</div>${extra}</div>
+    <div class="px">${fmtMoney(px)}<small class="${cls(s.chg_1d)}">${pct(s.chg_1d, 2)}</small></div>
+    <div>${chip(s.overall, "Overall")}</div>
+    <div class="cats">${cats}</div></button>`;
+}
+function bindRows(root) { root.querySelectorAll(".row[data-t]").forEach(b => b.onclick = () => Sheet.open(b.dataset.t)); }
+const headRow = first => `<div class="head label"><span>${first}</span><span>Price</span><span>Overall</span><span style="display:flex;gap:3px">${CATS.map(c => `<span style="min-width:24px;text-align:center" title="${c}">${CAT_SHORT[c]}</span>`).join("")}</span></div>`;
+
+function viewStocks() {
+  const sectors = [...new Set(DATA.stocks.map(s => s.sector))].sort();
+  let rows = DATA.stocks.filter(s => (!UI.sector || s.sector === UI.sector) &&
+    (!UI.q || (s.ticker + " " + s.name).toLowerCase().includes(UI.q.toLowerCase())));
+  const key = UI.sort;
+  rows.sort((a, b) => key === "ticker" ? a.ticker.localeCompare(b.ticker) : key === "weight" ? b.ivv_weight - a.ivv_weight :
+    key === "overall" ? (b.overall ?? -1) - (a.overall ?? -1) : (b.categories?.[key]?.score ?? -1) - (a.categories?.[key]?.score ?? -1) || (b.overall ?? 0) - (a.overall ?? 0));
+  $("#view").innerHTML = `
+    <div class="bar">
+      <input class="search" id="q" type="search" placeholder="Search ticker or name" value="${esc(UI.q)}" aria-label="Search">
+      <select class="sel" id="sector" aria-label="Sector"><option value="">All sectors</option>${sectors.map(s => `<option ${s === UI.sector ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>
+      <select class="sel" id="sort" aria-label="Sort by">
+        ${[["overall","Overall score"],["weight","Size (S&P weight)"],["ticker","Ticker A–Z"],...CATS.map(c => [c, c])].map(([v, l]) => `<option value="${v}" ${v === UI.sort ? "selected" : ""}>Sort: ${l}</option>`).join("")}
+      </select>
+    </div>
+    <div class="list">${headRow(rows.length + " stocks")}${rows.map(s => stockRow(s)).join("") || `<div class="empty">No stocks match.</div>`}</div>
+    <p class="disclaimer">For personal research. Not financial advice.</p>`;
+  const q = $("#q"); q.oninput = () => { UI.q = q.value; const pos = q.selectionStart; viewStocks(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#sector").onchange = e => { UI.sector = e.target.value; saveUI(); viewStocks(); };
+  $("#sort").onchange = e => { UI.sort = e.target.value; saveUI(); viewStocks(); };
+  bindRows($("#view"));
+}
+
+function viewWatch() {
+  const L = lists();
+  if (!UI.list || !L.some(l => l.id === UI.list)) UI.list = L[0].id;
+  const list = L.find(l => l.id === UI.list);
+  const items = list.items.map(it => ({it, s: BY[it.ticker]})).filter(x => x.s);
+  const missing = list.items.filter(it => !BY[it.ticker]);
+  const sync = Store.mode === "synced" ? "Synced to your account" : "Saved in this browser only";
+  $("#view").innerHTML = `
+    <div class="bar">
+      <select class="sel" id="wl" aria-label="Watchlist">${L.map(l => `<option value="${esc(l.id)}" ${l.id === UI.list ? "selected" : ""}>${esc(l.name)} (${l.items.length})</option>`).join("")}</select>
+      <button class="btn small" id="newList">New list</button>
+      <button class="btn small" id="renList">Rename</button>
+      ${L.length > 1 ? `<button class="btn small" id="delList">Delete</button>` : ""}
+      <span class="faint" style="margin-left:auto;font-size:12px">${sync}</span>
+    </div>
+    ${items.length ? `<div class="list">${headRow(esc(list.name))}${items.map(({it, s}) => {
+      const now = lastClose(s), ch = now - it.price, chp = it.price ? now / it.price - 1 : null, a = recentActivity(s);
+      const icons = [a.buys ? `<span class="badge good" title="Open-market insider buys in the last 30 days">▲ ${a.buys} insider buy${a.buys > 1 ? "s" : ""}</span>` : "",
+        a.ceo ? `<span class="badge acc">CEO/CFO buy</span>` : "", a.cluster ? `<span class="badge acc">Cluster buy</span>` : "",
+        a.disc ? `<span class="badge bad" title="Insider sales not under a 10b5-1 plan, last 30 days">▼ ${a.disc} discretionary sale${a.disc > 1 ? "s" : ""}</span>` : "",
+        (DATA.notesBadge && Store.state.notes[s.ticker]?.length) ? `<span class="badge">${Store.state.notes[s.ticker].length} note</span>` : ""].join("");
+      return stockRow(s, `<div class="nm"><span class="${cls(ch)} num">${ch >= 0 ? "+" : "−"}${fmtMoney(Math.abs(ch))} (${pct(chp)})</span> since ${esc(fmtDate(it.added))}</div>${icons ? `<div class="icons">${icons}</div>` : ""}`);
+    }).join("")}</div>` : `<div class="card empty"><p><b>This list is empty.</b></p><p>Open any stock and tap <b>Add to watchlist</b>. The date and closing price are saved so you can track the change since you added it.</p><button class="btn primary" id="goStocks">Browse stocks</button></div>`}
+    ${missing.length ? `<p class="callout">Not in this data snapshot: ${missing.map(m => esc(m.ticker)).join(", ")}</p>` : ""}
+    <p class="disclaimer">For personal research. Not financial advice.</p>`;
+  $("#wl").onchange = e => { UI.list = e.target.value; saveUI(); viewWatch(); };
+  $("#newList").onclick = () => askText("New watchlist", "", name => { const id = "l" + Date.now().toString(36); lists().push({id, name, items: []}); UI.list = id; saveUI(); Store.save(); viewWatch(); });
+  $("#renList").onclick = () => askText("Rename list", list.name, name => { list.name = name; Store.save(); viewWatch(); });
+  $("#delList") && ($("#delList").onclick = () => confirmDlg(`Delete “${list.name}”? Its ${list.items.length} stocks will be removed from this list.`, "Delete list", () => {
+    Store.state.watchlists = lists().filter(l => l !== list); UI.list = lists()[0].id; Store.save(); viewWatch(); }));
+  $("#goStocks") && ($("#goStocks").onclick = () => setTab("stocks"));
+  bindRows($("#view"));
+}
+
+function askText(title, value, done) {
+  const d = $("#dlg");
+  d.innerHTML = `<form method="dialog" id="f"><h3 style="margin-bottom:10px">${esc(title)}</h3>
+    <input class="search" id="dlgInput" value="${esc(value)}" maxlength="40" style="width:100%;box-sizing:border-box" required>
+    <div class="bar" style="margin:14px 0 0;justify-content:flex-end"><button class="btn" value="cancel" type="button" id="cx">Cancel</button><button class="btn primary" value="ok">Save</button></div></form>`;
+  $("#cx", d).onclick = () => d.close();
+  $("#f", d).onsubmit = e => { e.preventDefault(); const v = $("#dlgInput", d).value.trim(); if (v) { d.close(); done(v); } };
+  d.showModal(); $("#dlgInput", d).focus();
+}
+function confirmDlg(msg, label, done) {
+  const d = $("#dlg");
+  d.innerHTML = `<p style="margin-top:0">${esc(msg)}</p><div class="bar" style="justify-content:flex-end;margin:0"><button class="btn" id="cx">Cancel</button><button class="btn primary" id="ok">${esc(label)}</button></div>`;
+  $("#cx", d).onclick = () => d.close(); $("#ok", d).onclick = () => { d.close(); done(); }; d.showModal();
+}
+
+// ---------------------------------------------------------------- calendar
+const EVC = {earnings: "var(--accent)", ex_div: "var(--s9)", pay: "var(--s6)", fomc: "var(--down)", macro: "var(--warn)"};
+function calEvents() {
+  let tick = DATA.stocks.map(s => s.ticker);
+  if (UI.calFilter !== "all") { const l = lists().find(l => l.id === UI.calFilter); tick = l ? l.items.map(i => i.ticker) : []; }
+  const ev = [];
+  for (const t of tick) { const s = BY[t]; if (!s) continue; const c = s.calendar || {};
+    (c.earnings || []).slice(0, 1).forEach(d => ev.push({date: d, kind: "earnings", t, label: `${t} earnings` + (c.eps_estimate ? ` · est. EPS $${c.eps_estimate.toFixed(2)}` : "")}));
+    if (c.ex_dividend) ev.push({date: c.ex_dividend, kind: "ex_div", t, label: `${t} ex-dividend`});
+    if (c.dividend_pay) ev.push({date: c.dividend_pay, kind: "pay", t, label: `${t} dividend paid`}); }
+  (DATA.macro || []).forEach(m => ev.push({date: m.date, kind: m.type === "fomc" ? "fomc" : "macro", label: m.label}));
+  return ev.sort((a, b) => a.date.localeCompare(b.date));
+}
+function viewCal() {
+  const ev = calEvents();
+  const base = UI.calMonth ? new Date(UI.calMonth + "-15T12:00:00") : new Date(DATA.lastDate + "T12:00:00");
+  const y = base.getFullYear(), m = base.getMonth(), ym = `${y}-${String(m + 1).padStart(2, "0")}`;
+  const first = new Date(y, m, 1), start = new Date(first); start.setDate(1 - first.getDay());
+  const byDay = {}; ev.forEach(e => (byDay[e.date] ||= []).push(e));
+  const todayS = DATA.lastDate; let cells = "";
+  for (let i = 0; i < 42; i++) { const d = new Date(start); d.setDate(start.getDate() + i); const k = d.toISOString().slice(0, 10);
+    if (i >= 35 && d.getMonth() !== m) break;
+    const e = byDay[k] || [];
+    cells += `<button class="day ${d.getMonth() !== m ? "out" : ""} ${k === todayS ? "today" : ""}" data-day="${k}" aria-label="${fmtDay(k)}: ${e.length} events"><span class="num">${d.getDate()}</span><span class="dots">${e.slice(0, 8).map(x => `<i class="dot" style="background:${EVC[x.kind]}"></i>`).join("")}</span></button>`; }
+  const upcoming = ev.filter(e => e.date >= todayS).slice(0, 80);
+  const grouped = {}; upcoming.forEach(e => (grouped[e.date] ||= []).push(e));
+  $("#view").innerHTML = `
+    <div class="bar">
+      <select class="sel" id="cf" aria-label="Show"><option value="all">All ${DATA.top_n} stocks</option>${lists().map(l => `<option value="${esc(l.id)}" ${UI.calFilter === l.id ? "selected" : ""}>Watchlist: ${esc(l.name)}</option>`).join("")}</select>
+      <div class="seg" style="margin-left:auto"><button id="pm" aria-label="Previous month">‹</button><button aria-pressed="true" style="min-width:120px">${base.toLocaleDateString(undefined, {month: "long", year: "numeric"})}</button><button id="nm" aria-label="Next month">›</button></div>
+    </div>
+    <div class="month">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="dow">${d}</div>`).join("")}${cells}</div>
+    <div class="legend" style="margin-bottom:14px">${[["earnings","Earnings"],["ex_div","Ex-dividend"],["pay","Dividend paid"],["fomc","FOMC"],["macro","CPI · jobs · PCE · GDP"]].map(([k, l]) => `<span><i class="dot" style="display:inline-block;background:${EVC[k]};margin-right:5px"></i>${l}</span>`).join("")}</div>
+    <h2 style="font-size:18px;margin-bottom:8px">Coming up</h2>
+    <div class="agenda" id="agenda">${Object.entries(grouped).map(([d, es]) => `<div id="d-${d}"><div class="date">${fmtDay(d)}</div>${es.map(e => `<div class="ev" ${e.t ? `data-t="${esc(e.t)}" role="button" tabindex="0" style="cursor:pointer"` : ""}><i class="dot" style="background:${EVC[e.kind]}"></i>${esc(e.label)}</div>`).join("")}</div>`).join("") || `<div class="empty">No upcoming events for this selection.</div>`}</div>
+    <p class="faint" style="font-size:12px;margin-top:14px">Earnings and dividend dates come from Yahoo and can shift. FOMC dates are from the Federal Reserve calendar; macro release dates from FRED.</p>`;
+  $("#cf").onchange = e => { UI.calFilter = e.target.value; saveUI(); viewCal(); };
+  const shift = n => { const d = new Date(y, m + n, 15); UI.calMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; viewCal(); };
+  $("#pm").onclick = () => shift(-1); $("#nm").onclick = () => shift(1);
+  document.querySelectorAll(".day").forEach(b => b.onclick = () => { const el = document.getElementById("d-" + b.dataset.day); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); else toast("Nothing scheduled that day"); });
+  document.querySelectorAll(".ev[data-t]").forEach(b => { b.onclick = () => Sheet.open(b.dataset.t); b.onkeydown = e => { if (e.key === "Enter") Sheet.open(b.dataset.t); }; });
+}
+
+// ---------------------------------------------------------------- data status
+function viewAbout() {
+  const v = DATA.validation || {}, h = DATA.health || [];
+  const kinds = {}; h.forEach(x => (kinds[x.kind] ||= []).push(x.detail));
+  $("#view").innerHTML = `
+    <div class="stack" style="margin-top:0">
+    <div class="card"><h3>How the scores work</h3>
+      <p>Each stock gets seven category scores from 1 to 10: Valuation, Profitability, Financial Health, Growth, Dividends, Management and Analyst. Every metric is ranked as a percentile against the stock’s GICS sector across <b>${DATA.fundamentals_rows.toLocaleString()} stocks</b> in the Russell 1000 and S&P 1500. Valuation ratios blend that sector rank 50/50 with the stock’s own 3-year history. Category scores are deciles of the average percentile. The overall score is the simple average of the categories that apply.</p>
+      <p>Banks, insurers and REITs use their own metric sets, chosen by SEC industry code. A non-payer’s Dividends score is N/A, not 1. Tap any category on a stock to see every metric, its raw value and its rank.</p></div>
+    <div class="card"><h3>Data in this snapshot</h3>
+      <dl class="kv">
+        <dt>Built</dt><dd>${esc(new Date(DATA.generated).toLocaleString())}</dd>
+        <dt>Latest prices</dt><dd>${esc(fmtDate(DATA.lastDate))}</dd>
+        <dt>Universe</dt><dd>${DATA.universe_count.toLocaleString()} tickers</dd>
+        <dt>With fundamentals</dt><dd>${DATA.fundamentals_rows.toLocaleString()}</dd>
+        <dt>Detailed stocks</dt><dd>${DATA.top_n}</dd>
+      </dl>
+      <p class="muted" style="font-size:13px">Sources: SEC EDGAR (financial statements, insider Form 4s), iShares fund holdings (universe and sectors), Yahoo Finance via yfinance (prices, analyst data, earnings dates), Federal Reserve and FRED (macro calendar).</p></div>
+    <div class="card"><h3>Cross-check against Yahoo</h3>
+      <p>Trailing-twelve-month revenue computed from SEC filings matched Yahoo within 2% for <b>${v.rev_within_2pct ?? "—"} of ${v.rev_compared ?? "—"}</b> stocks (within 5%: ${v.rev_within_5pct ?? "—"}). Net income matched within 5% for <b>${v.ni_within_5pct ?? "—"} of ${v.ni_compared ?? "—"}</b>.</p>
+      ${(v.worst || []).length ? `<div style="overflow-x:auto"><table><thead><tr><th>Biggest gaps</th><th class="r">SEC (TTM)</th><th class="r">Yahoo</th><th class="r">Gap</th></tr></thead><tbody>${v.worst.slice(0, 8).map(w => `<tr><td>${esc(w.ticker)}</td><td class="r num">${fmtBig(w.rev_xbrl)}</td><td class="r num">${fmtBig(w.rev_yahoo)}</td><td class="r num">${pct(w.rev_diff)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+      <p class="faint" style="font-size:12px">Banks and insurers often differ because Yahoo defines revenue differently for them.</p></div>
+    <div class="card"><h3>Not built yet</h3>
+      <p class="muted">Politician trades with committee flags, tracked people, 13F fund holdings, score history, the sector divergence signal and Telegram alerts come in later phases.</p></div>
+    <div class="card"><h3>Data issues <span class="label">${h.length}</span></h3>
+      ${Object.keys(kinds).length ? Object.entries(kinds).map(([k, ds]) => `<details style="margin-top:6px"><summary><b>${esc(k)}</b> · ${ds.length}</summary><ul style="font-size:13px;color:var(--muted);padding-left:18px">${ds.slice(0, 40).map(d => `<li>${esc(d)}</li>`).join("")}</ul></details>`).join("") : `<p class="muted">None.</p>`}
+    </div>
+    <div class="card"><h3>Appearance</h3><div class="seg" id="theme">${[["","System"],["light","Light"],["dark","Dark"]].map(([v, l]) => `<button data-v="${v}" aria-pressed="${(document.documentElement.dataset.theme || "") === v}">${l}</button>`).join("")}</div></div>
+    </div>
+    <p class="disclaimer">For personal research. Not financial advice.</p>`;
+  document.querySelectorAll("#theme button").forEach(b => b.onclick = () => { const v = b.dataset.v; if (v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme; try { localStorage.setItem("ss-theme", v); } catch (e) {} viewAbout(); });
+}
+try { const th = localStorage.getItem("ss-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+
+// ---------------------------------------------------------------- price chart
+function priceChart(s, range) {
+  const n = {"3m": 63, "6m": 126, "1y": 252, "3y": 99999}[range] || 252;
+  const all = s.closes, dates = DATA.dates;
+  const sma = w => all.map((_, i) => { if (i < w - 1) return null; let sum = 0, c = 0; for (let j = i - w + 1; j <= i; j++) if (all[j] != null) { sum += all[j]; c++; } return c >= w * 0.9 ? sum / c : null; });
+  const s50 = sma(50), s200 = sma(200);
+  const from = Math.max(0, all.length - n);
+  const idx = []; for (let i = from; i < all.length; i++) if (all[i] != null) idx.push(i);
+  if (idx.length < 2) return `<div class="empty">No price history.</div>`;
+  const W = 680, H = 260, padL = 8, padR = 52, padT = 10, padB = 24;
+  const vals = idx.flatMap(i => [all[i], s50[i], s200[i]]).filter(v => v != null);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const X = k => padL + (k / (idx.length - 1)) * (W - padL - padR), Y = v => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const path = arr => { let d = "", pen = false; idx.forEach((i, k) => { const v = arr[i]; if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + X(k).toFixed(1) + " " + Y(v).toFixed(1); pen = true; }); return d; };
+  const ticks = []; const step = (hi - lo) / 4; for (let i = 0; i <= 4; i++) ticks.push(lo + step * i);
+  const xt = []; const nx = 4; for (let i = 0; i <= nx; i++) { const k = Math.round(i * (idx.length - 1) / nx); xt.push([k, dates[idx[k]]]); }
+  const pos = {}; idx.forEach((i, k) => pos[dates[i]] = k);
+  const sigs = (s.tech?.signals || []).filter(g => pos[g.date] != null);
+  const SIG = {cross_above_200: ["▲", "var(--up)", "Crossed above 200-day"], cross_below_200: ["▼", "var(--down)", "Crossed below 200-day"], golden_cross: ["G", "var(--s9)", "Golden cross (50 above 200)"], death_cross: ["D", "var(--down)", "Death cross (50 below 200)"]};
+  const area = path(all) + `L${X(idx.length - 1).toFixed(1)} ${H - padB}L${X(0).toFixed(1)} ${H - padB}Z`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" id="pchart" role="img" aria-label="${esc(s.ticker)} price chart with 50- and 200-day moving averages">
+    <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".16"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(t => `<line x1="${padL}" x2="${W - padR}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${W - padR + 6}" y="${Y(t) + 4}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t >= 1000 ? Math.round(t).toLocaleString() : t.toFixed(t < 20 ? 2 : 0)}</text>`).join("")}
+    ${xt.map(([k, d]) => `<text x="${X(k)}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="${k === 0 ? "start" : k === idx.length - 1 ? "end" : "middle"}">${new Date(d + "T12:00:00").toLocaleDateString(undefined, range === "3y" ? {month: "short", year: "2-digit"} : {month: "short", day: "numeric"})}</text>`).join("")}
+    <path d="${area}" fill="url(#ga)" stroke="none"/>
+    <path d="${path(s200)}" fill="none" stroke="var(--sma200)" stroke-width="1.6"/>
+    <path d="${path(s50)}" fill="none" stroke="var(--sma50)" stroke-width="1.6"/>
+    <path d="${path(all)}" fill="none" stroke="var(--price)" stroke-width="1.8" stroke-linejoin="round"/>
+    ${sigs.map(g => { const [sym, col, lab] = SIG[g.type]; const k = pos[g.date]; const v = all[idx[k]]; return `<g><title>${lab} · ${fmtDate(g.date)}</title><circle cx="${X(k)}" cy="${Y(v)}" r="7" fill="${col}"/><text x="${X(k)}" y="${Y(v) + 3.5}" font-size="9" font-weight="700" fill="var(--surface)" text-anchor="middle">${sym}</text></g>`; }).join("")}
+    <circle cx="${X(idx.length - 1)}" cy="${Y(all[idx[idx.length - 1]])}" r="3.5" fill="var(--price)"/>
+    <g id="hover" visibility="hidden"><line id="hl" y1="${padT}" y2="${H - padB}" stroke="var(--muted)" stroke-dasharray="3 3"/><rect id="hb" rx="5" height="36" width="132" fill="var(--fg)"/><text id="ht1" font-size="11" fill="var(--bg)"></text><text id="ht2" font-size="12" font-weight="600" fill="var(--bg)" font-family="IBM Plex Mono,monospace"></text></g>
+    <rect x="${padL}" y="${padT}" width="${W - padL - padR}" height="${H - padT - padB}" fill="transparent" id="hz"/>
+  </svg>`;
+  // hover wiring happens in bindChart
+}
+function bindChart(s, range) {
+  const svg = $("#pchart"); if (!svg) return;
+  const n = {"3m": 63, "6m": 126, "1y": 252, "3y": 99999}[range] || 252;
+  const from = Math.max(0, s.closes.length - n); const idx = []; for (let i = from; i < s.closes.length; i++) if (s.closes[i] != null) idx.push(i);
+  const W = 680, padL = 8, padR = 52;
+  const hz = $("#hz", svg), g = $("#hover", svg);
+  const move = e => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * W; let k = Math.round((x - padL) / (W - padL - padR) * (idx.length - 1)); k = Math.max(0, Math.min(idx.length - 1, k));
+    const xx = padL + k / (idx.length - 1) * (W - padL - padR); const i = idx[k];
+    $("#hl", svg).setAttribute("x1", xx); $("#hl", svg).setAttribute("x2", xx);
+    const bx = Math.min(Math.max(xx - 66, padL), W - padR - 132);
+    $("#hb", svg).setAttribute("x", bx); $("#hb", svg).setAttribute("y", 12);
+    $("#ht1", svg).setAttribute("x", bx + 8); $("#ht1", svg).setAttribute("y", 26); $("#ht1", svg).textContent = fmtDate(DATA.dates[i]);
+    $("#ht2", svg).setAttribute("x", bx + 8); $("#ht2", svg).setAttribute("y", 41); $("#ht2", svg).textContent = fmtMoney(s.closes[i]);
+    g.setAttribute("visibility", "visible"); };
+  hz.addEventListener("pointermove", move); hz.addEventListener("pointerdown", move);
+  hz.addEventListener("pointerleave", () => g.setAttribute("visibility", "hidden"));
+}
+
+// ---------------------------------------------------------------- detail sheet
+const Sheet = {
+  t: null,
+  open(t) { this.t = t; UI.openCat = null; const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden"; this.render(); el.scrollTop = 0; history.pushState({sheet: t}, ""); },
+  close() { $("#sheet").hidden = true; document.body.style.overflow = ""; this.t = null; render(); },
+  render() {
+    const s = BY[this.t]; if (!s) return;
+    const px = lastClose(s);
+    const el = $("#sheet");
+    el.innerHTML = `
+      <div class="sheet-top"><div class="top-row"><button class="back" id="back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>Back</button>
+        <span class="tk" style="margin-left:4px">${esc(s.ticker)}</span><span style="margin-left:auto" id="wlBtnWrap"></span></div></div>
+      <main>
+        <div class="title-row"><h1>${esc(s.name)}</h1><span class="muted">${esc(s.ticker)} · ${esc(s.sector)}${s.sic_desc ? " · " + esc(s.sic_desc.toLowerCase()) : ""}</span></div>
+        <div class="title-row" style="margin:4px 0 14px"><span class="price-big">${fmtMoney(px)}</span><span class="num ${cls(s.chg_1d)}">${pct(s.chg_1d, 2)} today</span>
+          <span class="muted num">Mkt cap ${fmtBig(s.mcap)}</span>${s.metric_set !== "default" ? `<span class="badge acc">${esc({bank: "Bank metrics", insurance: "Insurance metrics", reit: "REIT metrics", utility: "Utility"}[s.metric_set] || s.metric_set)}</span>` : ""}</div>
+        <div class="hero">
+          <div class="card">
+            <div class="bar" style="justify-content:space-between;margin-bottom:6px"><h3 style="margin:0">Price</h3>
+              <div class="seg" id="rng">${["3m","6m","1y","3y"].map(r => `<button data-r="${r}" aria-pressed="${UI.range === r}">${r.toUpperCase()}</button>`).join("")}</div></div>
+            <div id="chartWrap">${priceChart(s, UI.range)}</div>
+            <div class="legend"><span><i style="background:var(--price)"></i>Close</span><span><i style="background:var(--sma50)"></i>50-day avg${s.tech?.state ? " " + fmtMoney(s.tech.state.sma50) : ""}</span><span><i style="background:var(--sma200)"></i>200-day avg${s.tech?.state ? " " + fmtMoney(s.tech.state.sma200) : ""}</span></div>
+            ${s.tech?.state ? `<div class="pill-row" style="margin-top:10px"><span class="badge ${s.tech.state.above_200 ? "good" : "bad"}">${s.tech.state.above_200 ? "Above" : "Below"} 200-day</span><span class="badge ${s.tech.state.golden ? "good" : "bad"}">50-day ${s.tech.state.golden ? "above" : "below"} 200-day</span>${(() => { const l = (s.tech.signals || []).slice(-1)[0]; return l ? `<span class="badge">Last signal: ${esc(l.type.replace(/_/g, " "))} · ${esc(fmtDate(l.date))}</span>` : ""; })()}</div>` : ""}
+          </div>
+          <div class="card">
+            <div class="label">Overall score</div>
+            <div style="display:flex;align-items:flex-end;gap:12px;margin:6px 0 10px"><div class="overall" style="color:${sc(s.overall)}">${s.overall != null ? s.overall.toFixed(1) : "—"}<small> / 10</small></div></div>
+            ${ruler(s.overall)}
+            ${(s.excluded || []).length ? `<p class="faint" style="font-size:12px;margin:8px 0 0">Excludes ${s.excluded.map(c => `${esc(c)} (${esc(s.categories[c].na)})`).join(", ")}.</p>` : ""}
+            <div class="catlist" style="margin-top:10px">${CATS.map(c => { const k = s.categories?.[c] || {}; return `
+              <button class="cat" data-cat="${esc(c)}" aria-expanded="${UI.openCat === c}"><span><span class="cat-name">${esc(c)}</span>${k.na ? ` <span class="cat-na">· ${esc(k.na)}</span>` : (c === "Analyst" && s.analyst?.thin_coverage ? ` <span class="badge warn">Thin coverage</span>` : "")}</span>${chip(k.score)}${ruler(k.score)}</button>
+              ${UI.openCat === c ? `<div class="metrics">${metricTable(s, c)}</div>` : ""}`; }).join("")}</div>
+            <p class="faint" style="font-size:12px;margin:8px 0 0">Tap a category to see its metrics. Latest filing period: ${esc(fmtDate(s.latest_period))}.</p>
+          </div>
+        </div>
+        <div class="two" style="margin-top:14px">
+          ${analystCard(s)}
+          ${insiderCard(s)}
+        </div>
+        <div class="two" style="margin-top:14px">
+          ${sharesCard(s)}
+          ${fundCard(s)}
+        </div>
+        <div class="two" style="margin-top:14px">
+          ${eventsCard(s)}
+          <div class="card" id="notesCard"></div>
+        </div>
+        <div class="callout" style="margin-top:14px">Coming in later phases for this stock: politician trades with committee-conflict flags, 13F fund holders, 5%+ stakeholder filings, and score history.</div>
+        <p class="disclaimer">For personal research. Not financial advice.</p>
+      </main>`;
+    $("#back").onclick = () => history.back();
+    document.querySelectorAll("#rng button").forEach(b => b.onclick = () => { UI.range = b.dataset.r; saveUI(); $("#chartWrap").innerHTML = priceChart(s, UI.range); bindChart(s, UI.range); document.querySelectorAll("#rng button").forEach(x => x.setAttribute("aria-pressed", x.dataset.r === UI.range)); });
+    bindChart(s, UI.range);
+    el.querySelectorAll(".cat").forEach(b => b.onclick = () => { const st = el.scrollTop; UI.openCat = UI.openCat === b.dataset.cat ? null : b.dataset.cat; this.render(); el.scrollTop = st; });
+    el.querySelectorAll("#insF button").forEach(b => b.onclick = () => { UI.insiderFilter = b.dataset.f; saveUI(); const st = el.scrollTop; this.render(); el.scrollTop = st; });
+    this.renderNotesAndLists();
+  },
+  renderNotesAndLists() {
+    const s = BY[this.t]; if (!s) return;
+    const mem = inLists(s.ticker);
+    $("#wlBtnWrap").innerHTML = `<button class="btn ${mem.length ? "" : "primary"} small" id="wlBtn">${mem.length ? "★ On " + mem.length + " list" + (mem.length > 1 ? "s" : "") : "Add to watchlist"}</button>`;
+    $("#wlBtn").onclick = () => this.pickList(s);
+    const notes = Store.state.notes[s.ticker] || [];
+    $("#notesCard").innerHTML = `<h3>My notes <span class="label">${Store.mode === "synced" ? "synced" : "this browser"}</span></h3>
+      <textarea id="noteIn" placeholder="Why you’re watching this, what would change your mind…" aria-label="New note"></textarea>
+      <div class="bar" style="margin:8px 0 4px;justify-content:flex-end"><button class="btn primary small" id="addNote">Add note</button></div>
+      ${notes.slice().reverse().map(n => `<div class="note"><div class="meta"><span>${esc(new Date(n.ts).toLocaleString())}${n.edited ? " · edited" : ""}</span><button class="link" data-edit="${n.id}">Edit</button><button class="link" data-del="${n.id}">Delete</button></div>${esc(n.text)}</div>`).join("") || `<p class="faint" style="font-size:13px">No notes yet.</p>`}`;
+    $("#addNote").onclick = () => { const v = $("#noteIn").value.trim(); if (!v) return; (Store.state.notes[s.ticker] ||= []).push({id: Date.now().toString(36), ts: new Date().toISOString(), text: v}); Store.save(); this.renderNotesAndLists(); toast("Note added"); };
+    document.querySelectorAll("[data-del]").forEach(b => b.onclick = () => confirmDlg("Delete this note?", "Delete", () => { Store.state.notes[s.ticker] = notes.filter(n => n.id !== b.dataset.del); Store.save(); this.renderNotesAndLists(); }));
+    document.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { const n = notes.find(x => x.id === b.dataset.edit); const d = $("#dlg");
+      d.innerHTML = `<h3 style="margin-bottom:10px">Edit note</h3><textarea id="ed">${esc(n.text)}</textarea><div class="bar" style="justify-content:flex-end;margin:12px 0 0"><button class="btn" id="cx">Cancel</button><button class="btn primary" id="ok">Save</button></div>`;
+      $("#cx", d).onclick = () => d.close(); $("#ok", d).onclick = () => { const v = $("#ed", d).value.trim(); if (v) { n.text = v; n.edited = new Date().toISOString(); Store.save(); } d.close(); this.renderNotesAndLists(); }; d.showModal(); });
+  },
+  pickList(s) {
+    const d = $("#dlg"); const px = lastClose(s);
+    d.innerHTML = `<h3 style="margin-bottom:6px">Watchlists for ${esc(s.ticker)}</h3><p class="muted" style="font-size:13px;margin-top:0">Adding saves today’s close (${fmtMoney(px)} on ${esc(fmtDate(DATA.lastDate))}).</p>
+      ${lists().map(l => { const it = l.items.find(i => i.ticker === s.ticker); return `<label style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)"><input type="checkbox" data-l="${esc(l.id)}" ${it ? "checked" : ""}><span style="flex:1">${esc(l.name)}</span>${it ? `<span class="faint" style="font-size:12px">added ${esc(fmtDate(it.added))} at ${fmtMoney(it.price)}</span>` : ""}</label>`; }).join("")}
+      <div class="bar" style="justify-content:space-between;margin:12px 0 0"><button class="btn small" id="nl">New list</button><button class="btn primary" id="ok">Done</button></div>`;
+    d.querySelectorAll("input[data-l]").forEach(c => c.onchange = () => { const l = lists().find(x => x.id === c.dataset.l);
+      if (c.checked) l.items.push({ticker: s.ticker, added: DATA.lastDate, price: px}); else l.items = l.items.filter(i => i.ticker !== s.ticker);
+      Store.save(); this.renderNotesAndLists(); this.pickList(s); });
+    $("#nl", d).onclick = () => { d.close(); askText("New watchlist", "", name => { const id = "l" + Date.now().toString(36); lists().push({id, name, items: [{ticker: s.ticker, added: DATA.lastDate, price: px}]}); Store.save(); this.renderNotesAndLists(); toast(`Added to ${name}`); }); };
+    $("#ok", d).onclick = () => d.close();
+    if (!d.open) d.showModal();
+  },
+};
+window.addEventListener("popstate", () => { if (!$("#sheet").hidden) Sheet.close(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden && !$("#dlg").open) history.back(); });
+
+function metricTable(s, c) {
+  const k = s.categories[c]; if (!k) return "";
+  return `<table><thead><tr><th>Metric</th><th class="r">Value</th><th>Rank</th></tr></thead><tbody>${k.metrics.map(m => {
+    if (m.value == null) return `<tr><td>${esc(m.label)}</td><td class="r faint">N/A</td><td class="faint" style="font-size:12px">${esc(m.na || "")}</td></tr>`;
+    const p = m.pct ?? 0;
+    const basis = m.basis === "sector" ? `vs ${m.peers} ${esc(s.sector)} stocks` : `vs all ${m.peers} stocks with data`;
+    return `<tr><td>${esc(m.label)}</td><td class="r num">${fmtMetric(m.key, m.value)}</td><td style="min-width:140px">
+      <div class="pctbar" title="${p.toFixed(0)}th percentile"><i style="width:${p}%;background:${sc(p / 10 + 0.5)}"></i></div>
+      <div class="faint" style="font-size:11.5px;margin-top:3px">${Math.round(m.pct_peer)}th pct ${basis}${m.pct_own != null ? ` · ${Math.round(m.pct_own)}th vs own 3y` : m.own_na ? ` · own history N/A` : ""}</div></td></tr>`; }).join("")}</tbody></table>
+    <p class="faint" style="font-size:11.5px;margin:6px 0 0">Higher rank is better. ${c === "Valuation" ? "Ratios blend sector rank and own-history rank 50/50; 100 means cheapest. " : ""}Category score ${k.score ?? "N/A"} = average rank ${k.avg_pct != null ? k.avg_pct.toFixed(0) : "—"}${k.n_used ? ` across ${k.n_used} of ${k.n_total} metrics` : ""}.</p>`;
+}
+
+function analystCard(s) {
+  const a = s.analyst; if (!a || !a.n_analysts) return `<div class="card"><h3>Analysts</h3><p class="muted">No analyst coverage data.</p></div>`;
+  const r = a.ratings || {}, tot = Object.values(r).reduce((x, y) => x + y, 0) || 1;
+  const RC = [["strongBuy", "Strong buy", "var(--s10)"], ["buy", "Buy", "var(--s8)"], ["hold", "Hold", "var(--s5)"], ["sell", "Sell", "var(--s3)"], ["strongSell", "Strong sell", "var(--s1)"]];
+  const px = lastClose(s), t = a.targets;
+  let range = "";
+  if (t && t.low != null && t.high != null) { const lo = Math.min(t.low, px), hi = Math.max(t.high, px); const P = v => ((v - lo) / (hi - lo || 1) * 100).toFixed(1) + "%";
+    range = `<div class="label" style="margin-top:14px">Price targets</div><div class="rangebar"><div class="track"></div>
+      <div class="mean" style="left:${P(t.mean)}" title="Mean target"></div><div class="mark" style="left:${P(px)}" title="Current price"></div>
+      <span class="tick" style="left:${P(t.low)}">${fmtMoney(t.low, 0)}</span><span class="tick" style="left:${P(t.high)}">${fmtMoney(t.high, 0)}</span></div>
+      <dl class="kv"><dt>Mean target</dt><dd>${fmtMoney(t.mean)} <span class="${cls(t.mean / px - 1)}">(${pct(t.mean / px - 1)})</span></dd><dt>Median</dt><dd>${fmtMoney(t.median)}</dd><dt>Current</dt><dd>${fmtMoney(px)}</dd></dl>`; }
+  const et = a.eps_trend?.["0y"], er = a.eps_revisions?.["0y"];
+  const acts = (a.actions || []).filter(x => ["up", "down", "init"].includes(x.action) || x.pt_action === "Raises" || x.pt_action === "Lowers").slice(0, 25);
+  const AL = {up: ["Upgrade", "good"], down: ["Downgrade", "bad"], init: ["Initiated", "acc"], main: ["Maintained", ""], reit: ["Reiterated", ""]};
+  return `<div class="card"><h3>Analysts <span class="label">${a.n_analysts} covering</span>${a.thin_coverage ? `<span class="badge warn">Thin coverage</span>` : ""}</h3>
+    <div class="label">Ratings this month</div>
+    <div class="distbar">${RC.map(([k, , c]) => r[k] ? `<span style="width:${r[k] / tot * 100}%;background:${c}" title="${k}: ${r[k]}"></span>` : "").join("")}</div>
+    <div class="legend" style="margin:0">${RC.map(([k, l, c]) => `<span><i style="background:${c}"></i>${l} ${r[k] || 0}</span>`).join("")}</div>
+    <dl class="kv" style="margin-top:10px"><dt>Consensus (1 = strong buy, 5 = sell)</dt><dd>${a.rating_mean != null ? a.rating_mean.toFixed(2) : "—"}</dd>
+      ${et ? `<dt>This year’s EPS estimate</dt><dd>${fmtMoney(et.current)} <span class="${cls(et.current / et["90daysAgo"] - 1)}">(${pct(et.current / et["90daysAgo"] - 1)} vs 90 days ago)</span></dd>` : ""}
+      ${er ? `<dt>Estimate revisions, 30 days</dt><dd><span class="up">${er.upLast30days ?? 0} up</span> · <span class="down">${er.downLast30days ?? 0} down</span></dd>` : ""}
+      ${a.upgrades_90d != null ? `<dt>Rating changes, 90 days</dt><dd><span class="up">${a.upgrades_90d} up</span> · <span class="down">${a.downgrades_90d} down</span></dd>` : ""}</dl>
+    ${range}
+    ${acts.length ? `<div class="label" style="margin-top:14px">Recent actions</div><div class="feed">${acts.map(x => { const [l, c] = AL[x.action] || [x.action, ""]; return `<div><span class="faint num">${esc(fmtDate(x.date).replace(/, \d{4}$/, ""))}</span><span style="min-width:0">${esc(x.firm)} · <span class="badge ${c}">${esc(l)}</span> ${esc(x.to || "")}</span><span class="num faint">${x.pt ? fmtMoney(x.pt, 0) : ""}${x.pt_prior && x.pt && x.pt_prior !== x.pt ? ` <span class="${x.pt > x.pt_prior ? "up" : "down"}">${x.pt > x.pt_prior ? "↑" : "↓"}</span>` : ""}</span></div>`; }).join("")}</div>` : ""}
+  </div>`;
+}
+
+function insiderCard(s) {
+  const ins = s.insiders || {}, all = ins.trades || [], sm = ins.summary || {};
+  const F = UI.insiderFilter;
+  const tr = all.filter(t => F === "buys" ? t.code === "P" : F === "sales" ? t.code === "S" && !t.plan_10b5_1 : true);
+  return `<div class="card"><h3>Insider trades <span class="label">last 12 months · ${ins.n_form4 ?? 0} Form 4s</span></h3>
+    <div class="pill-row" style="margin-bottom:10px">
+      <span class="badge good">${sm.buys || 0} buys · ${fmtBig(sm.buy_value || 0)}</span>
+      <span class="badge bad">${sm.disc_sales || 0} discretionary sales · ${fmtBig(sm.disc_sale_value || 0)}</span>
+      <span class="badge">${sm.plan_sales || 0} 10b5-1 plan sales · ${fmtBig(sm.plan_sale_value || 0)}</span>
+      ${sm.ceo_cfo_buys ? `<span class="badge acc">${sm.ceo_cfo_buys} CEO/CFO buys</span>` : ""}
+      ${(ins.clusters || []).map(c => `<span class="badge acc" title="${esc(c.insiders.join(", "))}">Cluster buy ${esc(fmtDate(c.start))}: ${c.insiders.length} insiders</span>`).join("")}
+    </div>
+    <div class="seg" id="insF" style="margin-bottom:8px">${[["buys", "Buys"], ["sales", "Discretionary sales"], ["all", "All incl. plan sales"]].map(([v, l]) => `<button data-f="${v}" aria-pressed="${F === v}">${l}</button>`).join("")}</div>
+    ${tr.length ? `<div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><thead><tr><th>Date</th><th>Insider</th><th class="r">Shares</th><th class="r">Value</th></tr></thead><tbody>${tr.slice(0, 80).map(t => `<tr>
+      <td class="num" style="white-space:nowrap">${esc(fmtDate(t.date).replace(/, (\d{4})$/, " ’$1".slice(0, 0)))}<div class="faint" style="font-size:11px">filed ${esc(fmtDate(t.filed).replace(/, \d{4}$/, ""))}</div></td>
+      <td style="min-width:0">${esc(t.owner)}${t.ceo ? ` <span class="badge acc">CEO</span>` : t.cfo ? ` <span class="badge acc">CFO</span>` : ""}<div class="faint" style="font-size:11.5px">${esc((t.roles || []).join(", "))}${t.code === "S" ? (t.plan_10b5_1 ? ` · 10b5-1 plan (${t.plan_10b5_1 === "footnote" ? "likely, from footnote" : "checkbox"})` : " · not a plan sale") : ""}</div></td>
+      <td class="r num ${t.code === "P" ? "up" : "down"}">${t.code === "P" ? "+" : "−"}${Math.round(t.shares).toLocaleString()}<div class="faint" style="font-size:11px">${t.price ? "@ " + fmtMoney(t.price) : ""}</div></td>
+      <td class="r num">${fmtBig(t.value)}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="muted" style="font-size:14px">${F === "buys" ? "No open-market insider buys in the last 12 months." : F === "sales" ? "No discretionary insider sales in the last 12 months." : "No open-market insider trades in the last 12 months."}</p>`}
+    <p class="faint" style="font-size:11.5px;margin:6px 0 0">Open-market trades only (codes P and S). Option exercises, tax withholding, gifts and grants are excluded.</p>
+  </div>`;
+}
+
+function sharesCard(s) {
+  const h = s.shares_history || []; if (h.length < 2) return `<div class="card"><h3>Share count</h3><p class="muted">Not enough filings to show a trend.</p></div>`;
+  const last = h[h.length - 1][1];
+  const chg = y => { const i = h.length - 1 - y; return i >= 0 ? last / h[i][1] - 1 : null; };
+  const W = 340, H = 120, max = Math.max(...h.map(x => x[1])), min = Math.min(...h.map(x => x[1])), lo = min - (max - min) * 0.6 - 1e-9;
+  const bw = W / h.length;
+  const bars = h.map(([d, v], i) => { const hh = (v - lo) / (max - lo) * (H - 20); return `<rect x="${(i * bw + 2).toFixed(1)}" y="${(H - 16 - hh).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${i === h.length - 1 ? "var(--accent)" : "var(--line)"}"><title>FY ${d.slice(0, 4)}: ${(v / 1e6).toFixed(0)}M shares</title></rect><text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 3}" font-size="9.5" text-anchor="middle" fill="var(--muted)">’${d.slice(2, 4)}</text>`; }).join("");
+  const c1 = chg(1), trend = c1 == null ? "" : c1 < -0.002 ? `<span class="badge good">Buybacks (decreasing)</span>` : c1 > 0.002 ? `<span class="badge bad">Dilution (increasing)</span>` : `<span class="badge">Flat</span>`;
+  return `<div class="card"><h3>Share count ${trend}</h3>
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Diluted shares by fiscal year">${bars}</svg>
+    <dl class="kv" style="margin-top:8px">${[[1, "1 year"], [3, "3 years"], [5, "5 years"], [10, "10 years"]].map(([y, l]) => { const c = chg(y); return c == null ? "" : `<dt>${l}</dt><dd class="${c < 0 ? "up" : c > 0 ? "down" : ""}">${pct(c)}</dd>`; }).join("")}</dl>
+    <p class="faint" style="font-size:11.5px;margin:6px 0 0">Diluted weighted-average shares from 10-K filings, adjusted for stock splits. Latest: ${(last / 1e6).toLocaleString(undefined, {maximumFractionDigits: 0})}M.</p></div>`;
+}
+
+function fundCard(s) {
+  const t = s.ttm || {}; const q = (s.quarterly || []).filter(x => x.revenue != null);
+  const W = 340, H = 110, mx = Math.max(...q.map(x => Math.abs(x.revenue)), 1), bw = W / Math.max(q.length, 1);
+  const bars = q.map((x, i) => { const h = Math.abs(x.revenue) / mx * (H - 22), hn = x.net_income != null ? Math.max(0, x.net_income) / mx * (H - 22) : 0;
+    return `<rect x="${(i * bw + 2).toFixed(1)}" y="${(H - 16 - h).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--line)"><title>${x.end}: revenue ${fmtBig(x.revenue)}</title></rect>
+      <rect x="${(i * bw + 2 + bw * .22).toFixed(1)}" y="${(H - 16 - hn).toFixed(1)}" width="${(bw * .56 - 4).toFixed(1)}" height="${hn.toFixed(1)}" rx="1.5" fill="var(--accent)"><title>${x.end}: net income ${fmtBig(x.net_income)}</title></rect>
+      ${i % 2 === q.length % 2 ? "" : `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 3}" font-size="9.5" text-anchor="middle" fill="var(--muted)">${x.end.slice(2, 7).replace("-", "/")}</text>`}`; }).join("");
+  const rows = [["Revenue", t.revenue], ["Operating income", t.operating_income], ["Net income", t.net_income], ["Free cash flow", t.fcf], ["EBITDA", t.ebitda], ...(s.metric_set === "reit" ? [["FFO (approx.)", t.ffo]] : []), ["Dividends paid", t.dividends_paid ? Math.abs(t.dividends_paid) : null], ["Debt", t.debt], ["Cash & short-term inv.", t.cash_total], ["Equity", t.equity]];
+  return `<div class="card"><h3>Financials <span class="label">trailing 12 months</span></h3>
+    ${q.length ? `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Quarterly revenue and net income">${bars}</svg><div class="legend"><span><i style="background:var(--line)"></i>Quarterly revenue</span><span><i style="background:var(--accent)"></i>Net income</span></div>` : ""}
+    <dl class="kv" style="margin-top:10px">${rows.map(([l, v]) => `<dt>${l}</dt><dd>${fmtBig(v)}</dd>`).join("")}</dl>
+    <p class="faint" style="font-size:11.5px;margin:6px 0 0">From SEC XBRL filings through ${esc(fmtDate(s.latest_period))}. Market cap source: ${esc(s.mcap_source || "—")}.</p></div>`;
+}
+
+function eventsCard(s) {
+  const c = s.calendar || {}, ev = [];
+  (c.earnings || []).forEach(d => ev.push([d, "Earnings" + (c.eps_estimate ? ` · est. EPS ${fmtMoney(c.eps_estimate)}` : ""), "earnings"]));
+  if (c.ex_dividend) ev.push([c.ex_dividend, "Ex-dividend date", "ex_div"]);
+  if (c.dividend_pay) ev.push([c.dividend_pay, "Dividend paid", "pay"]);
+  ev.sort((a, b) => a[0].localeCompare(b[0]));
+  const macro = (DATA.macro || []).filter(m => m.date >= DATA.lastDate).slice(0, 3);
+  return `<div class="card"><h3>Upcoming</h3>${ev.length ? ev.map(([d, l, k]) => `<div class="ev"><i class="dot" style="background:${EVC[k]}"></i><span style="flex:1">${esc(l)}</span><span class="num faint">${esc(fmtDate(d))}${d < DATA.lastDate ? " (past)" : ""}</span></div>`).join("") : `<p class="muted">No dates announced.</p>`}
+    ${macro.length ? `<div class="label" style="margin-top:12px">Market-wide</div>${macro.map(m => `<div class="ev"><i class="dot" style="background:${EVC[m.type === "fomc" ? "fomc" : "macro"]}"></i><span style="flex:1">${esc(m.label)}</span><span class="num faint">${esc(fmtDate(m.date))}</span></div>`).join("")}` : ""}</div>`;
+}
+
+load();
+</script>
