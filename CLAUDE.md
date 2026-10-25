@@ -110,6 +110,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   "Price vs fundamentals" (Tom's NFLX screenshot): weekly closes vs a quarterly-stepped typical-valuation band
   (20th–80th pct of own 3y P/E, or P/S when TTM earnings ≤ 0, × TTM per-share figure), quarter dots with YoY revenue
   growth, weekly RSI(14) panel with simple bullish/bearish divergence detection, drawdown-from-3y-high panel.
+- 2026-10-25 v8: **Russell 2000 added** (Tom: "add the Russell 2000") — iShares IWM 239710; universe ~3,000.
+  App scope + Top Picks scope "Russell 2000"; sizeOf = S&P membership else market cap (≥$10B large, ≥$2B mid).
+  Form 4 budget per run lowered to 30,000 so the cold backfill can't time out; Yahoo budget 2,600.
+  Published data will exceed 60 MB → the weekday task splits into two publishes.
+  Next idea offered to Tom: thematic ETF holdings (nuclear, quantum, robotics, space, cyber…) as theme tags/extra tickers.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

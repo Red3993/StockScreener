@@ -49,7 +49,7 @@ TODAY = date.today()
 CFG = yaml.safe_load((ROOT / "config/scoring.yaml").read_text())
 OVR = yaml.safe_load((ROOT / "config/overrides.yaml").read_text())
 UA = os.environ.get("SEC_USER_AGENT", "")
-ISHARES = {"IWB": 239707, "IVV": 239726, "IJH": 239763, "IJR": 239774}
+ISHARES = {"IWB": 239707, "IVV": 239726, "IJH": 239763, "IJR": 239774, "IWM": 239710}   # IWM = Russell 2000 (Tom, 2026-10-25)
 HEALTH: list[dict] = []
 T0 = time.time()
 
@@ -133,7 +133,8 @@ def load_universe() -> dict[str, dict]:
                 continue
             t = x["Ticker"]
             u = uni.setdefault(t, {"ticker": t, "name": x["Name"].title(), "sector": x["Sector"], "etfs": [], "ivv_weight": 0.0})
-            u["etfs"].append(etf)
+            if etf not in u["etfs"]:
+                u["etfs"].append(etf)
             if etf == "IVV":
                 u["ivv_weight"] = float(x["Weight (%)"].replace(",", "") or 0)
             n += 1

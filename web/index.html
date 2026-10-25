@@ -517,7 +517,7 @@ F("r5", {group: "Price & size", label: "Change, 1 week", unit: "%", get: r => P1
 F("r21", {group: "Price & size", label: "Change, 1 month", unit: "%", get: r => P100(r.d?.r21)});
 F("r63", {group: "Price & size", label: "Change, 3 months", unit: "%", get: r => P100(r.d?.r63)});
 F("r252", {group: "Price & size", label: "Change, 1 year", unit: "%", get: r => P100(r.d?.r252)});
-F("mom", {group: "Technical", label: "Momentum score (0–100)", unit: "", get: r => r.mo?.s ?? null, hint: "Trend + relative strength + buying pressure, ranked vs ~1,650 stocks"});
+F("mom", {group: "Technical", label: "Momentum score (0–100)", unit: "", get: r => r.mo?.s ?? null, hint: "Trend + relative strength + buying pressure, ranked vs every stock in the app"});
 F("stretch", {group: "Technical", label: "Stretch (0–100)", unit: "", get: r => r.mo?.st ?? null, hint: "How extended the price is; above ~75 = overextended"});
 F("pcv", {group: "Technical", label: "Put/call ratio (volume)", unit: "", get: r => r.mo?.pc ?? null, hint: "Above 1 = more puts than calls (fear); below 0.5 = complacent"});
 F("shortPct", {group: "Technical", label: "Short interest (% of float)", unit: "%", get: r => P100(r.mo?.si)});
@@ -567,7 +567,7 @@ function buildMetricFields() {
 }
 function fieldStats(f) { const v = ROWS.map(r => f.get(r)).filter(x => x != null && isFinite(x)).sort((a, b) => a - b); if (!v.length) return null; return {min: v[0], med: v[Math.floor(v.length / 2)], max: v[v.length - 1], n: v.length}; }
 const fmtU = (v, u) => v == null ? "—" : u === "%" ? (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)) + "%" : u === "$" ? "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2)) : u === "$B" ? "$" + v.toFixed(v < 10 ? 1 : 0) + "B" : u === "×" ? v.toFixed(1) + "×" : u === "score" ? String(Math.round(v * 10) / 10) : (Math.round(v * 100) / 100) + (u ? " " + u : "");
-const INDEXES = {IVV: "S&P 500", IJH: "S&P MidCap 400", IJR: "S&P SmallCap 600", IWB: "Russell 1000"};
+const INDEXES = {IVV: "S&P 500", IJH: "S&P MidCap 400", IJR: "S&P SmallCap 600", IWB: "Russell 1000", IWM: "Russell 2000"};
 function passes(r, f) {
   if (f.type === "range") { const fd = FIELDS[f.key]; if (!fd) return true; const v = fd.get(r); if (v == null || !isFinite(v)) return false;
     if (f.min !== "" && f.min != null && v < +f.min) return false; if (f.max !== "" && f.max != null && v > +f.max) return false; return true; }
@@ -664,7 +664,7 @@ function sortedFiltered() {
   return rows;
 }
 const PAGE = 120;
-const SCOPES = [["all", "All"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWB", "Russell 1000"], ["top", "Top 100"]];
+const SCOPES = [["all", "All"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWB", "Russell 1000"], ["IWM", "Russell 2000"], ["top", "Top 100"]];
 function viewStocks() {
   const rows = sortedFiltered();
   const nf = UI.filters.length;
@@ -1074,7 +1074,7 @@ ${stockContext(s)}`;
   toolsFor() {
     if (!this.tools) return undefined;
     return [
-      {name: "get_stock", description: "Returns scores, key metrics, price signals and analyst/insider summary for one ticker in this app (~1,650 US stocks). Use to compare with peers.",
+      {name: "get_stock", description: "Returns scores, key metrics, price signals and analyst/insider summary for one ticker in this app (~3,000 US stocks: Russell 1000 + 2000 and S&P 1500). Use to compare with peers.",
        inputSchema: {type: "object", properties: {ticker: {type: "string"}}, required: ["ticker"]},
        execute: async ({ticker}) => { const t = String(ticker || "").toUpperCase(); const s = await getDetail(t); if (!s) throw new Error("Not in this app: " + ticker); return stockContext(s, false) + "\n" + CATS.map(c => `${c} key metrics: ` + (s.categories?.[c]?.metrics || []).filter(m => m.value != null).slice(0, 4).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)}`).join(", ")).join("\n"); }},
       {name: "list_sector", description: "Lists the 25 largest stocks in a GICS sector with overall and category scores. Sector names: " + [...new Set(ROWS.map(r => r.sec))].join(", ") + ".",
@@ -1505,7 +1505,8 @@ function opportunity(r) {
   const score = Math.max(0, Math.min(100, 0.45 * vScore + 0.25 * qScore + setup + cat));   // no size penalty: small caps compete equally
   return {score, why, vScore, qScore};
 }
-const sizeOf = r => r.ix?.includes("IJR") ? "Small cap" : r.ix?.includes("IJH") ? "Mid cap" : "Large cap";
+// S&P membership decides size when present; otherwise market cap (≥ $10B large, ≥ $2B mid)
+const sizeOf = r => r.ix?.includes("IVV") ? "Large cap" : r.ix?.includes("IJH") ? "Mid cap" : r.ix?.includes("IJR") ? "Small cap" : (r.mc || 0) >= 1e10 ? "Large cap" : (r.mc || 0) >= 2e9 ? "Mid cap" : "Small cap";
 // One ranking across all sizes (no size slots). At most 10 per sector so one cheap sector can't fill the pool.
 const PICKS_N = 25;
 function candidates(n = 45) {
@@ -1524,7 +1525,7 @@ async function viewIdeas() {
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
     <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
-    <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
+    <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWM", "Russell 2000"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
     <div class="list">${headRow("Opportunity score")}${cands.map(({s, o, size}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span><span class="badge">${esc(size || sizeOf(s))}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   bindRows($("#view"));
@@ -1630,7 +1631,7 @@ function momentumCard(s, compact = false) {
       <dt>12-month return (ex last month)</dt><dd class="${cls(i.r12_1)}">${pct(i.r12_1)}</dd><dt>3-month return</dt><dd class="${cls(i.r3m)}">${pct(i.r3m)}</dd>
       <dt>vs 200-day average</dt><dd>${pct(i.vs200)} (${i.vs200_z != null ? (i.vs200_z > 0 ? "+" : "") + i.vs200_z.toFixed(1) + "σ vs own 3y" : ""})</dd><dt>RSI (14-day)</dt><dd>${i.rsi != null ? i.rsi.toFixed(0) : "—"}</dd>`}
     </dl>
-    ${compact ? "" : `<p class="faint small" style="margin-bottom:0">Momentum = 35% trend (price vs 50/200-day averages and their slope) + 35% relative strength (12-month-minus-last-month and 3-month returns) + 30% buying pressure (up-day volume share and On-Balance Volume), each ranked against ~1,650 stocks. Stretch blends RSI, distance above the 200-day versus the stock’s own 3-year range, and closeness to the 52-week high. Put/call and short interest are shown as context, not scored. Options data covers the two nearest expiries.</p>`}
+    ${compact ? "" : `<p class="faint small" style="margin-bottom:0">Momentum = 35% trend (price vs 50/200-day averages and their slope) + 35% relative strength (12-month-minus-last-month and 3-month returns) + 30% buying pressure (up-day volume share and On-Balance Volume), each ranked against every stock in the app. Stretch blends RSI, distance above the 200-day versus the stock’s own 3-year range, and closeness to the 52-week high. Put/call and short interest are shown as context, not scored. Options data covers the two nearest expiries.</p>`}
   </div>`;
 }
 function congressCard(s) {

@@ -142,9 +142,9 @@ def main() -> int:
     ap.add_argument("--zip", default="/tmp/companyfacts.zip")
     ap.add_argument("--politics", default="politics.json")
     ap.add_argument("--hist-quarters", type=int, default=12)
-    ap.add_argument("--form4-budget", type=int, default=60000)
+    ap.add_argument("--form4-budget", type=int, default=30000)   # caps a cold backfill so the run finishes; the rest fills in on later nights
     ap.add_argument("--yahoo-threads", type=int, default=3)
-    ap.add_argument("--yahoo-budget", type=int, default=2000)
+    ap.add_argument("--yahoo-budget", type=int, default=2600)
     ap.add_argument("--limit", type=int, default=0, help="debug: only first N tickers")
     args = ap.parse_args()
     out, cdir = ROOT / args.out, ROOT / args.cache
