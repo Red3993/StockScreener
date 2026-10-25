@@ -1,12 +1,12 @@
 name: Congress trades
-# House PTRs -> politics.json on the `politics-data` branch (incremental: only new filings are fetched).
+# House PTRs (+ Senate from scripts/senate on a home computer) -> politics.json on the `politics-data` branch (incremental: only new filings are fetched).
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths: ["jobs/politics/**", ".github/workflows/politics.yml"]
   schedule:
-    - cron: "17 21 * * 1-5"   # weekdays ~5:15pm ET, before the demo build
+    - cron: "17 23 * * 1-5"   # weekdays ~7:15pm ET: after the Senate script (6:15pm on Tom's computer), before the app build
 permissions:
   contents: write
 concurrency:
@@ -24,8 +24,9 @@ jobs:
       - name: Restore cache
         run: |
           git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no cache yet"
+          git fetch origin senate-data && git show origin/senate-data:senate.json > senate.json || echo "no senate data yet"
       - name: Build
-        run: python jobs/politics/build_politics.py --cache politics.json --out politics.json --years 3 2>&1 | tee politics.log
+        run: python jobs/politics/build_politics.py --cache politics.json --out politics.json --senate senate.json --years 3 2>&1 | tee politics.log
       - name: Publish
         if: always()
         run: |

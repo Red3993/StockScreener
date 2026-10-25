@@ -68,6 +68,7 @@ def main() -> int:
     ap.add_argument("--out", default="politics.json")
     ap.add_argument("--years", type=int, default=3)
     ap.add_argument("--max-new", type=int, default=2500)
+    ap.add_argument("--senate", default="senate.json", help="output of scripts/senate/senate_trades.py (run on a home computer)")
     args = ap.parse_args()
     cache = {"processed": {}, "trades": []}
     if Path(args.cache).exists():
@@ -116,6 +117,29 @@ def main() -> int:
             if new % 100 == 0:
                 log(f"  parsed {new} new filings ({len(trades)} trades total)")
             time.sleep(0.25)
+    # Senate (from the local-runner script); replaces any Senate rows from earlier runs
+    trades = [t for t in trades if t.get("chamber") != "Senate"]
+    senate_stats = None
+    if Path(args.senate).exists():
+        sj = json.loads(Path(args.senate).read_text())
+        sens = [b for b, m in by_bio.items() if m["chamber"] == "Senate"]
+        def match(t):
+            last, first = (t.get("last") or "").lower(), (t.get("first") or "").lower()
+            c = [b for b in sens if by_bio[b]["last"].lower() == last]
+            if len(c) > 1:
+                c = [b for b in c if first[:3] and first[:3] in by_bio[b]["name"].lower()] or c[:1]
+            return c[0] if c else None
+        n = 0
+        for t in sj.get("trades", []):
+            b = match(t)
+            t2 = {k: t.get(k) for k in ("date", "owner", "ticker", "asset", "asset_type", "type", "amount_low", "amount_high", "desc", "filed", "url")}
+            t2.update(chamber="Senate", name=t.get("name"), bioguide=b, district=by_bio[b]["state"] if b else None)
+            trades.append(t2)
+            n += 1
+        senate_stats = {"trades": n, "generated": sj.get("generated"), "reports": (sj.get("stats") or {}).get("reports")}
+        log(f"senate: merged {n} trades (file generated {sj.get('generated')})")
+    else:
+        log("senate: no senate.json (run scripts/senate/senate_trades.py on a home computer)")
     cutoff = f"{y0 - args.years}-{date.today():%m-%d}"
     trades = [t for t in trades if (t.get("date") or "") >= cutoff]
     # refresh member attributes on every run (committees change)
@@ -129,7 +153,8 @@ def main() -> int:
            "stats": {"filings": len(processed), "paper_skipped": sum(1 for v in processed.values() if v["status"] == "paper"),
                      "errors": sum(1 for v in processed.values() if v["status"] == "error"), "trades": len(trades),
                      "with_ticker": sum(1 for t in trades if t.get("ticker")), "new_this_run": new,
-                     "coverage": "House only (Senate eFD blocks cloud IPs)"}}
+                     "senate": senate_stats,
+                     "coverage": "House + Senate" if senate_stats else "House only (Senate script not run yet)"}}
     Path(args.out).write_text(json.dumps(out, separators=(",", ":")))
     log(f"wrote {args.out}: {out['stats']}")
     return 0
