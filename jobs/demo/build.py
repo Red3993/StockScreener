@@ -233,6 +233,15 @@ def yahoo_detail(t: str) -> dict:
         out.setdefault("_errors", []).append(f"{name}: rate limited")
 
     grab("info", lambda: tk.info)
+    for wait in (20, 60):   # Yahoo sometimes answers a throttled request with a near-empty info dict instead of a 429
+        inf = out.get("info") or {}
+        if inf.get("marketCap") or inf.get("longName") or inf.get("shortName"):
+            break
+        time.sleep(wait)
+        tk = yf.Ticker(t)
+        grab("info", lambda: tk.info)
+    if not ((out.get("info") or {}).get("marketCap") or (out.get("info") or {}).get("longName")):
+        out.setdefault("_errors", []).append("info: empty (throttled)")
     grab("news", lambda: (tk.get_news(count=12) if hasattr(tk, "get_news") else tk.news))
 
     def opt_summary():

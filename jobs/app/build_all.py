@@ -91,6 +91,8 @@ def yahoo_fetch(yt: str) -> dict:
 def needs_refresh(entry: dict | None, t: str, is_top: bool) -> bool:
     if not entry:
         return True
+    if not (entry.get("ymcap") or (entry.get("prof") or {}).get("longBusinessSummary")):
+        return True   # incomplete (Yahoo throttled us last time): retry on the next run
     if is_top:
         return entry.get("fetched") != TODAY.isoformat()
     age = (TODAY - date.fromisoformat(entry.get("fetched", "2000-01-01"))).days
@@ -140,7 +142,7 @@ def main() -> int:
     ap.add_argument("--politics", default="politics.json")
     ap.add_argument("--hist-quarters", type=int, default=12)
     ap.add_argument("--form4-budget", type=int, default=60000)
-    ap.add_argument("--yahoo-threads", type=int, default=4)
+    ap.add_argument("--yahoo-threads", type=int, default=3)
     ap.add_argument("--yahoo-budget", type=int, default=2000)
     ap.add_argument("--limit", type=int, default=0, help="debug: only first N tickers")
     args = ap.parse_args()
