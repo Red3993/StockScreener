@@ -273,9 +273,9 @@ const CAT_SHORT = {"Valuation":"Val","Profitability":"Prof","Financial Health":"
 const sc = n => n == null ? "var(--sunk)" : `var(--s${Math.max(1, Math.min(10, Math.round(n)))})`;
 const chip = (n, title = "") => n == null ? `<span class="chip na" title="${esc(title)}">–</span>` : `<span class="chip" style="background:${sc(n)}" title="${esc(title)}">${typeof n === "number" && n % 1 ? n.toFixed(1) : n}</span>`;
 const ruler = n => `<div class="ruler" aria-hidden="true">${Array.from({length: 10}, (_, i) => `<i style="${n != null && i < Math.round(n) ? `background:${sc(n)}` : ""}"></i>`).join("")}</div>`;
-const scores7 = s => `<div class="scores7">${CATS.map(c => { const k = s.categories?.[c] || {}; return k.score == null
-  ? `<span class="sc7 na" title="${esc(c)}: ${esc(k.na || "N/A")}"><small>${CAT_SHORT[c]}</small><b>–</b></span>`
-  : `<span class="sc7" style="background:${sc(k.score)}" title="${esc(c)}"><small>${CAT_SHORT[c]}</small><b>${k.score}</b></span>`; }).join("")}</div>`;
+const scores7 = r => `<div class="scores7">${CATS.map((c, i) => { const v = r.cs?.[i]; return v == null
+  ? `<span class="sc7 na" title="${esc(c)}: ${esc(r.na?.[c] || "N/A")}"><small>${CAT_SHORT[c]}</small><b>–</b></span>`
+  : `<span class="sc7" style="background:${sc(v)}" title="${esc(c)}"><small>${CAT_SHORT[c]}</small><b>${v}</b></span>`; }).join("")}</div>`;
 const fmtMoney = (v, d = 2) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
   return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
@@ -301,11 +301,22 @@ function toast(msg) { const t = document.createElement("div"); t.className = "to
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // ================================================================ state
-let DATA = null, BY = {}, DER = {};
-const UI = {mk: {ins: true, cong: true}, tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calFilter: "all", calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
+let DATA = null, BY = {}, DER = {}, ROWS = [], RB = {};   // ROWS/RB: index rows (all stocks); BY/DER: loaded detail
+const SHARD_CACHE = {};
+const pad2 = n => String(n).padStart(2, "0");
+async function getDetail(t) {
+  if (BY[t]) return BY[t];
+  const r = RB[t]; if (!r) return null;
+  if (!SHARD_CACHE[r.sh]) SHARD_CACHE[r.sh] = fetch(`detail/${pad2(r.sh)}.json`, {cache: "no-cache"}).then(x => { if (!x.ok) throw new Error("HTTP " + x.status); return x.json(); });
+  const shard = await SHARD_CACHE[r.sh];
+  for (const [k, v] of Object.entries(shard)) if (!BY[k]) { BY[k] = v; DER[k] = derive(v); }
+  return BY[t] || null;
+}
+const lab = m => DATA.labels?.[m.key] || m.label || m.key;
+const UI = {calFilter: "top", mk: {ins: true, cong: true}, scope: "all", page: 1, tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
 try { Object.assign(UI, JSON.parse(localStorage.getItem("ss-ui2") || "{}")); } catch (e) {}
 UI.q = ""; UI.dtab = "overview";
-const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, mk: UI.mk, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
+const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({scope: UI.scope, tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, mk: UI.mk, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
 
 // Watchlists, notes, saved screens: owner-only database doc; AI synopses: one doc per stock. Browser fallback.
 const Store = {
@@ -426,34 +437,36 @@ function derive(s) {
 const P100 = v => v == null ? null : v * 100;
 const FIELDS = {};
 const F = (key, o) => FIELDS[key] = {key, ...o};
-F("overall", {group: "Scores", label: "Overall score", unit: "score", get: s => s.overall});
-CATS.forEach(c => F("cat:" + c, {group: "Scores", label: c + " score", unit: "score", get: s => s.categories?.[c]?.score ?? null}));
-F("minCat", {group: "Scores", label: "Every category score at least…", unit: "score", get: (s, d) => d.minCat, minOnly: true});
-F("fromLow", {group: "52-week range", label: "% above 52-week low", unit: "%", get: (s, d) => P100(d.fromLow)});
-F("fromHigh", {group: "52-week range", label: "% below 52-week high", unit: "%", get: (s, d) => d.fromHigh == null ? null : -P100(d.fromHigh), hint: "0 = at the high"});
-F("pos52", {group: "52-week range", label: "Position in 52-week range", unit: "%", get: (s, d) => P100(d.pos52), hint: "0 = at the low, 100 = at the high"});
-F("price", {group: "Price & size", label: "Price", unit: "$", get: (s, d) => d.price});
-F("mcapB", {group: "Price & size", label: "Market cap ($B)", unit: "$B", get: s => s.mcap ? s.mcap / 1e9 : null});
-F("chg1d", {group: "Price & size", label: "Change today", unit: "%", get: (s, d) => P100(d.chg1d)});
-F("r5", {group: "Price & size", label: "Change, 1 week", unit: "%", get: (s, d) => P100(d.r5)});
-F("r21", {group: "Price & size", label: "Change, 1 month", unit: "%", get: (s, d) => P100(d.r21)});
-F("r63", {group: "Price & size", label: "Change, 3 months", unit: "%", get: (s, d) => P100(d.r63)});
-F("r252", {group: "Price & size", label: "Change, 1 year", unit: "%", get: (s, d) => P100(d.r252)});
-F("beta", {group: "Price & size", label: "Beta", unit: "", get: (s, d) => d.beta});
-F("mom", {group: "Technical", label: "Momentum score (0–100)", unit: "", get: s => s.momentum?.score ?? null, hint: "Trend + relative strength + buying pressure, ranked vs ~1,650 stocks"});
-F("stretch", {group: "Technical", label: "Stretch (0–100)", unit: "", get: s => s.momentum?.stretch ?? null, hint: "How extended the price is; above ~75 = overextended"});
-F("pcv", {group: "Technical", label: "Put/call ratio (volume)", unit: "", get: s => s.momentum?.inputs?.put_call_volume ?? null, hint: "Above 1 = more puts than calls (fear); below 0.5 = complacent"});
-F("shortPct", {group: "Technical", label: "Short interest (% of float)", unit: "%", get: s => P100(s.momentum?.inputs?.short_pct_float)});
-F("rsi", {group: "Technical", label: "RSI (14-day)", unit: "", get: (s, d) => d.rsi, hint: "Below 30 = oversold, above 70 = overbought"});
-F("vs50", {group: "Technical", label: "% vs 50-day average", unit: "%", get: (s, d) => P100(d.vs50)});
-F("vs200", {group: "Technical", label: "% vs 200-day average", unit: "%", get: (s, d) => P100(d.vs200)});
-F("upside", {group: "Analysts & insiders", label: "Upside to mean price target", unit: "%", get: (s, d) => P100(d.upside)});
-F("nAnalysts", {group: "Analysts & insiders", label: "Number of analysts", unit: "", get: (s, d) => d.nAnalysts});
-F("ratingMean", {group: "Analysts & insiders", label: "Consensus rating (1 = strong buy)", unit: "", get: s => s.analyst?.rating_mean ?? null});
-F("buys90", {group: "Analysts & insiders", label: "Insider buys, last 90 days", unit: "", get: (s, d) => d.buys90});
-F("discSales90", {group: "Analysts & insiders", label: "Discretionary insider sales, 90 days", unit: "", get: (s, d) => d.discSales90});
-F("congress90", {group: "Analysts & insiders", label: "Committee-relevant congressional buys, 90 days", unit: "", get: (s, d) => d.congBuys90});
-F("daysToEarnings", {group: "Analysts & insiders", label: "Days until earnings", unit: "days", get: (s, d) => d.daysToEarnings != null && d.daysToEarnings >= 0 ? d.daysToEarnings : null});
+const ci = c => CATS.indexOf(c);
+const daysTo = ds => ds ? Math.round((new Date(ds + "T12:00:00") - new Date(DATA.lastDate + "T12:00:00")) / 864e5) : null;
+F("overall", {group: "Scores", label: "Overall score", unit: "score", get: r => r.ov});
+CATS.forEach(c => F("cat:" + c, {group: "Scores", label: c + " score", unit: "score", get: r => r.cs?.[ci(c)] ?? null}));
+F("minCat", {group: "Scores", label: "Every category score at least…", unit: "score", get: r => { const v = (r.cs || []).filter(x => x != null); return v.length ? Math.min(...v) : null; }, minOnly: true});
+F("own", {group: "Scores", label: "Cheapness vs own 3-year history (0–100)", unit: "", get: r => r.own, hint: "Average own-history percentile of the valuation ratios; 100 = cheapest in 3 years"});
+F("fromLow", {group: "52-week range", label: "% above 52-week low", unit: "%", get: r => P100(r.d?.fl)});
+F("fromHigh", {group: "52-week range", label: "% below 52-week high", unit: "%", get: r => r.d?.fh == null ? null : -P100(r.d.fh), hint: "0 = at the high"});
+F("pos52", {group: "52-week range", label: "Position in 52-week range", unit: "%", get: r => P100(r.d?.pos), hint: "0 = at the low, 100 = at the high"});
+F("price", {group: "Price & size", label: "Price", unit: "$", get: r => r.d?.px});
+F("mcapB", {group: "Price & size", label: "Market cap ($B)", unit: "$B", get: r => r.mc ? r.mc / 1e9 : null});
+F("chg1d", {group: "Price & size", label: "Change today", unit: "%", get: r => P100(r.d?.c1)});
+F("r5", {group: "Price & size", label: "Change, 1 week", unit: "%", get: r => P100(r.d?.r5)});
+F("r21", {group: "Price & size", label: "Change, 1 month", unit: "%", get: r => P100(r.d?.r21)});
+F("r63", {group: "Price & size", label: "Change, 3 months", unit: "%", get: r => P100(r.d?.r63)});
+F("r252", {group: "Price & size", label: "Change, 1 year", unit: "%", get: r => P100(r.d?.r252)});
+F("mom", {group: "Technical", label: "Momentum score (0–100)", unit: "", get: r => r.mo?.s ?? null, hint: "Trend + relative strength + buying pressure, ranked vs ~1,650 stocks"});
+F("stretch", {group: "Technical", label: "Stretch (0–100)", unit: "", get: r => r.mo?.st ?? null, hint: "How extended the price is; above ~75 = overextended"});
+F("pcv", {group: "Technical", label: "Put/call ratio (volume)", unit: "", get: r => r.mo?.pc ?? null, hint: "Above 1 = more puts than calls (fear); below 0.5 = complacent"});
+F("shortPct", {group: "Technical", label: "Short interest (% of float)", unit: "%", get: r => P100(r.mo?.si)});
+F("rsi", {group: "Technical", label: "RSI (14-day)", unit: "", get: r => r.d?.rsi ?? null, hint: "Below 30 = oversold, above 70 = overbought"});
+F("vs50", {group: "Technical", label: "% vs 50-day average", unit: "%", get: r => P100(r.d?.v50)});
+F("vs200", {group: "Technical", label: "% vs 200-day average", unit: "%", get: r => P100(r.d?.v200)});
+F("upside", {group: "Analysts & insiders", label: "Upside to mean price target", unit: "%", get: r => r.a?.tm && r.d?.px ? (r.a.tm / r.d.px - 1) * 100 : null});
+F("nAnalysts", {group: "Analysts & insiders", label: "Number of analysts", unit: "", get: r => r.a?.n ?? null});
+F("ratingMean", {group: "Analysts & insiders", label: "Consensus rating (1 = strong buy)", unit: "", get: r => r.a?.rm ?? null});
+F("buys90", {group: "Analysts & insiders", label: "Insider buys, last 90 days", unit: "", get: r => r.i?.b90 ?? 0});
+F("discSales90", {group: "Analysts & insiders", label: "Discretionary insider sales, 90 days", unit: "", get: r => r.i?.ds90 ?? 0});
+F("congress90", {group: "Analysts & insiders", label: "Committee-relevant congressional buys, 90 days", unit: "", get: r => r.cg?.b90 ?? 0});
+F("daysToEarnings", {group: "Analysts & insiders", label: "Days until earnings", unit: "days", get: r => { const d = daysTo(r.e?.earn); return d != null && d >= 0 ? d : null; }});
 const METRIC_LABELS = {};
 // technical / event flags: within the last N trading days
 const FLAGS = {
@@ -465,42 +478,49 @@ const FLAGS = {
   rsi_lt30: "RSI below 30 (oversold)", rsi_gt70: "RSI above 70 (overbought)",
 };
 const STATE_FLAGS = {
-  above200: ["Above 200-day average", (s, d) => d.above200 === true], below200: ["Below 200-day average", (s, d) => d.above200 === false],
-  goldenState: ["50-day above 200-day (uptrend)", (s, d) => d.golden === true], deathState: ["50-day below 200-day (downtrend)", (s, d) => d.golden === false],
-  insiderBuy90: ["Any insider buy, 90 days", (s, d) => d.buys90 > 0], ceoBuy90: ["CEO or CFO buy, 90 days", (s, d) => d.ceo90], cluster90: ["Cluster buy, 90 days", (s, d) => d.cluster90],
-  upgrade90: ["Net analyst upgrades, 90 days", (s, d) => (d.upgrades90 ?? 0) > (d.downgrades90 ?? 0)],
-  knife: ["Momentum: falling knife", s => s.momentum?.regime === "Falling knife"], basing: ["Momentum: basing / turning", s => s.momentum?.regime === "Basing / turning"],
-  healthy: ["Momentum: healthy uptrend", s => s.momentum?.regime === "Healthy uptrend"], extended: ["Momentum: overextended", s => s.momentum?.regime === "Overextended"],
-  congBuy90: ["Committee-relevant congressional buy, 90 days", (s, d) => d.congBuys90 > 0],
-  paysDiv: ["Pays a dividend", s => s.categories?.Dividends?.score != null], thinCov: ["Thin analyst coverage", s => !!s.analyst?.thin_coverage],
+  above200: ["Above 200-day average", r => r.d?.ab200 === true], below200: ["Below 200-day average", r => r.d?.ab200 === false],
+  goldenState: ["50-day above 200-day (uptrend)", r => r.d?.gold === true], deathState: ["50-day below 200-day (downtrend)", r => r.d?.gold === false],
+  knife: ["Momentum: falling knife", r => r.mo?.rg === "Falling knife"], basing: ["Momentum: basing / turning", r => r.mo?.rg === "Basing / turning"],
+  healthy: ["Momentum: healthy uptrend", r => r.mo?.rg === "Healthy uptrend"], extended: ["Momentum: overextended", r => r.mo?.rg === "Overextended"],
+  insiderBuy90: ["Any insider buy, 90 days", r => (r.i?.b90 || 0) > 0], ceoBuy90: ["CEO or CFO buy, 90 days", r => !!r.i?.ceo], cluster90: ["Cluster buy, 90 days", r => !!r.i?.cl],
+  congBuy90: ["Committee-relevant congressional buy, 90 days", r => (r.cg?.b90 || 0) > 0],
+  upgrade90: ["Net analyst upgrades, 90 days", r => (r.a?.ug ?? 0) > (r.a?.dg ?? 0)],
+  paysDiv: ["Pays a dividend", r => r.cs?.[4] != null], thinCov: ["Thin analyst coverage", r => !!r.a?.thin],
 };
+const METRIC_CAT = {Valuation: ["ev_ebitda","pfcf","pe","peg","ps","pb","ptbv","pffo"], Profitability: ["roic","fcf_margin","operating_margin","gross_margin","roe","net_margin","op_margin_trend","roa","efficiency_ratio","nii_to_assets"],
+  "Financial Health": ["debt_to_equity","interest_coverage","net_cash_to_mcap","altman_z","current_ratio","tangible_equity_ratio"],
+  Growth: ["eps_growth_3y","rev_growth_3y","fcf_growth_3y","rev_growth_1y","eps_growth_1y","growth_consistency","rev_growth_5y","eps_growth_5y","fcf_growth_1y","ffo_growth_3y","ffo_growth_1y"],
+  Dividends: ["payout_fcf","div_growth_streak","div_yield","payout_earnings","div_fcf_coverage","payout_ffo"], Management: ["roic_minus_coc","share_change_3y","insider_net_buy_pct","share_change_1y"],
+  Analyst: ["eps_rev_90d","net_upgrades_90d","target_upside","eps_revisions_net_30d","rating_mean"]};
 function buildMetricFields() {
-  for (const s of DATA.stocks) for (const c of CATS) for (const m of s.categories?.[c]?.metrics || []) {
-    if (FIELDS["m:" + m.key]) continue;
-    const isP = PCT_KEYS.has(m.key) && !["insider_net_buy_pct"].includes(m.key);
-    METRIC_LABELS[m.key] = m.label;
-    F("m:" + m.key, {group: "Financial metrics · " + c, label: m.label, unit: isP ? "%" : m.key === "div_growth_streak" ? "yrs" : (["rating_mean","altman_z","eps_revisions_net_30d","net_upgrades_90d","insider_net_buy_pct"].includes(m.key) ? "" : "×"),
-      get: (s, d) => { const v = d.metrics[m.key]; return v == null ? null : (isP ? v * 100 : m.key === "insider_net_buy_pct" ? v * 100 : v); }});
+  for (const c of CATS) for (const k of METRIC_CAT[c]) {
+    if (FIELDS["m:" + k] || !DATA.labels?.[k]) continue;
+    const isP = PCT_KEYS.has(k);
+    METRIC_LABELS[k] = DATA.labels[k];
+    F("m:" + k, {group: "Financial metrics · " + c, label: DATA.labels[k], unit: isP ? "%" : k === "div_growth_streak" ? "yrs" : (["rating_mean","altman_z","eps_revisions_net_30d","net_upgrades_90d"].includes(k) ? "" : "×"),
+      get: r => { const v = r.m?.[k]; return v == null ? null : (isP ? v * 100 : v); }});
   }
 }
-function fieldStats(f) { const v = DATA.stocks.map(s => f.get(s, DER[s.ticker])).filter(x => x != null && isFinite(x)).sort((a, b) => a - b); if (!v.length) return null; return {min: v[0], med: v[Math.floor(v.length / 2)], max: v[v.length - 1], n: v.length}; }
-const fmtU = (v, u) => v == null ? "—" : u === "%" ? (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)) + "%" : u === "$" ? "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2)) : u === "$B" ? "$" + v.toFixed(0) + "B" : u === "×" ? v.toFixed(1) + "×" : u === "score" ? String(Math.round(v * 10) / 10) : (Math.round(v * 100) / 100) + (u ? " " + u : "");
-
-function passes(s, f) {
-  const d = DER[s.ticker];
-  if (f.type === "range") { const fd = FIELDS[f.key]; if (!fd) return true; const v = fd.get(s, d); if (v == null || !isFinite(v)) return false;
+function fieldStats(f) { const v = ROWS.map(r => f.get(r)).filter(x => x != null && isFinite(x)).sort((a, b) => a - b); if (!v.length) return null; return {min: v[0], med: v[Math.floor(v.length / 2)], max: v[v.length - 1], n: v.length}; }
+const fmtU = (v, u) => v == null ? "—" : u === "%" ? (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)) + "%" : u === "$" ? "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2)) : u === "$B" ? "$" + v.toFixed(v < 10 ? 1 : 0) + "B" : u === "×" ? v.toFixed(1) + "×" : u === "score" ? String(Math.round(v * 10) / 10) : (Math.round(v * 100) / 100) + (u ? " " + u : "");
+const INDEXES = {IVV: "S&P 500", IJH: "S&P MidCap 400", IJR: "S&P SmallCap 600", IWB: "Russell 1000"};
+function passes(r, f) {
+  if (f.type === "range") { const fd = FIELDS[f.key]; if (!fd) return true; const v = fd.get(r); if (v == null || !isFinite(v)) return false;
     if (f.min !== "" && f.min != null && v < +f.min) return false; if (f.max !== "" && f.max != null && v > +f.max) return false; return true; }
-  if (f.type === "flag") { const b = d.ev[f.key]; return b != null && b < (+f.days || 7); }
-  if (f.type === "state") return !!STATE_FLAGS[f.key]?.[1](s, d);
-  if (f.type === "sector") return !f.values?.length || f.values.includes(s.sector);
+  if (f.type === "flag") { const b = r.d?.ev?.[f.key]; return b != null && b < (+f.days || 7); }
+  if (f.type === "state") return !!STATE_FLAGS[f.key]?.[1](r);
+  if (f.type === "sector") return !f.values?.length || f.values.includes(r.sec);
+  if (f.type === "index") return !f.values?.length || f.values.some(v => r.ix?.includes(v));
   return true;
 }
+const inScope = r => UI.scope === "all" || (UI.scope === "top" ? r.top : r.ix?.includes(UI.scope));
 function describe(f) {
   if (f.type === "range") { const fd = FIELDS[f.key]; if (!fd) return "?"; const u = fd.unit; const has = x => x !== "" && x != null;
     return has(f.min) && has(f.max) ? `${fd.label}: ${fmtU(+f.min, u)} – ${fmtU(+f.max, u)}` : has(f.min) ? `${fd.label} ≥ ${fmtU(+f.min, u)}` : has(f.max) ? `${fd.label} ≤ ${fmtU(+f.max, u)}` : fd.label + ": any"; }
   if (f.type === "flag") return `${FLAGS[f.key]} · last ${f.days || 7} days`;
   if (f.type === "state") return STATE_FLAGS[f.key]?.[0] || f.key;
   if (f.type === "sector") return f.values?.length === 1 ? f.values[0] : `${f.values?.length || 0} sectors`;
+  if (f.type === "index") return (f.values || []).map(v => INDEXES[v]).join(" or ") || "Any index";
   return "";
 }
 const PRESETS = [
@@ -517,14 +537,14 @@ const PRESETS = [
 
 // ================================================================ load
 async function load() {
-  try { const r = await fetch("demo.json", {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status); DATA = await r.json(); }
+  try { const r = await fetch("index.json", {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status); DATA = await r.json(); }
   catch (e) { $("#view").innerHTML = `<div class="empty">Couldn’t load the data file (${esc(e.message)}). Reload the page to try again.</div>`; $("#asof").textContent = "No data"; return; }
   DATA.lastDate = DATA.dates[DATA.dates.length - 1];
-  DATA.stocks.forEach(s => { BY[s.ticker] = s; });
-  DATA.stocks.forEach(s => { DER[s.ticker] = derive(s); });
+  ROWS = DATA.rows; ROWS.forEach(r => { RB[r.t] = r; });
+  DATA.top_n = DATA.count;
   buildMetricFields();
   UI.filters = (UI.filters || []).filter(f => f.type !== "range" || FIELDS[f.key]);
-  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}<br><span class="faint">${DATA.top_n} stocks · ranked vs ${DATA.fundamentals_rows.toLocaleString()}</span>`;
+  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
   render();
   await Store.init();
   AI.init();
@@ -542,36 +562,39 @@ function render() {
 function rerender() { if (!DATA) return; if ($("#fpanel").hidden) render(); if (!$("#sheet").hidden && Sheet.t) Sheet.refreshLists(); }
 
 // ================================================================ stock list
-function stockRow(s, extra = "") {
-  const d = DER[s.ticker];
-  const pos = d.pos52 != null ? Math.max(0, Math.min(1, d.pos52)) : null;
-  return `<button class="row" data-t="${esc(s.ticker)}">
-    <div class="id"><div class="tk">${esc(s.ticker)}</div><div class="nm">${esc(s.name)}</div>${extra}</div>
-    <div class="px">${fmtMoney(d.price)}<small class="${cls(d.chg1d)}">${pct(d.chg1d, 2)}</small>${pos != null ? `<div class="r52" title="52-week range: ${fmtMoney(d.lo52)} – ${fmtMoney(d.hi52)}"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
-    <div class="ov">${chip(s.overall, "Overall")}</div>
-    ${scores7(s)}</button>`;
+function stockRow(r, extra = "") {
+  const d = r.d || {};
+  const pos = d.pos != null ? Math.max(0, Math.min(1, d.pos)) : null;
+  return `<button class="row" data-t="${esc(r.t)}">
+    <div class="id"><div class="tk">${esc(r.t)}</div><div class="nm">${esc(r.n)}</div>${extra}</div>
+    <div class="px">${fmtMoney(d.px)}<small class="${cls(d.c1)}">${pct(d.c1, 2)}</small>${pos != null ? `<div class="r52" title="52-week range: ${fmtMoney(d.lo)} – ${fmtMoney(d.hi)}"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
+    <div class="ov">${chip(r.ov, "Overall")}</div>
+    ${scores7(r)}</button>`;
 }
 function bindRows(root) { $$(".row[data-t]", root).forEach(b => b.onclick = () => Sheet.open(b.dataset.t)); }
 const headRow = first => `<div class="head label"><span>${first}</span><span>Price · 52-wk</span><span>All</span><span class="scores7" style="gap:3px">${CATS.map(c => `<span style="text-align:center" title="${c}">${CAT_SHORT[c]}</span>`).join("")}</span></div>`;
-function whyChips(s) {
-  const d = DER[s.ticker];
+function whyChips(r) {
   return UI.filters.filter(f => f.type === "range" && !f.key.startsWith("cat:") && f.key !== "overall" || f.type === "flag").slice(0, 3).map(f => {
-    if (f.type === "flag") { const b = d.ev[f.key]; return `<span class="badge acc">${esc(FLAGS[f.key].split(" (")[0])} ${b === 0 ? "today" : b + "d ago"}</span>`; }
-    const fd = FIELDS[f.key]; return `<span class="badge">${esc(fd.label.replace(/…$/, ""))}: ${fmtU(fd.get(s, d), fd.unit)}</span>`; }).join("");
+    if (f.type === "flag") { const b = r.d?.ev?.[f.key]; return `<span class="badge acc">${esc(FLAGS[f.key].split(" (")[0])} ${b === 0 ? "today" : b + "d ago"}</span>`; }
+    const fd = FIELDS[f.key]; return `<span class="badge">${esc(fd.label.replace(/…$/, ""))}: ${fmtU(fd.get(r), fd.unit)}</span>`; }).join("");
 }
-const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["ticker", "Ticker A–Z"]];
+const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
 const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc"};
 function sortedFiltered() {
-  let rows = DATA.stocks.filter(s => (!UI.q || (s.ticker + " " + s.name).toLowerCase().includes(UI.q.toLowerCase())) && UI.filters.every(f => passes(s, f)));
+  const q = UI.q.toLowerCase();
+  let rows = ROWS.filter(r => inScope(r) && (!q || r.t.toLowerCase().startsWith(q) || r.n.toLowerCase().includes(q)) && UI.filters.every(f => passes(r, f)));
   const k = UI.sort, dir = UI.dir === "asc" ? 1 : -1;
-  const val = s => k === "ticker" ? null : FIELDS[k]?.get(s, DER[s.ticker]);
-  rows.sort((a, b) => { if (k === "ticker") return dir * a.ticker.localeCompare(b.ticker);
-    const va = val(a), vb = val(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return dir * (va - vb) || (b.overall ?? 0) - (a.overall ?? 0); });
+  rows.sort((a, b) => { if (k === "ticker") return dir * a.t.localeCompare(b.t);
+    const va = FIELDS[k]?.get(a), vb = FIELDS[k]?.get(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return dir * (va - vb) || (b.ov ?? 0) - (a.ov ?? 0); });
+  if (q) rows.sort((a, b) => (b.t.toLowerCase() === q) - (a.t.toLowerCase() === q));
   return rows;
 }
+const PAGE = 120;
+const SCOPES = [["all", "All"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWB", "Russell 1000"], ["top", "Top 100"]];
 function viewStocks() {
   const rows = sortedFiltered();
   const nf = UI.filters.length;
+  const shown = rows.slice(0, PAGE * UI.page);
   $("#view").innerHTML = `
     <div class="bar">
       <input class="search" id="q" type="search" placeholder="Search ticker or name" value="${esc(UI.q)}" aria-label="Search">
@@ -579,12 +602,16 @@ function viewStocks() {
       <select class="sel" id="sort" aria-label="Sort by">${SORTS.map(([v, l]) => `<option value="${v}" ${v === UI.sort ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
       <button class="btn small" id="dir" aria-label="Sort direction" title="Reverse order">${UI.dir === "asc" ? "↑" : "↓"}</button>
     </div>
+    <div class="seg" id="scope" style="margin-bottom:10px">${SCOPES.map(([v, l]) => `<button data-sc="${v}" aria-pressed="${UI.scope === v}">${l}</button>`).join("")}</div>
     ${nf ? `<div class="fchips">${UI.filters.map((f, i) => `<span class="fchip"><button class="edit" data-i="${i}">${esc(describe(f))}</button><button data-x="${i}" aria-label="Remove filter">×</button></span>`).join("")}<button class="link" id="clearF" style="font-size:13px">Clear all</button></div>`
       : `<div class="presets">${PRESETS.map(([l], i) => `<button data-p="${i}">${esc(l)}</button>`).join("")}</div>`}
-    <div class="list">${headRow(rows.length + " of " + DATA.stocks.length + " stocks")}${rows.map(s => stockRow(s, nf ? `<div class="why">${whyChips(s)}</div>` : "")).join("") || `<div class="empty">No stocks match these filters.<br><button class="btn small" id="clearF2" style="margin-top:10px">Clear filters</button></div>`}</div>
+    <div class="list">${headRow(rows.length.toLocaleString() + " of " + ROWS.length.toLocaleString() + " stocks")}${shown.map(r => stockRow(r, nf ? `<div class="why">${whyChips(r)}</div>` : "")).join("") || `<div class="empty">No stocks match these filters.<br><button class="btn small" id="clearF2" style="margin-top:10px">Clear filters</button></div>`}</div>
+    ${rows.length > shown.length ? `<div style="text-align:center;margin-top:12px"><button class="btn" id="more">Show ${Math.min(PAGE, rows.length - shown.length)} more of ${(rows.length - shown.length).toLocaleString()}</button></div>` : ""}
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
-  const q = $("#q"); q.oninput = () => { UI.q = q.value; const pos = q.selectionStart; viewStocks(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
-  $("#sort").onchange = e => { UI.sort = e.target.value; UI.dir = DEFAULT_DIR[UI.sort] || "desc"; saveUI(); viewStocks(); };
+  $$("[data-sc]").forEach(b => b.onclick = () => { UI.scope = b.dataset.sc; UI.page = 1; saveUI(); viewStocks(); });
+  $("#more") && ($("#more").onclick = () => { UI.page++; const y = window.scrollY; viewStocks(); window.scrollTo(0, y); });
+  const q = $("#q"); q.oninput = () => { UI.q = q.value; UI.page = 1; const pos = q.selectionStart; viewStocks(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#sort").onchange = e => { UI.page = 1; UI.sort = e.target.value; UI.dir = DEFAULT_DIR[UI.sort] || "desc"; saveUI(); viewStocks(); };
   $("#dir").onclick = () => { UI.dir = UI.dir === "asc" ? "desc" : "asc"; saveUI(); viewStocks(); };
   $("#openF").onclick = () => Filters.open();
   $$("[data-p]").forEach(b => b.onclick = () => { UI.filters = JSON.parse(JSON.stringify(PRESETS[+b.dataset.p][1])); const k0 = UI.filters[0]; if (k0.key === "fromLow") { UI.sort = "fromLow"; UI.dir = "asc"; } saveUI(); viewStocks(); });
@@ -599,11 +626,11 @@ function viewStocks() {
 const Filters = {
   draft: [], adding: false,
   open() { this.draft = JSON.parse(JSON.stringify(UI.filters)); this.adding = !this.draft.length; const p = $("#fpanel"); p.hidden = false; document.body.style.overflow = "hidden"; this.render(); p.scrollTop = 0; },
-  close(apply) { if (apply) { UI.filters = this.draft.filter(f => f.type !== "range" || (f.min !== "" && f.min != null) || (f.max !== "" && f.max != null)); saveUI(); } $("#fpanel").hidden = true; document.body.style.overflow = ""; render(); },
-  count() { return DATA.stocks.filter(s => this.draft.every(f => passes(s, f))).length; },
+  close(apply) { if (apply) { UI.page = 1; UI.filters = this.draft.filter(f => f.type !== "range" || (f.min !== "" && f.min != null) || (f.max !== "" && f.max != null)); saveUI(); } $("#fpanel").hidden = true; document.body.style.overflow = ""; render(); },
+  count() { return ROWS.filter(r => inScope(r) && this.draft.every(f => passes(r, f))).length; },
   render() {
     const p = $("#fpanel"), n = this.count();
-    const sectors = [...new Set(DATA.stocks.map(s => s.sector))].sort();
+    const sectors = [...new Set(ROWS.map(r => r.sec))].sort();
     const screens = Store.state.screens || [];
     p.innerHTML = `
       <div class="panel-top"><div class="top-row"><button class="back" id="fcx">Cancel</button><h2 style="font-size:18px">Filters</h2>
@@ -627,9 +654,10 @@ const Filters = {
     $$("[data-load]", p).forEach(b => b.onclick = () => { const sc = screens.find(x => x.id === b.dataset.load); this.draft = JSON.parse(JSON.stringify(sc.filters)); this.adding = false; this.render(); });
     $$("[data-rm]", p).forEach(b => b.onclick = () => { this.draft.splice(+b.dataset.rm, 1); this.render(); });
     $$("input[data-i]", p).forEach(inp => inp.oninput = () => { const f = this.draft[+inp.dataset.i]; f[inp.dataset.k] = inp.value; $("#fok").textContent = `Show ${this.count()} stocks`; });
+    $$("[data-ixv]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi]; const v = b.dataset.ixv; f.values = f.values.includes(v) ? f.values.filter(x => x !== v) : [...f.values, v]; this.render(); });
     $$("[data-sec]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi]; const v = b.dataset.sec; f.values = f.values.includes(v) ? f.values.filter(x => x !== v) : [...f.values, v]; this.render(); });
     $$("[data-add]", p).forEach(b => b.onclick = () => { const [type, key] = b.dataset.add.split("|");
-      const f = type === "range" ? {type, key, min: "", max: ""} : type === "flag" ? {type, key, days: 7} : type === "sector" ? {type, values: []} : {type, key};
+      const f = type === "range" ? {type, key, min: "", max: ""} : type === "flag" ? {type, key, days: 7} : type === "sector" || type === "index" ? {type, values: []} : {type, key};
       this.draft.push(f); this.adding = false; this.render(); const last = $$("input[data-i]", p).filter(x => +x.dataset.i === this.draft.length - 1)[0]; last && last.focus(); });
     $$("[data-scope]", p).forEach(b => b.onclick = () => { this.scope = b.dataset.scope; this.render(); });
     $("#fsearch") && ($("#fsearch").oninput = e => { this.fq = e.target.value; const pos = e.target.selectionStart; this.render(); const n2 = $("#fsearch"); n2.focus(); n2.setSelectionRange(pos, pos); });
@@ -644,6 +672,7 @@ const Filters = {
     if (f.type === "flag") return `<div class="frow"><div class="frow-h"><b>${esc(FLAGS[f.key])}</b>${rm}</div>
         <div class="rng"><label class="small muted">Within the last <input type="number" min="1" max="60" data-i="${i}" data-k="days" value="${esc(f.days ?? 7)}"> trading days</label></div></div>`;
     if (f.type === "state") return `<div class="frow"><div class="frow-h"><b>${esc(STATE_FLAGS[f.key][0])}</b>${rm}</div></div>`;
+    if (f.type === "index") return `<div class="frow"><div class="frow-h"><b>Index membership</b>${rm}</div><div class="picker"><div class="opts">${Object.entries(INDEXES).map(([k, l]) => `<button data-fi="${i}" data-ixv="${k}" class="${f.values.includes(k) ? "on" : ""}">${esc(l)}</button>`).join("")}</div></div><div class="faint small">Stocks in any of the picked indexes.</div></div>`;
     if (f.type === "sector") return `<div class="frow"><div class="frow-h"><b>Sectors</b>${rm}</div><div class="picker"><div class="opts">${sectors.map(s => `<button data-fi="${i}" data-sec="${esc(s)}" class="${f.values.includes(s) ? "on" : ""}">${esc(s)}</button>`).join("")}</div></div><div class="faint small">Pick one or more. None picked = all sectors.</div></div>`;
     return "";
   },
@@ -655,7 +684,7 @@ const Filters = {
     const ev = ["insiderBuy90","ceoBuy90","cluster90","congBuy90","upgrade90","paysDiv","thinCov"].map(k => ["state|" + k, STATE_FLAGS[k][0]]);
     const tabs = {"Scores": groups["Scores"], "52-week & price": [...groups["52-week range"], ...groups["Price & size"]], "Technical": [...tech, ...groups["Technical"]],
       "Financial metrics": Object.entries(groups).filter(([g]) => g.startsWith("Financial metrics")).flatMap(([g, items]) => items.map(x => [x[0], x[1], g.split(" · ")[1]])),
-      "Analysts & insiders": [...groups["Analysts & insiders"], ...ev], "Sector": [["sector|", "Sector"]]};
+      "Analysts & insiders": [...groups["Analysts & insiders"], ...ev], "Sector & index": [["sector|", "Sector"], ["index|", "Index membership"]]};
     const used = new Set(this.draft.map(f => f.type + "|" + (f.key || "")));
     let items = tabs[this.scope] || [];
     if (this.fq) { const q = this.fq.toLowerCase(); items = Object.values(tabs).flat().filter(x => x[1].toLowerCase().includes(q)); }
@@ -675,8 +704,8 @@ function viewWatch() {
   const L = lists();
   if (!UI.list || !L.some(l => l.id === UI.list)) UI.list = L[0].id;
   const list = L.find(l => l.id === UI.list);
-  const items = list.items.map(it => ({it, s: BY[it.ticker]})).filter(x => x.s);
-  const missing = list.items.filter(it => !BY[it.ticker]);
+  const items = list.items.map(it => ({it, s: RB[it.ticker]})).filter(x => x.s);
+  const missing = list.items.filter(it => !RB[it.ticker]);
   $("#view").innerHTML = `
     <div class="bar">
       <select class="sel" id="wl" aria-label="Watchlist">${L.map(l => `<option value="${esc(l.id)}" ${l.id === UI.list ? "selected" : ""}>${esc(l.name)} (${l.items.length})</option>`).join("")}</select>
@@ -685,9 +714,10 @@ function viewWatch() {
       <span class="faint" style="margin-left:auto;font-size:12px">${Store.mode === "synced" ? "Synced to your account" : "Saved in this browser only"}</span>
     </div>
     ${items.length ? `<div class="list">${headRow(esc(list.name))}${items.map(({it, s}) => {
-      const d = DER[s.ticker], ch = d.price - it.price, chp = it.price ? d.price / it.price - 1 : null;
-      const icons = [d.buys30 ? `<span class="badge good">▲ ${d.buys30} insider buy${d.buys30 > 1 ? "s" : ""} (30d)</span>` : "", d.ceo90 ? `<span class="badge acc">CEO/CFO buy</span>` : "", d.cluster90 ? `<span class="badge acc">Cluster buy</span>` : "",
-        ...Object.keys(FLAGS).filter(k => d.ev[k] != null && d.ev[k] < 7).slice(0, 2).map(k => `<span class="badge ${k.endsWith("_up") || k === "new_high" ? "good" : k === "rsi_gt70" || k === "rsi_lt30" ? "warn" : "bad"}">${esc(FLAGS[k].split(" (")[0])}</span>`)].join("");
+      const r = s, px = r.d?.px, ch = px - it.price, chp = it.price ? px / it.price - 1 : null, ev = r.d?.ev || {};
+      const icons = [r.i?.b30 ? `<span class="badge good">▲ ${r.i.b30} insider buy${r.i.b30 > 1 ? "s" : ""} (30d)</span>` : "", r.i?.ceo ? `<span class="badge acc">CEO/CFO buy</span>` : "", r.i?.cl ? `<span class="badge acc">Cluster buy</span>` : "",
+        r.cg?.b90 ? `<span class="badge acc">◆ ${r.cg.b90} congressional buy${r.cg.b90 > 1 ? "s" : ""}</span>` : "", r.mo?.rg && r.mo.rg !== "Neutral" ? `<span class="badge">${esc(r.mo.rg)}</span>` : "",
+        ...Object.keys(FLAGS).filter(k => ev[k] != null && ev[k] < 7).slice(0, 2).map(k => `<span class="badge ${k.endsWith("_up") || k === "new_high" ? "good" : k === "rsi_gt70" || k === "rsi_lt30" ? "warn" : "bad"}">${esc(FLAGS[k].split(" (")[0])}</span>`)].join("");
       return stockRow(s, `<div class="nm" style="white-space:normal"><span class="${cls(ch)} num">${ch >= 0 ? "+" : "−"}${fmtMoney(Math.abs(ch))} (${pct(chp)})</span> since ${esc(fmtDate(it.added))}</div>${icons ? `<div class="why">${icons}</div>` : ""}`);
     }).join("")}</div>` : `<div class="card empty"><p><b>This list is empty.</b></p><p>Open any stock and tap <b>Add to watchlist</b>. The date and closing price are saved so you can track the change since you added it.</p><button class="btn primary" id="goStocks">Browse stocks</button></div>`}
     ${missing.length ? `<p class="callout">Not in this data snapshot: ${missing.map(m => esc(m.ticker)).join(", ")}</p>` : ""}
@@ -716,13 +746,13 @@ function confirmDlg(msg, label, done) {
 // ================================================================ calendar
 const EVC = {earnings: "var(--accent)", ex_div: "var(--s9)", pay: "var(--s6)", fomc: "var(--down)", macro: "var(--warn)"};
 function calEvents() {
-  let tick = DATA.stocks.map(s => s.ticker);
-  if (UI.calFilter !== "all") { const l = lists().find(l => l.id === UI.calFilter); tick = l ? l.items.map(i => i.ticker) : []; }
+  let rows = UI.calFilter === "all" ? ROWS : UI.calFilter === "IVV" ? ROWS.filter(r => r.ix?.includes("IVV")) : UI.calFilter === "top" ? ROWS.filter(r => r.top) : [];
+  if (!["all", "IVV", "top"].includes(UI.calFilter)) { const l = lists().find(l => l.id === UI.calFilter); rows = l ? l.items.map(i => RB[i.ticker]).filter(Boolean) : []; }
   const ev = [];
-  for (const t of tick) { const s = BY[t]; if (!s) continue; const c = s.calendar || {};
-    (c.earnings || []).slice(0, 1).forEach(d => ev.push({date: d, kind: "earnings", t, label: `${t} earnings` + (c.eps_estimate ? ` · est. EPS $${c.eps_estimate.toFixed(2)}` : "")}));
-    if (c.ex_dividend) ev.push({date: c.ex_dividend, kind: "ex_div", t, label: `${t} ex-dividend`});
-    if (c.dividend_pay) ev.push({date: c.dividend_pay, kind: "pay", t, label: `${t} dividend paid`}); }
+  for (const r of rows) { const e = r.e || {};
+    if (e.earn) ev.push({date: e.earn, kind: "earnings", t: r.t, label: `${r.t} earnings` + (e.eps ? ` · est. EPS $${e.eps.toFixed(2)}` : "")});
+    if (e.exd) ev.push({date: e.exd, kind: "ex_div", t: r.t, label: `${r.t} ex-dividend`});
+    if (e.pay) ev.push({date: e.pay, kind: "pay", t: r.t, label: `${r.t} dividend paid`}); }
   (DATA.macro || []).forEach(m => ev.push({date: m.date, kind: m.type === "fomc" ? "fomc" : "macro", label: m.label}));
   return ev.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -740,7 +770,7 @@ function viewCal() {
   const grouped = {}; upcoming.forEach(e => (grouped[e.date] ||= []).push(e));
   $("#view").innerHTML = `
     <div class="bar">
-      <select class="sel" id="cf" aria-label="Show"><option value="all">All ${DATA.top_n} stocks</option>${lists().map(l => `<option value="${esc(l.id)}" ${UI.calFilter === l.id ? "selected" : ""}>Watchlist: ${esc(l.name)}</option>`).join("")}</select>
+      <select class="sel" id="cf" aria-label="Show"><option value="top" ${UI.calFilter === "top" ? "selected" : ""}>Top 100</option><option value="IVV" ${UI.calFilter === "IVV" ? "selected" : ""}>S&amp;P 500</option><option value="all" ${UI.calFilter === "all" ? "selected" : ""}>All ${DATA.count.toLocaleString()} stocks</option>${lists().map(l => `<option value="${esc(l.id)}" ${UI.calFilter === l.id ? "selected" : ""}>Watchlist: ${esc(l.name)}</option>`).join("")}</select>
       <div class="seg" style="margin-left:auto"><button id="pm" aria-label="Previous month">‹</button><button aria-pressed="true" style="min-width:120px">${base.toLocaleDateString(undefined, {month: "long", year: "numeric"})}</button><button id="nm" aria-label="Next month">›</button></div>
     </div>
     <div class="month">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="dow">${d}</div>`).join("")}${cells}</div>
@@ -773,7 +803,16 @@ function viewAbout() {
       <p>Trailing-twelve-month revenue computed from SEC filings matched Yahoo within 2% for <b>${v.rev_within_2pct ?? "—"} of ${v.rev_compared ?? "—"}</b> stocks (within 5%: ${v.rev_within_5pct ?? "—"}). Net income matched within 5% for <b>${v.ni_within_5pct ?? "—"} of ${v.ni_compared ?? "—"}</b>.</p>
       ${(v.worst || []).length ? `<div style="overflow-x:auto"><table><thead><tr><th>Biggest gaps</th><th class="r">SEC (TTM)</th><th class="r">Yahoo</th><th class="r">Gap</th></tr></thead><tbody>${v.worst.slice(0, 8).map(w => `<tr><td>${esc(w.ticker)}</td><td class="r num">${fmtBig(w.rev_xbrl)}</td><td class="r num">${fmtBig(w.rev_yahoo)}</td><td class="r num">${pct(w.rev_diff)}</td></tr>`).join("")}</tbody></table></div>` : ""}
       <p class="faint" style="font-size:12px">Banks and insurers often differ because Yahoo defines revenue differently for them.</p></div>
-    <div class="card"><h3>Not built yet</h3><p class="muted">Politician trades with committee flags, tracked people, 13F fund holdings, score history, the sector divergence signal and Telegram alerts come in later phases.</p></div>
+    <div class="card"><h3>Coverage</h3>
+      <dl class="kv">
+        <dt>Congress trades</dt><dd>${esc(DATA.politics_stats?.coverage || "—")}</dd>
+        ${DATA.politics_stats?.senate ? `<dt>Senate file</dt><dd>${esc(fmtDate(DATA.politics_stats.senate.generated))}</dd>` : ""}
+        <dt>House filings read</dt><dd>${(DATA.politics_stats?.filings ?? 0).toLocaleString()} (${DATA.politics_stats?.paper_skipped ?? 0} scanned, skipped)</dd>
+        ${DATA.cache_stats ? `<dt>Analyst & options data</dt><dd>${DATA.cache_stats.yahoo.toLocaleString()} stocks (${DATA.cache_stats.yahoo_refreshed} refreshed today)</dd>
+        <dt>Insider filings</dt><dd>${DATA.cache_stats.insider_ciks.toLocaleString()} companies${DATA.cache_stats.form4_budget_left <= 0 ? " · backfill still in progress" : ""}</dd>` : ""}
+      </dl>
+      <p class="muted small" style="margin-bottom:0">The 100 largest stocks get fresh analyst, options and news data every night; the rest refresh on a weekly rotation. Prices, scores, signals and insider filings update nightly for every stock.</p></div>
+    <div class="card"><h3>Not built yet</h3><p class="muted">13F fund holdings, the sector divergence signal and Telegram alerts.</p></div>
     <div class="card"><h3>Data issues <span class="label">${h.length}</span></h3>
       ${Object.keys(kinds).length ? Object.entries(kinds).map(([k, ds]) => `<details style="margin-top:6px"><summary><b>${esc(k)}</b> · ${ds.length}</summary><ul style="font-size:13px;color:var(--muted);padding-left:18px">${ds.slice(0, 40).map(d => `<li>${esc(d)}</li>`).join("")}</ul></details>`).join("") : `<p class="muted">None.</p>`}</div>
     <div class="card"><h3>Appearance</h3><div class="seg" id="theme">${[["","System"],["light","Light"],["dark","Dark"]].map(([v, l]) => `<button data-v="${v}" aria-pressed="${(document.documentElement.dataset.theme || "") === v}">${l}</button>`).join("")}</div></div>
@@ -868,7 +907,7 @@ function stockContext(s, full = true) {
   L.push(`Overall score ${s.overall}/10 (scores are 1–10 deciles vs sector peers across ~${DATA.fundamentals_rows} US stocks).`);
   for (const c of CATS) { const k = s.categories?.[c]; if (!k) continue;
     if (k.score == null) { L.push(`${c}: N/A (${k.na}).`); continue; }
-    const ms = full ? k.metrics.map(m => m.value == null ? `${m.label} N/A` : `${m.label} ${fmtMetric(m.key, m.value)} (${ord(m.pct)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)}` : ""})`).join("; ") : "";
+    const ms = full ? k.metrics.map(m => m.value == null ? `${lab(m)} N/A` : `${lab(m)} ${fmtMetric(m.key, m.value)} (${ord(m.pct)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)}` : ""})`).join("; ") : "";
     L.push(`${c}: ${k.score}/10${ms ? " — " + ms : ""}.`); }
   if (full) {
     L.push(`TTM financials (SEC filings through ${s.latest_period}): revenue ${fmtBig(t.revenue)}, operating income ${fmtBig(t.operating_income)}, net income ${fmtBig(t.net_income)}, free cash flow ${fmtBig(t.fcf)}, debt ${fmtBig(t.debt)}, cash ${fmtBig(t.cash_total)}.`);
@@ -881,7 +920,7 @@ function stockContext(s, full = true) {
     const mo = s.momentum; if (mo?.score != null) L.push(`Momentum: ${mo.regime} (momentum ${mo.score}/100, stretch ${mo.stretch}/100${mo.reasons?.length ? "; " + mo.reasons.join("; ") : ""}). Put/call (volume) ${mo.inputs?.put_call_volume?.toFixed?.(2) ?? "n/a"}; short interest ${mo.inputs?.short_pct_float != null ? (mo.inputs.short_pct_float * 100).toFixed(1) + "% of float" : "n/a"}.`);
     const cg = (s.congress || []).filter(t => t.relevant).slice(0, 8).map(t => `${t.date} ${t.name} (${t.party?.[0] || "?"}) ${t.type} ${amtRange(t)}${t.owner && t.owner !== "Self" ? " by " + t.owner.toLowerCase() : ""}${t.committees?.length ? " — sits on " + t.committees[0] : t.tracked ? " — tracked trader" : ""}`).join("; ");
     L.push(cg ? "Committee-relevant congressional trades (House, 3y): " + cg + "." : "No committee-relevant congressional trades reported (House, 3y).");
-    const shh = s.score_history || []; if (shh.length > 4) L.push("Score trend (ex-analyst, quarterly): " + shh.filter((_, i) => i % 2 === 0 || i === shh.length - 1).map(p => `${p.date.slice(0, 7)} ${p.overall_ex_analyst}`).join(", ") + ".");
+    const shh = s.score_history || []; if (shh.length > 4) L.push("Overall score trend (ex-analyst, quarterly): " + shh.map((p, i) => p ? `${(DATA.hist_dates?.[i] || "").slice(0, 7)} ${p[0]}` : null).filter((x, i) => x && i % 2 === 0).join(", ") + ".");
     const sh = s.shares_history || []; if (sh.length > 3) L.push(`Diluted share count: ${(sh[sh.length - 1][1] / 1e6).toFixed(0)}M, ${pct(sh[sh.length - 1][1] / sh[sh.length - 4][1] - 1)} over 3 fiscal years.`);
     const c = s.calendar || {}; L.push(`Next earnings: ${(c.earnings || [])[0] || "not announced"}${c.ex_dividend ? `; last/next ex-dividend ${c.ex_dividend}` : ""}.`);
     if (p.longBusinessSummary) L.push("Business: " + p.longBusinessSummary.slice(0, 900));
@@ -960,12 +999,12 @@ ${stockContext(s)}`;
   toolsFor() {
     if (!this.tools) return undefined;
     return [
-      {name: "get_stock", description: "Returns scores, key metrics, price signals and analyst/insider summary for one ticker in this app (100 large US stocks). Use to compare with peers.",
+      {name: "get_stock", description: "Returns scores, key metrics, price signals and analyst/insider summary for one ticker in this app (~1,650 US stocks). Use to compare with peers.",
        inputSchema: {type: "object", properties: {ticker: {type: "string"}}, required: ["ticker"]},
-       execute: ({ticker}) => { const s = BY[String(ticker || "").toUpperCase()]; if (!s) throw new Error("Not in this app's 100 stocks: " + ticker); return stockContext(s, false) + "\n" + CATS.map(c => `${c} key metrics: ` + (s.categories?.[c]?.metrics || []).filter(m => m.value != null).slice(0, 4).map(m => `${m.label} ${fmtMetric(m.key, m.value)}`).join(", ")).join("\n"); }},
-      {name: "list_sector", description: "Lists the stocks in this app for a GICS sector with overall and category scores. Sector names: " + [...new Set(DATA.stocks.map(s => s.sector))].join(", ") + ".",
+       execute: async ({ticker}) => { const t = String(ticker || "").toUpperCase(); const s = await getDetail(t); if (!s) throw new Error("Not in this app: " + ticker); return stockContext(s, false) + "\n" + CATS.map(c => `${c} key metrics: ` + (s.categories?.[c]?.metrics || []).filter(m => m.value != null).slice(0, 4).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)}`).join(", ")).join("\n"); }},
+      {name: "list_sector", description: "Lists the 25 largest stocks in a GICS sector with overall and category scores. Sector names: " + [...new Set(ROWS.map(r => r.sec))].join(", ") + ".",
        inputSchema: {type: "object", properties: {sector: {type: "string"}}, required: ["sector"]},
-       execute: ({sector}) => DATA.stocks.filter(s => s.sector.toLowerCase() === String(sector || "").toLowerCase()).map(s => `${s.ticker} ${s.name}: overall ${s.overall}; ` + CATS.map(c => `${CAT_SHORT[c]} ${s.categories?.[c]?.score ?? "NA"}`).join(" ")).join("\n") || "No stocks in that sector."},
+       execute: ({sector}) => ROWS.filter(r => r.sec.toLowerCase() === String(sector || "").toLowerCase()).sort((a, b) => (b.mc || 0) - (a.mc || 0)).slice(0, 25).map(r => `${r.t} ${r.n}: overall ${r.ov}; ` + CATS.map((c, i) => `${CAT_SHORT[c]} ${r.cs?.[i] ?? "NA"}`).join(" ")).join("\n") || "No stocks in that sector."},
     ];
   },
   async ask(s) {
@@ -994,7 +1033,13 @@ ${stockContext(s)}`;
 const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["chart", "Chart & momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["financials", "Financials"], ["notes", "Notes"]];
 const Sheet = {
   t: null,
-  open(t) { this.t = t; UI.openCat = null; UI.dtab = "overview"; const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden"; this.render(); el.scrollTop = 0; history.pushState({sheet: t}, ""); },
+  async open(t) {
+    this.t = t; UI.openCat = null; UI.dtab = "overview"; const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden"; history.pushState({sheet: t}, "");
+    if (!BY[t]) { const r = RB[t]; el.innerHTML = `<div class="sheet-top"><div class="top-row"><button class="back" id="back">Back</button><span class="tk">${esc(t)}</span></div></div><main><h1>${esc(r?.n || t)}</h1><p class="muted">Loading details…</p></main>`; $("#back").onclick = () => history.back();
+      try { await getDetail(t); } catch (e) { el.querySelector("main").innerHTML = `<p class="down">Couldn’t load this stock’s details (${esc(e.message)}). Go back and try again.</p>`; return; } }
+    if (this.t !== t || el.hidden) return;
+    this.render(); el.scrollTop = 0;
+  },
   close() { AI.ctl?.abort(); $("#sheet").hidden = true; document.body.style.overflow = ""; this.t = null; render(); },
   render() {
     const s = BY[this.t]; if (!s) return; const d = DER[s.ticker]; const el = $("#sheet");
@@ -1159,9 +1204,9 @@ function scoresHtml(s) {
 function metricTable(s, c) {
   const k = s.categories[c]; if (!k) return "";
   return `<table><thead><tr><th>Metric <span class="faint" style="text-transform:none;letter-spacing:0">(most important first)</span></th><th class="r">Value · trend</th><th>Rank</th></tr></thead><tbody>${k.metrics.map((m, mi) => {
-    if (m.value == null) return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(m.label)}</td><td class="r faint">N/A</td><td class="faint" style="font-size:12px">${esc(m.na || "")}</td></tr>`;
+    if (m.value == null) return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(lab(m))}</td><td class="r faint">N/A</td><td class="faint" style="font-size:12px">${esc(m.na || "")}</td></tr>`;
     const p = m.pct ?? 0, basis = m.basis === "sector" ? `vs ${m.peers} ${esc(s.sector)} stocks` : `vs all ${m.peers} stocks with data`;
-    return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(m.label)}</td><td class="r num">${fmtMetric(m.key, m.value)}${metricTrend(s, m.key, m.value)}</td><td style="min-width:140px">
+    return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(lab(m))}</td><td class="r num">${fmtMetric(m.key, m.value)}${metricTrend(s, m.key, m.value)}</td><td style="min-width:140px">
       <div class="pctbar" title="${p.toFixed(0)}th percentile"><i style="width:${p}%;background:${sc(p / 10 + 0.5)}"></i></div>
       <div class="faint" style="font-size:11.5px;margin-top:3px">${ord(m.pct_peer)} pct ${basis}${m.pct_own != null ? ` · ${ord(m.pct_own)} vs own 3y` : m.own_na ? ` · own history N/A` : ""}</div></td></tr>`; }).join("")}</tbody></table>
     <p class="faint" style="font-size:11.5px;margin:6px 0 0">Higher rank is better. ${c === "Valuation" ? "Ratios blend sector rank and own-history rank 50/50; 100 means cheapest. " : ""}Category score ${k.score ?? "N/A"} = average rank ${k.avg_pct != null ? k.avg_pct.toFixed(0) : "—"}${k.n_used ? ` across ${k.n_used} of ${k.n_total} metrics` : ""}.</p>`;
@@ -1238,32 +1283,34 @@ function eventsHtml(s) {
 // ================================================================ ideas: tickers of the week
 function isoWeek(ds) { const d = new Date(ds + "T12:00:00"); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
   const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return `${t.getUTCFullYear()}-W${String(Math.ceil(((t - y0) / 864e5 + 1) / 7)).padStart(2, "0")}`; }
-function opportunity(s) {
-  const d = DER[s.ticker], c = k => s.categories?.[k]?.score, m = s.momentum || {};
-  const own = (s.categories?.Valuation?.metrics || []).map(x => x.pct_own).filter(x => x != null);
-  const ownCheap = own.length ? own.reduce((a, b) => a + b, 0) / own.length : null;
+function opportunity(r) {
+  const c = k => r.cs?.[ci(k)], d = r.d || {}, m = r.mo || {};
+  const ownCheap = r.own;
   const value = [c("Valuation") != null ? c("Valuation") * 10 : null, ownCheap].filter(x => x != null);
   const vScore = value.length ? value.reduce((a, b) => a + b, 0) / value.length : 40;
   const q = [c("Profitability"), c("Financial Health")].filter(x => x != null), qScore = q.length ? q.reduce((a, b) => a + b, 0) / q.length * 10 : 40;
   const why = [];
-  let setup = {"Basing / turning": 18, "Healthy uptrend": 4, "Neutral": 0, "Overextended": -18, "Falling knife": -25}[m.regime] ?? 0;
-  if (m.regime === "Basing / turning") why.push("Momentum basing / turning");
-  if (m.regime === "Falling knife") why.push("Falling knife (penalized)");
-  if (d.fromLow != null && d.fromLow < 0.15 && m.regime !== "Falling knife") { setup += 10; why.push(`${pct(d.fromLow)} above 52-week low`); }
+  let setup = {"Basing / turning": 18, "Healthy uptrend": 4, "Neutral": 0, "Overextended": -18, "Falling knife": -25}[m.rg] ?? 0;
+  if (m.rg === "Basing / turning") why.push("Momentum basing / turning");
+  if (m.rg === "Falling knife") why.push("Falling knife (penalized)");
+  if (d.fl != null && d.fl < 0.15 && m.rg !== "Falling knife") { setup += 10; why.push(`${pct(d.fl)} above 52-week low`); }
   if (d.rsi != null && d.rsi < 35) { setup += 5; why.push(`RSI ${d.rsi.toFixed(0)}`); }
   let cat = 0;
-  if (d.buys90) { cat += 10; why.push(`${d.buys90} insider buy${d.buys90 > 1 ? "s" : ""} (90d)`); } if (d.ceo90) cat += 5; if (d.cluster90) { cat += 10; why.push("Insider cluster buy"); }
-  if (d.congBuys90) { cat += 8; why.push(`${d.congBuys90} committee-relevant congressional buy${d.congBuys90 > 1 ? "s" : ""}`); }
-  if ((d.upgrades90 ?? 0) > (d.downgrades90 ?? 0)) { cat += 5; why.push("Net analyst upgrades"); }
-  if ((d.metrics.eps_rev_90d ?? 0) > 0.01) { cat += 5; why.push("EPS estimates rising"); }
-  if (d.news7 >= 4) { cat += 3; why.push(`${d.news7} headlines this week`); }
-  if (d.daysToEarnings != null && d.daysToEarnings >= 0 && d.daysToEarnings <= 21) { cat += 3; why.push(`Earnings in ${d.daysToEarnings}d`); }
+  const i = r.i || {};
+  if (i.b90) { cat += 10; why.push(`${i.b90} insider buy${i.b90 > 1 ? "s" : ""} (90d)`); } if (i.ceo) cat += 5; if (i.cl) { cat += 10; why.push("Insider cluster buy"); }
+  if (r.cg?.b90) { cat += 8; why.push(`${r.cg.b90} committee-relevant congressional buy${r.cg.b90 > 1 ? "s" : ""}`); }
+  if ((r.a?.ug ?? 0) > (r.a?.dg ?? 0)) { cat += 5; why.push("Net analyst upgrades"); }
+  if ((r.m?.eps_rev_90d ?? 0) > 0.01) { cat += 5; why.push("EPS estimates rising"); }
+  if ((r.nw7 || 0) >= 4) { cat += 3; why.push(`${r.nw7} headlines this week`); }
+  const de = daysTo(r.e?.earn); if (de != null && de >= 0 && de <= 21) { cat += 3; why.push(`Earnings in ${de}d`); }
   if (vScore >= 65) why.unshift(`Cheap: valuation ${c("Valuation") ?? "–"}/10${ownCheap != null ? `, ${ord(ownCheap)} pct vs own 3y` : ""}`);
   if (qScore >= 70) why.push("High quality");
-  const score = Math.max(0, Math.min(100, 0.45 * vScore + 0.25 * qScore + setup + cat));
+  const thin = (r.a?.n ?? 0) < 3 || (r.mc ?? 0) < 1e9;   // tiny or barely covered names are noisy
+  const score = Math.max(0, Math.min(100, 0.45 * vScore + 0.25 * qScore + setup + cat - (thin ? 10 : 0)));
   return {score, why, vScore, qScore};
 }
-function candidates(n = 15) { return DATA.stocks.map(s => ({s, o: opportunity(s)})).sort((a, b) => b.o.score - a.o.score).slice(0, n); }
+function candidates(n = 15) { return ROWS.filter(inScopeIdeas).map(r => ({s: r, o: opportunity(r)})).sort((a, b) => b.o.score - a.o.score).slice(0, n); }
+const inScopeIdeas = r => (UI.ideasScope || "all") === "all" || r.ix?.includes(UI.ideasScope);
 const Ideas = {state: null, loadedWeek: null, busy: false, ctl: null};
 async function viewIdeas() {
   const week = isoWeek(DATA.lastDate), key = "picks_" + week.replace("-", "_");
@@ -1272,10 +1319,12 @@ async function viewIdeas() {
     <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Tickers of the week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
-    <p class="muted small" style="margin:0 0 10px">The app ranks all ${DATA.top_n} stocks on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). Claude picks from the top ${cands.length}.</p>
+    <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). Claude picks from the top ${cands.length}.</p>
+    <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
     <div class="list">${headRow("Opportunity score")}${cands.map(({s, o}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   bindRows($("#view"));
+  $$("[data-is]").forEach(b => b.onclick = () => { UI.ideasScope = b.dataset.is; viewIdeas(); });
   if (Ideas.loadedWeek !== week) { Ideas.state = await Store.getDoc(key); Ideas.loadedWeek = week; }
   if (UI.tab === "ideas") renderPicks(week, key, cands);
 }
@@ -1287,10 +1336,10 @@ function renderPicks(week, key, cands) {
   const THEME_C = {"Undervalued": "good", "Turnaround setup": "warn", "Catalyst": "acc", "Quality on sale": "good", "Momentum": "acc"};
   box.innerHTML = head + (res ? `
     ${res.week_summary ? `<p style="margin-top:0">${esc(res.week_summary)}</p>` : ""}
-    <div style="display:grid;gap:14px">${(res.picks || []).filter(p => BY[p.ticker]).map(p => { const s = BY[p.ticker], d = DER[s.ticker]; return `<div class="card pick" style="background:var(--bg)">
-      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(s.name)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
+    <div style="display:grid;gap:14px">${(res.picks || []).filter(p => RB[p.ticker]).map(p => { const r = RB[p.ticker], d = {price: r.d?.px, fromHigh: r.d?.fh}; return `<div class="card pick" style="background:var(--bg)">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
       <b>${esc(p.headline || "")}</b>
-      <div class="pill-row">${chip(s.overall, "Overall")}<span class="badge">Valuation ${s.categories?.Valuation?.score ?? "–"}/10</span><span class="badge">${esc(s.momentum?.regime || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span></div>
+      <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span></div>
       <div><div class="label">Why it’s flagged</div><ul style="margin:4px 0;padding-left:18px">${(p.why_now || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
       <div class="md">${md(p.synopsis || "")}</div>
       ${(p.risks || []).length ? `<div><div class="label">Risks</div><ul style="margin:4px 0;padding-left:18px" class="muted">${p.risks.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
@@ -1304,15 +1353,18 @@ function renderPicks(week, key, cands) {
   $("#pickGo").onclick = () => runPicks(week, key, cands);
   $("#pickStop").onclick = () => Ideas.ctl?.abort();
   $$("[data-open]", box).forEach(b => b.onclick = () => Sheet.open(b.dataset.open));
-  $$("[data-wl]", box).forEach(b => b.onclick = () => Sheet.pickList(BY[b.dataset.wl]));
+  $$("[data-wl]", box).forEach(b => b.onclick = async () => { const s = await getDetail(b.dataset.wl); if (s) Sheet.pickList(s); });
 }
 async function runPicks(week, key, cands) {
   if (Ideas.busy) return; Ideas.busy = true; Ideas.ctl = new AbortController();
   $("#pickGo").disabled = true; $("#pickStop").hidden = false;
   let out = $("#pickOut"); if (!out) { $("#picksCard").insertAdjacentHTML("beforeend", `<div id="pickOut"></div>`); out = $("#pickOut"); }
+  out.innerHTML = `<p class="thinking">Loading candidate details…</p>`;
+  try { await Promise.all(cands.map(c => getDetail(c.s.t))); } catch (e) { out.innerHTML = `<p class="down small">Couldn’t load stock details. Try again.</p>`; Ideas.busy = false; $("#pickGo").disabled = false; $("#pickStop").hidden = true; return; }
+  cands = cands.map(c => ({s: BY[c.s.t], o: c.o})).filter(c => c.s);
   out.innerHTML = `<p class="thinking">Reviewing ${cands.length} candidates… this usually takes 30–90 seconds.</p>`;
   const block = ({s, o}) => { const d = DER[s.ticker];
-    const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${m.label} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
+    const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
     const news = (s.news || []).slice(0, 5).map(n => `  - ${n.date}: ${n.title}`).join("\n");
     const cg = (s.congress || []).filter(t => t.relevant).slice(0, 4).map(t => `${t.date} ${t.name} ${t.type} ${amtRange(t)}${t.committees?.[0] ? " (" + t.committees[0] + ")" : t.tracked ? " (tracked)" : ""}`).join("; ");
     return `### ${s.ticker} — ${s.name} (${s.sector})
@@ -1342,7 +1394,7 @@ ${cands.map(block).join("\n\n")}`;
   try {
     const result = await AI.sample.json(prompt, {signal: Ideas.ctl.signal, cache: false});
     if (!result || !Array.isArray(result.picks)) throw {code: "invalid_json"};
-    const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker)};
+    const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all"};
     await Store.setDoc(key, body); Ideas.state = body;
     if (UI.tab === "ideas") renderPicks(week, key, cands);
   } catch (e) {
@@ -1401,15 +1453,18 @@ function spark(vals, w = 72, h = 22, color = "var(--accent)") {
 }
 function catTrend(s, c) {
   const h = s.score_history || []; if (h.length < 3) return {svg: "", delta: null};
-  const vals = h.map(p => c === "overall" ? p.overall_ex_analyst : p.cats?.[c]);
-  const now = vals[vals.length - 1], ago = vals.length > 4 ? vals[vals.length - 5] : vals[0];
-  return {svg: spark(vals), delta: now != null && ago != null ? now - ago : null};
+  const idx = c === "overall" ? 0 : 1 + CATS.filter(x => x !== "Analyst").indexOf(c);
+  const vals = h.map(p => p ? p[idx] : null);
+  const cur = c === "overall" ? (() => { const v = CATS.filter(x => x !== "Analyst").map(x => s.categories?.[x]?.score).filter(x => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null; })() : s.categories?.[c]?.score ?? null;
+  vals.push(cur);
+  const ago = vals.length > 4 ? vals[vals.length - 5] : vals[0];
+  return {svg: spark(vals), delta: cur != null && ago != null ? cur - ago : null};
 }
 const deltaTxt = d => d == null ? "" : `<span class="trend ${d > 0 ? "up" : d < 0 ? "down" : "faint"}">${d > 0 ? "▲" : d < 0 ? "▼" : "■"} ${d > 0 ? "+" : ""}${Math.round(d * 10) / 10} vs 1y</span>`;
 function metricTrend(s, key, now) {
   const h = s.metric_history?.[key]; if (!h) return "";
-  const ds = Object.keys(h).sort(); const vals = ds.map(d => h[d]).concat([now]);
-  const ago = ds.length >= 4 ? h[ds[ds.length - 4]] : null;
+  const vals = h.concat([now]);
+  const ago = h.length >= 4 ? h[h.length - 4] : null;
   const dir = DATA.directions?.[key] ?? 1;
   let arrow = "";
   if (ago != null && now != null && ago !== 0) { const better = (now - ago) * dir > 0, same = Math.abs(now - ago) <= Math.abs(ago) * 0.02;
