@@ -46,6 +46,14 @@ ROTATE_DAYS = 5          # each non-top stock refreshes Yahoo + news once per ~w
 INSIDER_DAYS = 365
 
 
+def rss_mb() -> int:
+    try:
+        import resource
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
+    except Exception:  # noqa: BLE001
+        return -1
+
+
 def shard_of(t: str) -> int:
     return zlib.crc32(t.encode()) % SHARDS
 
@@ -358,7 +366,7 @@ def main() -> int:
         if i % 200 == 0:
             log(f"fundamentals {i}/{len(mapped)}")
 
-    log("scoring")
+    log(f"scoring (rss {rss_mb()} MB)")
     all_t = {r["ticker"] for r in rows}
     scores = score_rows(rows, CFG, score_only=all_t)
     rowmap = {r["ticker"]: r for r in rows}
@@ -367,7 +375,12 @@ def main() -> int:
     shist = {t: [] for t in all_t}
     mhist: dict[str, dict] = {t: {} for t in all_t}
     for j, hd in enumerate(hist_dates):
-        hs = score_rows(hist_rows[hd], CFG, score_only=all_t)
+        try:
+            hs = score_rows(hist_rows[hd], CFG, score_only=all_t)
+        except Exception as e:  # noqa: BLE001
+            health("history", f"scoring @ {hd}: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            hs = {}
         hrow = {r["ticker"]: r for r in hist_rows[hd]}
         for t in all_t:
             if t not in hs:
@@ -383,46 +396,52 @@ def main() -> int:
     # ------------------------------------------------------------ output
     dates = [d.date().isoformat() for d in uclose.index]
     idx_rows, shards = [], {}
+    log(f"output: {len(all_t)} tickers, rss {rss_mb()} MB")
     for t in sorted(all_t):
         if t not in detail or t not in scores:
             continue
-        u, d, sc, row = mapped[t], detail[t], scores[t], rowmap[t]
-        yt = ytick[t]
-        closes = [None if pd.isna(v) else round(float(v), 2) for v in uclose[yt]] if yt in uclose.columns else []
-        dv, mo, ab = d["derived"], d["momentum"] or {}, d["analyst"] or {}
-        ins, cg = d["insiders"], d["congress"]
-        cats = [sc["categories"][c].get("score") for c in CATEGORIES]
-        for c in sc["categories"].values():         # drop repeated labels from detail (the app looks them up)
-            for mm in c["metrics"]:
-                mm.pop("label", None)
-        own_vals = [mm.get("pct_own") for mm in sc["categories"]["Valuation"]["metrics"] if mm.get("pct_own") is not None]
-        cal = d["calendar"] or {}
-        nxt = next((e for e in (cal.get("earnings") or []) if e >= TODAY.isoformat()), None)
-        idx_rows.append({
-            "t": t, "n": u["name"], "sec": u["sector"], "ind": (d["profile"] or {}).get("industry"), "set": row["set"],
-            "ix": u["etfs"], "w": u["ivv_weight"], "top": t in top_set, "sh": shard_of(t),
-            "mc": rnd(d["mcap"]) if d["mcap"] else None, "ov": sc.get("overall"), "cs": cats, "na": {c: sc["categories"][c].get("na") for c in CATEGORIES if sc["categories"][c].get("na")},
-            "m": {k: rnd(v) for k, v in row["metrics"].items() if isinstance(v, (int, float))},
-            "own": round(sum(own_vals) / len(own_vals), 1) if own_vals else None,
-            "d": dv, "mo": {"s": mo.get("score"), "st": mo.get("stretch"), "rg": mo.get("regime"), "pc": rnd((mo.get("inputs") or {}).get("put_call_volume")),
-                            "si": rnd((mo.get("inputs") or {}).get("short_pct_float"))},
-            "a": {"n": ab.get("n_analysts"), "rm": ab.get("rating_mean"), "ug": ab.get("upgrades_90d"), "dg": ab.get("downgrades_90d"),
-                  "thin": ab.get("thin_coverage"), "tm": (ab.get("targets") or {}).get("mean")},
-            "i": {"b30": sum(1 for x in ins["trades"] if x["code"] == "P" and (x["date"] or "") >= (TODAY - timedelta(days=30)).isoformat()),
-                  "b90": sum(1 for x in ins["trades"] if x["code"] == "P" and (x["date"] or "") >= cut90),
-                  "ceo": any((x["ceo"] or x["cfo"]) and x["code"] == "P" and (x["date"] or "") >= cut90 for x in ins["trades"]),
-                  "cl": any(c["end"] >= cut90 for c in ins["clusters"]),
-                  "ds90": sum(1 for x in ins["trades"] if x["code"] == "S" and not x["plan_10b5_1"] and (x["date"] or "") >= cut90)},
-            "cg": {"b90": sum(1 for x in cg if x["relevant"] and "Purchase" in (x["type"] or "") and (x["date"] or "") >= cut90),
-                   "n12": sum(1 for x in cg if x["relevant"] and (x["date"] or "") >= cut365)},
-            "e": {"earn": nxt, "exd": cal.get("ex_dividend"), "pay": cal.get("dividend_pay"), "eps": cal.get("eps_estimate")},
-            "nw7": sum(1 for n in d["news"] if (n.get("date") or "") >= (TODAY - timedelta(days=7)).isoformat()),
-        })
-        full = {"ticker": t, "yahoo": yt, "name": u["name"], "sector": u["sector"], "sic": u.get("sic"), "sic_desc": u.get("sic_desc"),
-                "cik": u["cik"], "metric_set": row["set"], "ivv_weight": u["ivv_weight"], "chg_1d": dv.get("c1"),
-                "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"), "closes": closes,
-                "score_history": shist.get(t), "metric_history": mhist.get(t), **{k: v for k, v in d.items() if k != "derived"}}
-        shards.setdefault(shard_of(t), {})[t] = full
+        try:
+            u, d, sc, row = mapped[t], detail[t], scores[t], rowmap[t]
+            yt = ytick[t]
+            closes = [None if pd.isna(v) else round(float(v), 2) for v in uclose[yt]] if yt in uclose.columns else []
+            dv, mo, ab = d["derived"], d["momentum"] or {}, d["analyst"] or {}
+            ins, cg = d["insiders"], d["congress"]
+            cats = [sc["categories"][c].get("score") for c in CATEGORIES]
+            for c in sc["categories"].values():         # drop repeated labels from detail (the app looks them up)
+                for mm in c["metrics"]:
+                    mm.pop("label", None)
+            own_vals = [mm.get("pct_own") for mm in sc["categories"]["Valuation"]["metrics"] if mm.get("pct_own") is not None]
+            cal = d["calendar"] or {}
+            nxt = next((e for e in (cal.get("earnings") or []) if e >= TODAY.isoformat()), None)
+            idx_rows.append({
+                "t": t, "n": u["name"], "sec": u["sector"], "ind": (d["profile"] or {}).get("industry"), "set": row["set"],
+                "ix": u["etfs"], "w": u["ivv_weight"], "top": t in top_set, "sh": shard_of(t),
+                "mc": rnd(d["mcap"]) if d["mcap"] else None, "ov": sc.get("overall"), "cs": cats, "na": {c: sc["categories"][c].get("na") for c in CATEGORIES if sc["categories"][c].get("na")},
+                "m": {k: rnd(v) for k, v in row["metrics"].items() if isinstance(v, (int, float))},
+                "own": round(sum(own_vals) / len(own_vals), 1) if own_vals else None,
+                "d": dv, "mo": {"s": mo.get("score"), "st": mo.get("stretch"), "rg": mo.get("regime"), "pc": rnd((mo.get("inputs") or {}).get("put_call_volume")),
+                                "si": rnd((mo.get("inputs") or {}).get("short_pct_float"))},
+                "a": {"n": ab.get("n_analysts"), "rm": ab.get("rating_mean"), "ug": ab.get("upgrades_90d"), "dg": ab.get("downgrades_90d"),
+                      "thin": ab.get("thin_coverage"), "tm": (ab.get("targets") or {}).get("mean")},
+                "i": {"b30": sum(1 for x in ins["trades"] if x["code"] == "P" and (x["date"] or "") >= (TODAY - timedelta(days=30)).isoformat()),
+                      "b90": sum(1 for x in ins["trades"] if x["code"] == "P" and (x["date"] or "") >= cut90),
+                      "ceo": any((x["ceo"] or x["cfo"]) and x["code"] == "P" and (x["date"] or "") >= cut90 for x in ins["trades"]),
+                      "cl": any(c["end"] >= cut90 for c in ins["clusters"]),
+                      "ds90": sum(1 for x in ins["trades"] if x["code"] == "S" and not x["plan_10b5_1"] and (x["date"] or "") >= cut90)},
+                "cg": {"b90": sum(1 for x in cg if x["relevant"] and "Purchase" in (x["type"] or "") and (x["date"] or "") >= cut90),
+                       "n12": sum(1 for x in cg if x["relevant"] and (x["date"] or "") >= cut365)},
+                "e": {"earn": nxt, "exd": cal.get("ex_dividend"), "pay": cal.get("dividend_pay"), "eps": cal.get("eps_estimate")},
+                "nw7": sum(1 for n in d["news"] if (n.get("date") or "") >= (TODAY - timedelta(days=7)).isoformat()),
+            })
+            full = {"ticker": t, "yahoo": yt, "name": u["name"], "sector": u["sector"], "sic": u.get("sic"), "sic_desc": u.get("sic_desc"),
+                    "cik": u["cik"], "metric_set": row["set"], "ivv_weight": u["ivv_weight"], "chg_1d": dv.get("c1"),
+                    "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"), "closes": closes,
+                    "score_history": shist.get(t), "metric_history": mhist.get(t), **{k: v for k, v in d.items() if k != "derived"}}
+            shards.setdefault(shard_of(t), {})[t] = full
+        except Exception as e:  # noqa: BLE001
+            health("output", f"{t}: {type(e).__name__}: {e}")
+            traceback.print_exc()
+    log(f"output rows {len(idx_rows)}, rss {rss_mb()} MB")
     for sh, obj in shards.items():
         (out / "detail" / f"{sh:02d}.json").write_text(json.dumps(clean(obj), separators=(",", ":")))
     vv = [v for v in validation if v["rev_diff"] is not None]

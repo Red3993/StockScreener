@@ -32,18 +32,27 @@ jobs:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python jobs/app/build_all.py --out app-data --cache cache 2>&1 | tee app-build.log
+        run: |
+          set -o pipefail
+          python jobs/app/build_all.py --out app-data --cache cache 2>&1 | tee app-build.log
+          echo "exit ok" >> app-build.log
       - name: Save caches
         if: always()
         run: |
           mkdir -p /tmp/c && cp cache/*.json.gz /tmp/c/ 2>/dev/null || true
-          rm -rf /tmp/ad && cp -r app-data /tmp/ad 2>/dev/null || true; cp app-build.log /tmp/ad/ 2>/dev/null || true
+          rm -rf /tmp/ad && (cp -r app-data /tmp/ad 2>/dev/null || mkdir -p /tmp/ad); cp app-build.log /tmp/ad/ 2>/dev/null || true
           git config user.name "app-bot"; git config user.email "app-bot@users.noreply.github.com"
           git checkout --orphan cache-tmp
           git rm -rq --cached . || true
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp /tmp/c/*.json.gz . 2>/dev/null || true
           git add *.json.gz 2>/dev/null && git commit -qm "cache ${{ github.run_id }}" && git push -f origin HEAD:cache-data || echo "no cache to save"
+          # keep the build log (and memory info) on its own branch so failures can be diagnosed without API auth
+          git checkout -q --orphan log-tmp && git rm -rq --cached . 2>/dev/null || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          tail -c 3000000 /tmp/ad/app-build.log > app-build.log 2>/dev/null || echo "no log" > app-build.log
+          (free -m; dmesg 2>/dev/null | grep -i -E "killed process|out of memory" | tail -5) > runner.txt 2>&1 || true
+          git add app-build.log runner.txt && git commit -qm "log ${{ github.run_id }}" && git push -f origin HEAD:build-log || true
       - name: Publish app data
         if: success()
         run: |
