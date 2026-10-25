@@ -61,7 +61,24 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
 - News: **yfinance news returns [] from runners** (verified 2026-10-24) → Finnhub `company-news` (free, 14 days,
   relevance-filtered by ticker/name). Plus recent SEC filings from submissions with 8-K item labels.
   Profiles (description, industry, 52w hi/lo, beta, fwd P/E) from yfinance `info`.
-- Known gaps: politician trades, tracked people, 13F, score history, divergence, Telegram not in prototype.
+- 2026-10-24 v4:
+  - **Congress trades (House):** `jobs/politics/` parses Clerk e-filed PTR PDFs (pdfplumber text + regex;
+    page-break and wrapped-ticker handling). Workflow `politics.yml` → `politics-data` branch, incremental
+    (`processed` DocIDs cached). First backfill (3 years): 1,403 filings, 13,742 trades, 12,026 with tickers,
+    176 scanned paper filings skipped (no OCR), 0 errors, ~12 min. Validated vs Pelosi's known 2024 trades.
+  - **Senate eFD blocks GitHub runners** (Akamai 403 on agreement POST and search API). Options: local-runner
+    script on Tom's machine (spec's fallback) — not built yet.
+  - Relevance: `jobs/lib/politics_match.py` + `config/committee_sectors.yaml` (names quoted — commas broke YAML
+    flow maps; `tickers:` lists for cyber, big-tech antitrust, China-exposed tech; Science/Intel/Judiciary/T&I
+    narrowed so MSFT went 95 → 4 relevant of 241 trades). Tracked traders: `config/tracked_people.yaml` (Pelosi).
+  - **Score history:** 12 quarter-end as-of dates, full-universe re-rank per date, filed-date no-look-ahead,
+    valuation sector-only (no own-history in history), Analyst excluded; plus per-metric history for top 100.
+  - **Momentum model:** `jobs/lib/momentum.py` (docstring explains). Options P/C from yfinance nearest 2 expiries,
+    short interest from `info`, volume from yf.download. Regimes: falling knife / basing / healthy / overextended.
+  - Metric lists in `config/scoring.yaml` ordered by importance (display order; scoring still simple average).
+  - App: chart markers (insider buys/sales, congress buys/sales) with toggles; Congress tab; momentum card;
+    score + metric trend sparklines; Ideas tab = opportunity score shortlist → Claude picks (saved `app/picks_YYYY_Www`).
+- Known gaps: Senate trades, 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
 

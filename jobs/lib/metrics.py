@@ -157,6 +157,8 @@ class Fundamentals:
     def compute(self, mcap: float | None, extra: dict | None = None) -> dict[str, float | None]:
         g, m, na = self.inputs, {}, self.na
         extra = extra or {}
+        if mcap is not None and mcap <= 0:
+            mcap = None   # a zero share count in a filing would otherwise divide by zero
         ev = None if mcap is None or g["debt"] is None or g["cash_total"] is None else mcap + g["debt"] - g["cash_total"]
         tangible = None if g["equity"] is None else g["equity"] - (g["goodwill"] or 0) - (g["intangibles"] or 0)
 

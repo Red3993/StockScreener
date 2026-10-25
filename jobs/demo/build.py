@@ -37,6 +37,7 @@ from jobs.lib.scoring import own_history_pct, score_rows  # noqa: E402
 from jobs.lib.xbrl import CompanyFacts  # noqa: E402
 from jobs.lib.momentum import momentum_block, universe_stats  # noqa: E402
 from jobs.lib.politics_match import CommitteeMatcher  # noqa: E402
+from jobs.demo.slim import slim_stock  # noqa: E402
 
 try:
     import orjson
@@ -742,7 +743,7 @@ def main() -> int:
                                                extra.get("eps_rev_90d"),
                                                sum(1 for x in (insiders.get(t) or {}).get("trades", []) if x["code"] == "P"
                                                    and (x["date"] or "") >= (TODAY - timedelta(days=90)).isoformat())),
-                    "congress": matcher.annotate(pol_by_ticker.get(t, []) + (pol_by_ticker.get(t.replace("-", ".")) or []),
+                    "congress": matcher.annotate(pol_by_ticker.get(t.replace(".", "-").upper(), []),
                                                  pol.get("members", {}), sector, u.get("sic"), t),
                     "volume": [None if pd.isna(x) else int(x) for x in tvol[yt].reindex(tclose.index)] if yt in tvol.columns else [],
                 }
@@ -755,6 +756,7 @@ def main() -> int:
             usplits = split_list(usplit, yt)
             p_now = price_at(yt, TODAY) or price
             for hd in hist_dates:
+              try:
                 ph = price_at(yt, hd)
                 if ph is None:
                     continue
@@ -764,8 +766,10 @@ def main() -> int:
                     mh = mcap * ph / p_now if mcap and p_now else None
                 else:
                     mh = ph * soh[0] * split_factor(usplits, soh[1])
-                hist_rows[hd].append({"ticker": t, "sector": sector, "set": mset, "metrics": fh.compute(mh), "na": {},
+                hist_rows[hd].append({"ticker": t, "sector": sector, "set": mset, "metrics": fh.compute(mh if mh and mh > 0 else None), "na": {},
                                       "pays_dividend": fh.pays_dividend, "has_analyst": False})
+              except Exception as e:  # noqa: BLE001
+                health("history", f"{t} @ {hd}: {type(e).__name__}: {e}")
         except Exception as e:  # noqa: BLE001
             health("fundamentals", f"{t}: {type(e).__name__}: {e}")
             traceback.print_exc()
@@ -833,6 +837,7 @@ def main() -> int:
                        "ivv_weight": u["ivv_weight"], "chg_1d": (closes[-1] / prev - 1) if closes and prev and closes[-1] else None,
                        "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"),
                        "closes": closes, "score_history": score_hist.get(t, []), "metric_history": metric_hist.get(t, {}), **d})
+    stocks = [slim_stock(x, TODAY) for x in stocks]
     vv = [v for v in validation if v["rev_diff"] is not None]
     summary = {
         "rev_within_2pct": sum(abs(v["rev_diff"]) <= 0.02 for v in vv), "rev_within_5pct": sum(abs(v["rev_diff"]) <= 0.05 for v in vv),
