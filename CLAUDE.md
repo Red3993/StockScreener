@@ -91,7 +91,7 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   almost certainly prohibit scraping, fragile; kept official source.
   Ideas (Tom, 2026-10-24, supersedes equal size slots): one opportunity ranking across all sizes, top 45 candidates
   (max 10 per sector), Claude picks the **top 25 regardless of large/mid/small cap**, ranked, short synopses.
-  **Scheduled task** "Publish StockScreener data" (trig_019ShUgBg9BzCSG4EziRkwnv): weekdays 7:35am ET, cloud session
+  **Scheduled task** "Publish StockScreener data" (trig_01WQvKWPhG8zShQJT8dDYway, push notifications on): weekdays 7:35am ET, cloud session
   clones app-data + web/index.html and republishes the artifact. Auto-approval mode.
   Phone push (Tom, 2026-10-24): push when the run starts, then a news push built by `jobs/app/daily_digest.py`
   (watchlist moves/news/insider/congress/analyst/earnings + notable insider and committee-relevant congress buys).
