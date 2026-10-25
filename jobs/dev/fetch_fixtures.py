@@ -1,36 +1,40 @@
 #!/usr/bin/env python3
-"""Dev only: inspect open congress-trade projects (scraper code + data freshness)."""
-import json, os, subprocess, glob
+"""Dev only: (a) try Senate eFD from the runner with an honest User-Agent; (b) inspect Kadoa's Senate filer files."""
+import json, re, subprocess, glob, time
 from pathlib import Path
+import requests
 OUT = Path("fixtures"); OUT.mkdir(exist_ok=True)
 rep = {}
-for r in ["amodi24/congress-stock-tracker", "kadoa-org/congress-trading-monitor", "anabolic-capital/congress-trades"]:
-    d = Path("/tmp/" + r.replace("/", "_"))
-    p = subprocess.run(["git", "clone", "--depth", "1", f"https://github.com/{r}", str(d)], capture_output=True, text=True)
-    info = {"clone": p.returncode, "files": []}
-    if p.returncode == 0:
-        info["last_commit"] = subprocess.run(["git", "-C", str(d), "log", "-1", "--format=%cI %s"], capture_output=True, text=True).stdout.strip()
-        for f in sorted(glob.glob(str(d) + "/**/*", recursive=True)):
-            fp = Path(f)
-            if fp.is_file() and ".git/" not in f:
-                info["files"].append([f.replace(str(d) + "/", ""), fp.stat().st_size])
-        lic = [x for x in info["files"] if x[0].upper().startswith("LICENSE")]
-        if lic: info["license_head"] = (d / lic[0][0]).read_text()[:300]
-        # copy small source files for reading
-        for rel, size in info["files"]:
-            if rel.endswith((".py", ".yml", ".yaml", ".md", ".ts", ".js")) and size < 120000 and not rel.startswith(("node_modules", "public/")):
-                dst = OUT / r.replace("/", "_") / rel; dst.parent.mkdir(parents=True, exist_ok=True); dst.write_text((d / rel).read_text(errors="replace"))
-        # data summaries
-        for rel, size in info["files"]:
-            if rel.endswith(".json") and size > 10000:
-                try:
-                    j = json.loads((d / rel).read_text())
-                    rows = j if isinstance(j, list) else next((v for v in j.values() if isinstance(v, list)), [])
-                    info.setdefault("data", {})[rel] = {"size": size, "n": len(rows), "keys": list(rows[0].keys())[:25] if rows and isinstance(rows[0], dict) else None,
-                                                        "sample": rows[:2] if rows else None,
-                                                        "max_dates": sorted({str(x.get(k)) for x in rows[:200000] if isinstance(x, dict) for k in ("filing_date", "filed", "date_received", "disclosure_date", "transaction_date") if x.get(k)})[-3:]}
-                except Exception as e:
-                    info.setdefault("data", {})[rel] = {"size": size, "err": str(e)[:100]}
-    rep[r] = info
-(OUT / "repos.json").write_text(json.dumps(rep, indent=1, default=str)[:3_000_000])
-print(json.dumps({k: {"last": v.get("last_commit"), "nfiles": len(v["files"]), "data": {a: {kk: b.get(kk) for kk in ("size", "n", "max_dates")} for a, b in v.get("data", {}).items()}} for k, v in rep.items()}, indent=1, default=str)[:6000])
+# (a) eFD with honest UA (amodi24 style)
+for ua in ["StockScreener/1.0 (personal, non-commercial research)", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"]:
+    s = requests.Session(); s.headers.update({"User-Agent": ua}); r = {}
+    try:
+        h = s.get("https://efdsearch.senate.gov/search/home/", timeout=30); r["home"] = h.status_code
+        tok = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', h.text)
+        a = s.post("https://efdsearch.senate.gov/search/home/", data={"csrfmiddlewaretoken": tok.group(1) if tok else "", "prohibition_agreement": "1"}, headers={"Referer": "https://efdsearch.senate.gov/search/home/"}, timeout=30); r["agree"] = a.status_code
+        c = s.cookies.get("csrftoken")
+        d = s.post("https://efdsearch.senate.gov/search/report/data/", data={"draw": 1, "start": 0, "length": 5, "report_types": "[11]", "filer_types": "[]", "submitted_start_date": "09/01/2026 00:00:00", "submitted_end_date": "", "candidate_state": "", "senator_state": "", "office_id": "", "first_name": "", "last_name": ""},
+                   headers={"X-CSRFToken": c or "", "X-Requested-With": "XMLHttpRequest", "Referer": "https://efdsearch.senate.gov/search/"}, timeout=30)
+        r["data"] = d.status_code; r["body"] = d.text[:400]
+    except Exception as e:
+        r["err"] = str(e)[:200]
+    rep["efd " + ua[:20]] = r; time.sleep(2)
+# (b) kadoa senate filers via sparse checkout
+d = Path("/tmp/kadoa")
+subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse", "https://github.com/kadoa-org/congress-trading-monitor", str(d)], check=True)
+subprocess.run(["git", "-C", str(d), "sparse-checkout", "set", "--no-cone", "public/data/filer/senate_*", "public/data/filers.json", "public/data/stats.json", "LICENSE", "README.md", "scripts", "scraper", "pipeline"], check=True)
+files = sorted(glob.glob(str(d / "public/data/filer/senate_*.json")))
+rep["kadoa_senate_files"] = len(files)
+rep["kadoa_license"] = (d / "LICENSE").read_text()[:200] if (d / "LICENSE").exists() else None
+rep["kadoa_stats"] = (d / "public/data/stats.json").read_text()[:1200] if (d / "public/data/stats.json").exists() else None
+rep["kadoa_last_commit"] = subprocess.run(["git", "-C", str(d), "log", "-1", "--format=%cI %s"], capture_output=True, text=True).stdout.strip()
+samples = {}
+for f in files[:3] + [x for x in files if "tuberville" in x or "mullin" in x][:2]:
+    j = json.loads(Path(f).read_text()); samples[Path(f).name] = json.dumps(j)[:2500]
+rep["kadoa_samples"] = samples
+fj = json.loads((d / "public/data/filers.json").read_text()) if (d / "public/data/filers.json").exists() else None
+rep["kadoa_filers_head"] = json.dumps(fj)[:1500] if fj else None
+other = [str(p.relative_to(d)) for p in d.rglob("*") if p.is_file() and "public/data" not in str(p) and ".git/" not in str(p)]
+rep["kadoa_other_files"] = other[:80]
+(OUT / "senate_probe.json").write_text(json.dumps(rep, indent=1))
+print(json.dumps(rep, indent=1)[:5000])
