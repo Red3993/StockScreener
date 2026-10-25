@@ -95,6 +95,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   clones app-data + web/index.html and republishes the artifact. Auto-approval mode.
   Phone push (Tom, 2026-10-24): push when the run starts, then a news push built by `jobs/app/daily_digest.py`
   (watchlist moves/news/insider/congress/analyst/earnings + notable insider and committee-relevant congress buys).
+- 2026-10-25 first full build: run 1 (4h, cold Form 4 backfill) saved caches but crashed before index.json — no log
+  (tee masked it). Added pipefail, per-ticker output guards, rss logging, log → `build-log` branch. Reruns with warm
+  caches: ~13 min (no Yahoo refresh) / ~77 min (1,192 Yahoo refetches). Yahoo silently returned empty `info` for
+  1,193 tickers when throttled → retry in yahoo_detail + needs_refresh refetches incomplete entries. Result: 1,640 rows,
+  analyst data 1,618, health 5 (MDLN/VSNT TypeError, OZK/PFBC no companyfacts, HOLX no CIK). Artifact v7.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
