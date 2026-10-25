@@ -1,0 +1,39 @@
+name: Congress trades
+# House PTRs -> politics.json on the `politics-data` branch (incremental: only new filings are fetched).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/politics/**", ".github/workflows/politics.yml"]
+  schedule:
+    - cron: "17 21 * * 1-5"   # weekdays ~5:15pm ET, before the demo build
+permissions:
+  contents: write
+concurrency:
+  group: politics
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt pdfplumber
+      - name: Restore cache
+        run: |
+          git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no cache yet"
+      - name: Build
+        run: python jobs/politics/build_politics.py --cache politics.json --out politics.json --years 3 2>&1 | tee politics.log
+      - name: Publish
+        if: always()
+        run: |
+          cp politics.json politics.log /tmp/ 2>/dev/null || true
+          git config user.name "politics-bot"; git config user.email "politics-bot@users.noreply.github.com"
+          git checkout --orphan politics-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp /tmp/politics.json /tmp/politics.log . 2>/dev/null || true
+          git add -A && git commit -qm "politics ${{ github.run_id }} ($(date -u +%FT%TZ))"
+          git push -f origin HEAD:politics-data

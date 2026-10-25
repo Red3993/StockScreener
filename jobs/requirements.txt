@@ -3,3 +3,4 @@ pyyaml>=6.0
 pandas>=2.2
 yfinance>=1.7
 orjson>=3.10
+pdfplumber>=0.11
