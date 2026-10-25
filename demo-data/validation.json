@@ -1,0 +1,902 @@
+[
+ {
+  "ticker": "AAPL",
+  "rev_xbrl": 466823000000.0,
+  "rev_yahoo": 466822987776,
+  "ni_xbrl": 128930000000.0,
+  "ni_yahoo": 128929996800,
+  "rev_diff": 2.61855e-08,
+  "ni_diff": 2.48197e-08
+ },
+ {
+  "ticker": "NVDA",
+  "rev_xbrl": 302969000000.0,
+  "rev_yahoo": 302970011648,
+  "ni_xbrl": 192879000000.0,
+  "ni_yahoo": 192880001024,
+  "rev_diff": -3.3391e-06,
+  "ni_diff": -5.18988e-06
+ },
+ {
+  "ticker": "MSFT",
+  "rev_xbrl": 331839000000.0,
+  "rev_yahoo": 331839012864,
+  "ni_xbrl": 133749000000.0,
+  "ni_yahoo": 133748998144,
+  "rev_diff": -3.87658e-08,
+  "ni_diff": 1.38767e-08
+ },
+ {
+  "ticker": "AMZN",
+  "rev_xbrl": 775680000000.0,
+  "rev_yahoo": 775680032768,
+  "ni_xbrl": 135281000000.0,
+  "ni_yahoo": 135281000448,
+  "rev_diff": -4.22442e-08,
+  "ni_diff": -3.31163e-09
+ },
+ {
+  "ticker": "GOOGL",
+  "rev_xbrl": 445867000000.0,
+  "rev_yahoo": 445865984000,
+  "ni_xbrl": 244205000000.0,
+  "ni_yahoo": 244118994944,
+  "rev_diff": 2.27871e-06,
+  "ni_diff": 0.000352308
+ },
+ {
+  "ticker": "AVGO",
+  "rev_xbrl": 89104000000.0,
+  "rev_yahoo": 89103998976,
+  "ni_xbrl": 38265000000.0,
+  "ni_yahoo": 38264999936,
+  "rev_diff": 1.14922e-08,
+  "ni_diff": 1.67255e-09
+ },
+ {
+  "ticker": "META",
+  "rev_xbrl": 241606000000.0,
+  "rev_yahoo": 241605001216,
+  "ni_xbrl": 75249000000.0,
+  "ni_yahoo": 75249000448,
+  "rev_diff": 4.13395e-06,
+  "ni_diff": -5.95357e-09
+ },
+ {
+  "ticker": "TSLA",
+  "rev_xbrl": 103570000000.0,
+  "rev_yahoo": 103569997824,
+  "ni_xbrl": 3279000000.0,
+  "ni_yahoo": 3220000000,
+  "rev_diff": 2.10099e-08,
+  "ni_diff": 0.018323
+ },
+ {
+  "ticker": "LLY",
+  "rev_xbrl": 79665800000.0,
+  "rev_yahoo": 79666003968,
+  "ni_xbrl": 26711200000.0,
+  "ni_yahoo": 26710999040,
+  "rev_diff": -2.56029e-06,
+  "ni_diff": 7.52349e-06
+ },
+ {
+  "ticker": "MU",
+  "rev_xbrl": 133188000000.0,
+  "rev_yahoo": 133188001792,
+  "ni_xbrl": 84969000000.0,
+  "ni_yahoo": 84968996864,
+  "rev_diff": -1.34547e-08,
+  "ni_diff": 3.69076e-08
+ },
+ {
+  "ticker": "JPM",
+  "rev_xbrl": 199408000000.0,
+  "rev_yahoo": 190732992512,
+  "ni_xbrl": 65019000000.0,
+  "ni_yahoo": 64526999552,
+  "rev_diff": 0.0454825,
+  "ni_diff": 0.00762472
+ },
+ {
+  "ticker": "AMD",
+  "rev_xbrl": 41305000000.0,
+  "rev_yahoo": 41305001984,
+  "ni_xbrl": 6434000000.0,
+  "ni_yahoo": 6469000192,
+  "rev_diff": -4.80329e-08,
+  "ni_diff": -0.00541045
+ },
+ {
+  "ticker": "XOM",
+  "rev_xbrl": 368757000000.0,
+  "rev_yahoo": 361060007936,
+  "ni_xbrl": 32757000000.0,
+  "ni_yahoo": 32757000192,
+  "rev_diff": 0.0213178,
+  "ni_diff": -5.86134e-09
+ },
+ {
+  "ticker": "V",
+  "rev_xbrl": 43027000000.0,
+  "rev_yahoo": 44487999488,
+  "ni_xbrl": 22236000000.0,
+  "ni_yahoo": 22397999104,
+  "rev_diff": -0.0328403,
+  "ni_diff": -0.00723275
+ },
+ {
+  "ticker": "JNJ",
+  "rev_xbrl": 99335000000.0,
+  "rev_yahoo": 99334995968,
+  "ni_xbrl": 16095000000.0,
+  "ni_yahoo": 16094999552,
+  "rev_diff": 4.05899e-08,
+  "ni_diff": 2.78347e-08
+ },
+ {
+  "ticker": "WMT",
+  "rev_xbrl": 735840000000.0,
+  "rev_yahoo": 735839977472,
+  "ni_xbrl": 22076000000.0,
+  "ni_yahoo": 22076000256,
+  "rev_diff": 3.06154e-08,
+  "ni_diff": -1.15963e-08
+ },
+ {
+  "ticker": "MA",
+  "rev_xbrl": 35083000000.0,
+  "rev_yahoo": 35083001856,
+  "ni_xbrl": 16257000000.0,
+  "ni_yahoo": 16257000448,
+  "rev_diff": -5.29031e-08,
+  "ni_diff": -2.75574e-08
+ },
+ {
+  "ticker": "ABBV",
+  "rev_xbrl": 64386000000.0,
+  "rev_yahoo": 64385998848,
+  "ni_xbrl": 6310000000.0,
+  "ni_yahoo": 6270000128,
+  "rev_diff": 1.78921e-08,
+  "ni_diff": 0.00637956
+ },
+ {
+  "ticker": "COST",
+  "rev_xbrl": 303154000000.0,
+  "rev_yahoo": 303154003968,
+  "ni_xbrl": 9226000000.0,
+  "ni_yahoo": 9226000384,
+  "rev_diff": -1.30891e-08,
+  "ni_diff": -4.16215e-08
+ },
+ {
+  "ticker": "PLTR",
+  "rev_xbrl": 6155940000.0,
+  "rev_yahoo": 6155940864,
+  "ni_xbrl": 3016690000.0,
+  "ni_yahoo": 3016691968,
+  "rev_diff": 2.20925e-08,
+  "ni_diff": 1.06076e-08
+ },
+ {
+  "ticker": "CVX",
+  "rev_xbrl": 215261000000.0,
+  "rev_yahoo": 209383997440,
+  "ni_xbrl": 20592000000.0,
+  "ni_yahoo": 20590999552,
+  "rev_diff": 0.0280681,
+  "ni_diff": 4.85867e-05
+ },
+ {
+  "ticker": "CSCO",
+  "rev_xbrl": 63325000000.0,
+  "rev_yahoo": 63324999680,
+  "ni_xbrl": 13267000000.0,
+  "ni_yahoo": 13267000320,
+  "rev_diff": 5.0533e-09,
+  "ni_diff": -2.412e-08
+ },
+ {
+  "ticker": "INTC",
+  "rev_xbrl": 57032000000.0,
+  "rev_yahoo": 57031999488,
+  "ni_xbrl": -11289000000.0,
+  "ni_yahoo": -11288999936,
+  "rev_diff": 8.97742e-09,
+  "ni_diff": 5.66924e-09
+ },
+ {
+  "ticker": "PG",
+  "rev_xbrl": 87923000000.0,
+  "rev_yahoo": 87921999872,
+  "ni_xbrl": 16026000000.0,
+  "ni_yahoo": 15736000512,
+  "rev_diff": 1.13752e-05,
+  "ni_diff": 0.018429
+ },
+ {
+  "ticker": "UNH",
+  "rev_xbrl": 450129000000.0,
+  "rev_yahoo": 450059010048,
+  "ni_xbrl": 14122000000.0,
+  "ni_yahoo": 15884000256,
+  "rev_diff": 0.000155513,
+  "ni_diff": -0.110929
+ },
+ {
+  "ticker": "KO",
+  "rev_xbrl": 49284000000.0,
+  "rev_yahoo": 50128998400,
+  "ni_xbrl": 13701000000.0,
+  "ni_yahoo": 14316000256,
+  "rev_diff": -0.0168565,
+  "ni_diff": -0.0429589
+ },
+ {
+  "ticker": "MRK",
+  "rev_xbrl": 66569000000.0,
+  "rev_yahoo": 66568998912,
+  "ni_xbrl": 3173000000.0,
+  "ni_yahoo": 3172999936,
+  "rev_diff": 1.63439e-08,
+  "ni_diff": 2.01702e-08
+ },
+ {
+  "ticker": "BAC",
+  "rev_xbrl": 121098000000.0,
+  "rev_yahoo": 114874998784,
+  "ni_xbrl": 33655000000.0,
+  "ni_yahoo": 30762999808,
+  "rev_diff": 0.0541719,
+  "ni_diff": 0.094009
+ },
+ {
+  "ticker": "HD",
+  "rev_xbrl": 169176000000.0,
+  "rev_yahoo": 169176006656,
+  "ni_xbrl": 14231000000.0,
+  "ni_yahoo": 14227000320,
+  "rev_diff": -3.93436e-08,
+  "ni_diff": 0.000281133
+ },
+ {
+  "ticker": "CAT",
+  "rev_xbrl": 74729000000.0,
+  "rev_yahoo": 74728996864,
+  "ni_xbrl": 10844000000.0,
+  "ni_yahoo": 10844000256,
+  "rev_diff": 4.1965e-08,
+  "ni_diff": -2.36075e-08
+ },
+ {
+  "ticker": "PM",
+  "rev_xbrl": 43138000000.0,
+  "rev_yahoo": 43137998848,
+  "ni_xbrl": 10709000000.0,
+  "ni_yahoo": 10680999936,
+  "rev_diff": 2.6705e-08,
+  "ni_diff": 0.00262148
+ },
+ {
+  "ticker": "GE",
+  "rev_xbrl": 52576000000.0,
+  "rev_yahoo": 52576002048,
+  "ni_xbrl": 9103000000.0,
+  "ni_yahoo": 9201999872,
+  "rev_diff": -3.89531e-08,
+  "ni_diff": -0.0107585
+ },
+ {
+  "ticker": "AMAT",
+  "rev_xbrl": 30837000000.0,
+  "rev_yahoo": 30837000192,
+  "ni_xbrl": 9267000000.0,
+  "ni_yahoo": 9267000320,
+  "rev_diff": -6.22629e-09,
+  "ni_diff": -3.45311e-08
+ },
+ {
+  "ticker": "LRCX",
+  "rev_xbrl": 26127900000.0,
+  "rev_yahoo": 26127935488,
+  "ni_xbrl": 8449870000.0,
+  "ni_yahoo": 8449873920,
+  "rev_diff": -1.86773e-08,
+  "ni_diff": 9.4676e-09
+ },
+ {
+  "ticker": "PANW",
+  "rev_xbrl": 11480000000.0,
+  "rev_yahoo": 11480000512,
+  "ni_xbrl": 307000000.0,
+  "ni_yahoo": 307000000,
+  "rev_diff": -4.45993e-08,
+  "ni_diff": 0.0
+ },
+ {
+  "ticker": "NFLX",
+  "rev_xbrl": 49734600000.0,
+  "rev_yahoo": 49734631424,
+  "ni_xbrl": 14766500000.0,
+  "ni_yahoo": 14766653440,
+  "rev_diff": 3.16882e-08,
+  "ni_diff": -1.36415e-05
+ },
+ {
+  "ticker": "RTX",
+  "rev_xbrl": 95987000000.0,
+  "rev_yahoo": 95986999296,
+  "ni_xbrl": 8403000000.0,
+  "ni_yahoo": 8402999808,
+  "rev_diff": 7.33433e-09,
+  "ni_diff": 2.2849e-08
+ },
+ {
+  "ticker": "GS",
+  "rev_xbrl": 66203000000.0,
+  "rev_yahoo": 71036002304,
+  "ni_xbrl": 20973000000.0,
+  "ni_yahoo": 21251999744,
+  "rev_diff": -0.068036,
+  "ni_diff": -0.0131282
+ },
+ {
+  "ticker": "TXN",
+  "rev_xbrl": 20766000000.0,
+  "rev_yahoo": 20765999104,
+  "ni_xbrl": 7113000000.0,
+  "ni_yahoo": 7086000128,
+  "rev_diff": 4.31475e-08,
+  "ni_diff": 0.00381031
+ },
+ {
+  "ticker": "TMO",
+  "rev_xbrl": 46336000000.0,
+  "rev_yahoo": 47351001088,
+  "ni_xbrl": 6984000000.0,
+  "ni_yahoo": 7072000000,
+  "rev_diff": -0.0214357,
+  "ni_diff": -0.0124434
+ },
+ {
+  "ticker": "WFC",
+  "rev_xbrl": 86796000000.0,
+  "rev_yahoo": 83112001536,
+  "ni_xbrl": 22610000000.0,
+  "ni_yahoo": 21976999936,
+  "rev_diff": 0.0443257,
+  "ni_diff": 0.0288028
+ },
+ {
+  "ticker": "AMGN",
+  "rev_xbrl": 38095000000.0,
+  "rev_yahoo": 38094999552,
+  "ni_xbrl": 8743000000.0,
+  "ni_yahoo": 8743000064,
+  "rev_diff": 1.17601e-08,
+  "ni_diff": -7.32014e-09
+ },
+ {
+  "ticker": "CRWD",
+  "rev_xbrl": 5396140000.0,
+  "rev_yahoo": 5396145152,
+  "ni_xbrl": 59797000.0,
+  "ni_yahoo": 44995000,
+  "rev_diff": -2.81683e-08,
+  "ni_diff": 0.32897
+ },
+ {
+  "ticker": "IBM",
+  "rev_xbrl": 69868000000.0,
+  "rev_yahoo": 69868003328,
+  "ni_xbrl": 11171000000.0,
+  "ni_yahoo": 11160000512,
+  "rev_diff": -4.76327e-08,
+  "ni_diff": 0.000985617
+ },
+ {
+  "ticker": "LIN",
+  "rev_xbrl": 35449000000.0,
+  "rev_yahoo": 35448999936,
+  "ni_xbrl": 7244000000.0,
+  "ni_yahoo": 7244000256,
+  "rev_diff": 1.80541e-09,
+  "ni_diff": -3.53396e-08
+ },
+ {
+  "ticker": "GEV",
+  "rev_xbrl": 41368000000.0,
+  "rev_yahoo": 41366999040,
+  "ni_xbrl": 9529000000.0,
+  "ni_yahoo": 9528999936,
+  "rev_diff": 2.41971e-05,
+  "ni_diff": 6.71634e-09
+ },
+ {
+  "ticker": "ORCL",
+  "rev_xbrl": 71777000000.0,
+  "rev_yahoo": 71776002048,
+  "ni_xbrl": 18817000000.0,
+  "ni_yahoo": 18736001024,
+  "rev_diff": 1.39037e-05,
+  "ni_diff": 0.00432317
+ },
+ {
+  "ticker": "MS",
+  "rev_xbrl": 78042000000.0,
+  "rev_yahoo": 79794003968,
+  "ni_xbrl": 20155000000.0,
+  "ni_yahoo": 19847999488,
+  "rev_diff": -0.0219566,
+  "ni_diff": 0.0154676
+ },
+ {
+  "ticker": "C",
+  "rev_xbrl": null,
+  "rev_yahoo": 83299000320,
+  "ni_xbrl": null,
+  "ni_yahoo": 17860999168,
+  "rev_diff": null,
+  "ni_diff": null
+ },
+ {
+  "ticker": "CRM",
+  "rev_xbrl": 43938000000.0,
+  "rev_yahoo": 43938000896,
+  "ni_xbrl": 9662000000.0,
+  "ni_yahoo": 9662000128,
+  "rev_diff": -2.03924e-08,
+  "ni_diff": -1.32478e-08
+ },
+ {
+  "ticker": "DIS",
+  "rev_xbrl": 98861000000.0,
+  "rev_yahoo": 98860998656,
+  "ni_xbrl": 8600000000.0,
+  "ni_yahoo": 8600000512,
+  "rev_diff": 1.35948e-08,
+  "ni_diff": -5.95349e-08
+ },
+ {
+  "ticker": "GILD",
+  "rev_xbrl": 30457000000.0,
+  "rev_yahoo": 30456999936,
+  "ni_xbrl": -3240000000.0,
+  "ni_yahoo": -3240000000,
+  "rev_diff": 2.10132e-09,
+  "ni_diff": 0.0
+ },
+ {
+  "ticker": "MRVL",
+  "rev_xbrl": 9450300000.0,
+  "rev_yahoo": 9450300416,
+  "ni_xbrl": 2639900000.0,
+  "ni_yahoo": 2639899904,
+  "rev_diff": -4.40198e-08,
+  "ni_diff": 3.6365e-08
+ },
+ {
+  "ticker": "KLAC",
+  "rev_xbrl": 13579500000.0,
+  "rev_yahoo": 13579475968,
+  "ni_xbrl": 4830770000.0,
+  "ni_yahoo": 4830771200,
+  "rev_diff": 2.3565e-09,
+  "ni_diff": -4.14013e-08
+ },
+ {
+  "ticker": "PEP",
+  "rev_xbrl": null,
+  "rev_yahoo": 98241003520,
+  "ni_xbrl": null,
+  "ni_yahoo": 10896000000,
+  "rev_diff": null,
+  "ni_diff": null
+ },
+ {
+  "ticker": "VZ",
+  "rev_xbrl": 138895000000.0,
+  "rev_yahoo": 138894999552,
+  "ni_xbrl": 16606000000.0,
+  "ni_yahoo": 16172000256,
+  "rev_diff": 3.22546e-09,
+  "ni_diff": 0.0268365
+ },
+ {
+  "ticker": "ADI",
+  "rev_xbrl": 13881700000.0,
+  "rev_yahoo": 13881744384,
+  "ni_xbrl": 4135000000.0,
+  "ni_yahoo": 4135003904,
+  "rev_diff": -2.76622e-08,
+  "ni_diff": 2.32164e-08
+ },
+ {
+  "ticker": "SNDK",
+  "rev_xbrl": 20248000000.0,
+  "rev_yahoo": 20248000512,
+  "ni_xbrl": 11433000000.0,
+  "ni_yahoo": 11432999936,
+  "rev_diff": -2.52864e-08,
+  "ni_diff": 5.59783e-09
+ },
+ {
+  "ticker": "QCOM",
+  "rev_xbrl": 44069000000.0,
+  "rev_yahoo": 44068999168,
+  "ni_xbrl": 9259000000.0,
+  "ni_yahoo": 9260000256,
+  "rev_diff": 1.88795e-08,
+  "ni_diff": -0.000108019
+ },
+ {
+  "ticker": "MCD",
+  "rev_xbrl": 27703000000.0,
+  "rev_yahoo": 27701999616,
+  "ni_xbrl": 8787000000.0,
+  "ni_yahoo": 8787000320,
+  "rev_diff": 3.61123e-05,
+  "ni_diff": -3.64174e-08
+ },
+ {
+  "ticker": "APH",
+  "rev_xbrl": 29011600000.0,
+  "rev_yahoo": 29011599360,
+  "ni_xbrl": 5143100000.0,
+  "ni_yahoo": 5143399936,
+  "rev_diff": 2.20601e-08,
+  "ni_diff": -5.83147e-05
+ },
+ {
+  "ticker": "ANET",
+  "rev_xbrl": 10540800000.0,
+  "rev_yahoo": 10540800000,
+  "ni_xbrl": 533204000.0,
+  "ni_yahoo": 4044600064,
+  "rev_diff": 0.0,
+  "ni_diff": -0.868169
+ },
+ {
+  "ticker": "COP",
+  "rev_xbrl": 63345000000.0,
+  "rev_yahoo": 64459001856,
+  "ni_xbrl": 9282000000.0,
+  "ni_yahoo": 9253000192,
+  "rev_diff": -0.0172823,
+  "ni_diff": 0.0031341
+ },
+ {
+  "ticker": "ABT",
+  "rev_xbrl": 45134000000.0,
+  "rev_yahoo": 48228999168,
+  "ni_xbrl": 6276000000.0,
+  "ni_yahoo": 4677000192,
+  "rev_diff": -0.064173,
+  "ni_diff": 0.341886
+ },
+ {
+  "ticker": "UNP",
+  "rev_xbrl": 26363000000.0,
+  "rev_yahoo": 26363000832,
+  "ni_xbrl": 7618000000.0,
+  "ni_yahoo": 7617999872,
+  "rev_diff": -3.15594e-08,
+  "ni_diff": 1.68023e-08
+ },
+ {
+  "ticker": "BLK",
+  "rev_xbrl": 27299000000.0,
+  "rev_yahoo": 28541999104,
+  "ni_xbrl": 6576000000.0,
+  "ni_yahoo": 6912000000,
+  "rev_diff": -0.0435498,
+  "ni_diff": -0.0486111
+ },
+ {
+  "ticker": "PFE",
+  "rev_xbrl": 63696000000.0,
+  "rev_yahoo": 63695998976,
+  "ni_xbrl": 4332000000.0,
+  "ni_yahoo": 4338999808,
+  "rev_diff": 1.60764e-08,
+  "ni_diff": -0.00161323
+ },
+ {
+  "ticker": "WELL",
+  "rev_xbrl": 11766900000.0,
+  "rev_yahoo": 12763214848,
+  "ni_xbrl": 1407560000.0,
+  "ni_yahoo": 1550674048,
+  "rev_diff": -0.0780635,
+  "ni_diff": -0.0922915
+ },
+ {
+  "ticker": "NEE",
+  "rev_xbrl": 26000000000.0,
+  "rev_yahoo": 28824999936,
+  "ni_xbrl": 8183000000.0,
+  "ni_yahoo": 11637000192,
+  "rev_diff": -0.0980052,
+  "ni_diff": -0.296812
+ },
+ {
+  "ticker": "AXP",
+  "rev_xbrl": 77586000000.0,
+  "rev_yahoo": 72803000320,
+  "ni_xbrl": 12255000000.0,
+  "ni_yahoo": 12124000256,
+  "rev_diff": 0.0656978,
+  "ni_diff": 0.010805
+ },
+ {
+  "ticker": "TJX",
+  "rev_xbrl": 62363000000.0,
+  "rev_yahoo": 62363000832,
+  "ni_xbrl": 6066710000.0,
+  "ni_yahoo": 6066999808,
+  "rev_diff": -1.33412e-08,
+  "ni_diff": -4.84272e-05
+ },
+ {
+  "ticker": "NOW",
+  "rev_xbrl": 14732000000.0,
+  "rev_yahoo": 14732000256,
+  "ni_xbrl": 1670000000.0,
+  "ni_yahoo": 1670000000,
+  "rev_diff": -1.73771e-08,
+  "ni_diff": 0.0
+ },
+ {
+  "ticker": "DE",
+  "rev_xbrl": 47982000000.0,
+  "rev_yahoo": 47927001088,
+  "ni_xbrl": 4873000000.0,
+  "ni_yahoo": 4872999936,
+  "rev_diff": 0.00114756,
+  "ni_diff": 1.31336e-08
+ },
+ {
+  "ticker": "ACN",
+  "rev_xbrl": 74183400000.0,
+  "rev_yahoo": 74183442432,
+  "ni_xbrl": 8367060000.0,
+  "ni_yahoo": 8367055872,
+  "rev_diff": 3.46169e-08,
+  "ni_diff": 1.52981e-08
+ },
+ {
+  "ticker": "ISRG",
+  "rev_xbrl": 11578000000.0,
+  "rev_yahoo": 11578000384,
+  "ni_xbrl": 2957200000.0,
+  "ni_yahoo": 2957199872,
+  "rev_diff": -3.31663e-08,
+  "ni_diff": 4.32842e-08
+ },
+ {
+  "ticker": "T",
+  "rev_xbrl": 128852000000.0,
+  "rev_yahoo": 128852000768,
+  "ni_xbrl": 13135000000.0,
+  "ni_yahoo": 13093999616,
+  "rev_diff": -5.96033e-09,
+  "ni_diff": 0.00313123
+ },
+ {
+  "ticker": "SCHW",
+  "rev_xbrl": 26025000000.0,
+  "rev_yahoo": 27061000192,
+  "ni_xbrl": 1252850000.0,
+  "ni_yahoo": 10256499712,
+  "rev_diff": -0.0382839,
+  "ni_diff": -0.877848
+ },
+ {
+  "ticker": "DHR",
+  "rev_xbrl": 25608000000.0,
+  "rev_yahoo": 25607999488,
+  "ni_xbrl": 4331000000.0,
+  "ni_yahoo": 4288999936,
+  "rev_diff": 1.99938e-08,
+  "ni_diff": 0.00979251
+ },
+ {
+  "ticker": "ETN",
+  "rev_xbrl": 30025000000.0,
+  "rev_yahoo": 30026000384,
+  "ni_xbrl": 3829000000.0,
+  "ni_yahoo": 3828999936,
+  "rev_diff": -3.33173e-05,
+  "ni_diff": 1.67145e-08
+ },
+ {
+  "ticker": "BA",
+  "rev_xbrl": 93995000000.0,
+  "rev_yahoo": 93994999808,
+  "ni_xbrl": 2435000000.0,
+  "ni_yahoo": 2088999936,
+  "rev_diff": 2.04266e-09,
+  "ni_diff": 0.16563
+ },
+ {
+  "ticker": "DELL",
+  "rev_xbrl": 151197000000.0,
+  "rev_yahoo": 151197007872,
+  "ni_xbrl": 11378000000.0,
+  "ni_yahoo": 11377999872,
+  "rev_diff": -5.20645e-08,
+  "ni_diff": 1.12498e-08
+ },
+ {
+  "ticker": "VRTX",
+  "rev_xbrl": 12587200000.0,
+  "rev_yahoo": 12587200512,
+  "ni_xbrl": 4405200000.0,
+  "ni_yahoo": 4405199872,
+  "rev_diff": -4.06762e-08,
+  "ni_diff": 2.90566e-08
+ },
+ {
+  "ticker": "UBER",
+  "rev_xbrl": 55227000000.0,
+  "rev_yahoo": 55226998784,
+  "ni_xbrl": 9579000000.0,
+  "ni_yahoo": 9578999808,
+  "rev_diff": 2.20182e-08,
+  "ni_diff": 2.00438e-08
+ },
+ {
+  "ticker": "MPC",
+  "rev_xbrl": 153577000000.0,
+  "rev_yahoo": 154145996800,
+  "ni_xbrl": 8554000000.0,
+  "ni_yahoo": 8545999872,
+  "rev_diff": -0.00369128,
+  "ni_diff": 0.000936125
+ },
+ {
+  "ticker": "PGR",
+  "rev_xbrl": 91055000000.0,
+  "rev_yahoo": 91699003392,
+  "ni_xbrl": 11695000000.0,
+  "ni_yahoo": 11621999616,
+  "rev_diff": -0.00702301,
+  "ni_diff": 0.00628122
+ },
+ {
+  "ticker": "SPGI",
+  "rev_xbrl": 15730000000.0,
+  "rev_yahoo": 16122000384,
+  "ni_xbrl": 4777000000.0,
+  "ni_yahoo": 4922999808,
+  "rev_diff": -0.0243146,
+  "ni_diff": -0.0296567
+ },
+ {
+  "ticker": "BMY",
+  "rev_xbrl": 49186000000.0,
+  "rev_yahoo": 49186000896,
+  "ni_xbrl": 9282000000.0,
+  "ni_yahoo": 9281999872,
+  "rev_diff": -1.82166e-08,
+  "ni_diff": 1.37901e-08
+ },
+ {
+  "ticker": "CB",
+  "rev_xbrl": 60822000000.0,
+  "rev_yahoo": 61954998272,
+  "ni_xbrl": 11299000000.0,
+  "ni_yahoo": 11228000256,
+  "rev_diff": -0.0182874,
+  "ni_diff": 0.00632345
+ },
+ {
+  "ticker": "MO",
+  "rev_xbrl": 23457000000.0,
+  "rev_yahoo": 20444000256,
+  "ni_xbrl": 7973000000.0,
+  "ni_yahoo": 7952000000,
+  "rev_diff": 0.147378,
+  "ni_diff": 0.00264085
+ },
+ {
+  "ticker": "BKNG",
+  "rev_xbrl": 28241000000.0,
+  "rev_yahoo": 28241000448,
+  "ni_xbrl": 7209000000.0,
+  "ni_yahoo": 7208999936,
+  "rev_diff": -1.58635e-08,
+  "ni_diff": 8.87779e-09
+ },
+ {
+  "ticker": "ADP",
+  "rev_xbrl": 21947500000.0,
+  "rev_yahoo": 21947400192,
+  "ni_xbrl": 4413400000.0,
+  "ni_yahoo": 4413499904,
+  "rev_diff": 4.5476e-06,
+  "ni_diff": -2.2636e-05
+ },
+ {
+  "ticker": "COF",
+  "rev_xbrl": 62023000000.0,
+  "rev_yahoo": 48893001728,
+  "ni_xbrl": 10520000000.0,
+  "ni_yahoo": 10129000448,
+  "rev_diff": 0.268546,
+  "ni_diff": 0.038602
+ },
+ {
+  "ticker": "VLO",
+  "rev_xbrl": 139397000000.0,
+  "rev_yahoo": 146578997248,
+  "ni_xbrl": 7212000000.0,
+  "ni_yahoo": 12938000384,
+  "rev_diff": -0.0489975,
+  "ni_diff": -0.442572
+ },
+ {
+  "ticker": "WDC",
+  "rev_xbrl": 14482000000.0,
+  "rev_yahoo": 14481999872,
+  "ni_xbrl": 10021000000.0,
+  "ni_yahoo": 9912999936,
+  "rev_diff": 8.83856e-09,
+  "ni_diff": 0.0108948
+ },
+ {
+  "ticker": "CVS",
+  "rev_xbrl": 415086000000.0,
+  "rev_yahoo": 412644999168,
+  "ni_xbrl": 4890000000.0,
+  "ni_yahoo": 4889999872,
+  "rev_diff": 0.0059155,
+  "ni_diff": 2.61759e-08
+ },
+ {
+  "ticker": "NEM",
+  "rev_xbrl": 26606000000.0,
+  "rev_yahoo": 26606000128,
+  "ni_xbrl": 9240000000.0,
+  "ni_yahoo": 9240000512,
+  "rev_diff": -4.81094e-09,
+  "ni_diff": -5.54113e-08
+ },
+ {
+  "ticker": "LMT",
+  "rev_xbrl": 79116000000.0,
+  "rev_yahoo": 79116001280,
+  "ni_xbrl": 6513000000.0,
+  "ni_yahoo": 6512999936,
+  "rev_diff": -1.61788e-08,
+  "ni_diff": 9.8265e-09
+ },
+ {
+  "ticker": "PLD",
+  "rev_xbrl": 8948180000.0,
+  "rev_yahoo": 9893700608,
+  "ni_xbrl": 3715700000.0,
+  "ni_yahoo": 4255280896,
+  "rev_diff": -0.0955674,
+  "ni_diff": -0.126803
+ },
+ {
+  "ticker": "MDT",
+  "rev_xbrl": 37541000000.0,
+  "rev_yahoo": 37541998592,
+  "ni_xbrl": 430005000.0,
+  "ni_yahoo": 5231000064,
+  "rev_diff": -2.65993e-05,
+  "ni_diff": -0.917797
+ },
+ {
+  "ticker": "STX",
+  "rev_xbrl": 12195000000.0,
+  "rev_yahoo": 12195000320,
+  "ni_xbrl": 3184000000.0,
+  "ni_yahoo": 3184000000,
+  "rev_diff": -2.62403e-08,
+  "ni_diff": 0.0
+ }
+]

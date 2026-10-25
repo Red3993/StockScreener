@@ -1,0 +1,90 @@
+[
+ {
+  "kind": "cik_unmapped",
+  "detail": "1 tickers without SEC CIK: HOLX"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "SPOT (CIK 1639920): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "NU (CIK 1691493): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "VYLR (CIK 2128626): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "AU (CIK 1973832): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "VIK (CIK 1745201): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "GFL (CIK 1780232): only 1 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "ASND (CIK 1612042): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "XP (CIK 1787425): only 1 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "ONON (CIK 1858985): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "TIGO (CIK 912958): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "GFS (CIK 1709048): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "AS (CIK 1988894): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_missing",
+  "detail": "OZK: no companyfacts"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "JBS (CIK 1791942): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "BEPC (CIK 1791863): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "AUGO (CIK 1468642): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "ALM (CIK 1670061): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "BIRK (CIK 1977102): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "JMKE (CIK 2127043): only 5 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_thin",
+  "detail": "BLSH (CIK 1872195): only 0 concepts; add a predecessor CIK?"
+ },
+ {
+  "kind": "xbrl_missing",
+  "detail": "PFBC: no companyfacts"
+ }
+]
