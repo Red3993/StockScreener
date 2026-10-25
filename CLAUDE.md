@@ -105,6 +105,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Insiders > Congress > Notes; quarterly financials chart also on Overview; overall-score sort ranks stocks with
   < 5 of 7 scored categories after fully scored ones ("n/7 scored" tag), and Top Picks excludes them;
   "Ideas" tab renamed **Top Picks**.
+- 2026-10-25 v7: Overview starts with the price chart (compact, no trade list); financials chart only on Financials tab;
+  tabs Overview > Scores > Financials > Chart > Analysts > Insiders > Congress > Notes. Financials tab adds
+  "Price vs fundamentals" (Tom's NFLX screenshot): weekly closes vs a quarterly-stepped typical-valuation band
+  (20th–80th pct of own 3y P/E, or P/S when TTM earnings ≤ 0, × TTM per-share figure), quarter dots with YoY revenue
+  growth, weekly RSI(14) panel with simple bullish/bearish divergence detection, drawdown-from-3y-high panel.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
