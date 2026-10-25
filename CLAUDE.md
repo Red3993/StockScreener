@@ -93,6 +93,8 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (max 10 per sector), Claude picks the **top 25 regardless of large/mid/small cap**, ranked, short synopses.
   **Scheduled task** "Publish StockScreener data" (trig_019ShUgBg9BzCSG4EziRkwnv): weekdays 7:35am ET, cloud session
   clones app-data + web/index.html and republishes the artifact. Auto-approval mode.
+  Phone push (Tom, 2026-10-24): push when the run starts, then a news push built by `jobs/app/daily_digest.py`
+  (watchlist moves/news/insider/congress/analyst/earnings + notable insider and committee-relevant congress buys).
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
