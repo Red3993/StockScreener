@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import re
 import math
 import sys
 import time
@@ -460,6 +461,10 @@ def main() -> int:
                              "form4_budget_left": budget[0]},
              "rows": idx_rows}
     (out / "index.json").write_text(json.dumps(clean(index), separators=(",", ":")))
+    # theme/keyword search: company descriptions for every stock (loaded by the app on first search)
+    search = {t: re.sub(r"\s+", " ", ((detail.get(t) or {}).get("profile") or {}).get("longBusinessSummary") or "")[:1400]
+              for t in (r["t"] for r in idx_rows)}
+    (out / "search.json").write_text(json.dumps(search, separators=(",", ":")))
     save_gz(cdir / "yahoo.json.gz", ycache)
     sizes = sorted((p.stat().st_size for p in (out / "detail").glob("*.json")), reverse=True)
     log(f"wrote index ({(out / 'index.json').stat().st_size / 1e6:.1f} MB, {len(idx_rows)} rows) + {len(sizes)} shards "

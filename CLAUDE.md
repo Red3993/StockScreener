@@ -100,6 +100,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   caches: ~13 min (no Yahoo refresh) / ~77 min (1,192 Yahoo refetches). Yahoo silently returned empty `info` for
   1,193 tickers when throttled → retry in yahoo_detail + needs_refresh refetches incomplete entries. Result: 1,640 rows,
   analyst data 1,618, health 5 (MDLN/VSNT TypeError, OZK/PFBC no companyfacts, HOLX no CIK). Artifact v7.
+- 2026-10-25 v6 (Tom's feedback): theme search (search.json = company descriptions, THEMES synonym map, word-start
+  matching, AND across words, snippet shown); sheet tab order Overview > Financials > Scores > Chart > Analysts >
+  Insiders > Congress > Notes; quarterly financials chart also on Overview; overall-score sort ranks stocks with
+  < 5 of 7 scored categories after fully scored ones ("n/7 scored" tag), and Top Picks excludes them;
+  "Ideas" tab renamed **Top Picks**.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

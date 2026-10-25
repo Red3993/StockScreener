@@ -52,6 +52,8 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 
 /* controls */
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.snip{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ptl{font-size:10.5px;color:var(--faint);margin-left:6px;font-weight:500}
 .search{flex:1 1 180px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
 .sel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
 .btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px}
@@ -253,7 +255,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <nav class="tabs" aria-label="Sections">
   <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
   <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
-  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Ideas</button>
+  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Top Picks</button>
   <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
   <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
 </nav>
@@ -313,6 +315,68 @@ async function getDetail(t) {
   return BY[t] || null;
 }
 const lab = m => DATA.labels?.[m.key] || m.label || m.key;
+// ---- keyword search: ticker, name, industry, sector and the company description (search.json), with theme synonyms
+let SEARCH = null, SEARCH_P = null;
+function loadSearch() { if (!SEARCH_P) SEARCH_P = fetch("search.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(j => { SEARCH = j; rerender(); }); return SEARCH_P; }
+const THEMES = {
+  robot: ["robot", "automation", "autonomous", "motion control", "machine vision", "cobot"],
+  ai: ["artificial intelligence", "machine learning", "generative", "gpu", "accelerated computing", "neural"],
+  "artificial intelligence": ["artificial intelligence", "machine learning", "generative", "gpu", "accelerated computing"],
+  "data center": ["data center", "datacenter", "hyperscale", "server", "colocation"],
+  chip: ["semiconductor", "chip", "wafer", "foundry", "integrated circuit"], semiconductor: ["semiconductor", "chip", "wafer", "foundry", "integrated circuit"],
+  cloud: ["cloud", "software-as-a-service", "saas", "subscription software"], software: ["software", "saas", "platform"],
+  cyber: ["cybersecurity", "security software", "threat", "firewall", "endpoint", "identity"], security: ["cybersecurity", "security", "threat", "firewall"],
+  ev: ["electric vehicle", "battery", "charging"], electric: ["electric vehicle", "electrification", "battery"], battery: ["battery", "lithium", "energy storage"],
+  nuclear: ["nuclear", "uranium", "reactor", "fission"], uranium: ["uranium", "nuclear"], quantum: ["quantum"],
+  space: ["space", "satellite", "orbit", "launch vehicle", "spacecraft"], satellite: ["satellite", "space", "orbit"],
+  drone: ["drone", "unmanned", "uas", "uav", "loitering"], defense: ["defense", "military", "missile", "munition", "aerospace", "department of defense"],
+  biotech: ["biotechnology", "biopharmaceutical", "clinical-stage", "therapeutic", "gene"], obesity: ["obesity", "glp-1", "weight management", "diabetes"], "glp-1": ["glp-1", "obesity", "incretin"],
+  crypto: ["crypto", "bitcoin", "blockchain", "digital asset"], bitcoin: ["bitcoin", "crypto", "digital asset", "mining"],
+  solar: ["solar", "photovoltaic", "renewable"], renewable: ["renewable", "solar", "wind", "clean energy"], wind: ["wind", "turbine", "renewable"],
+  "5g": ["5g", "wireless", "spectrum", "tower"], fintech: ["payment", "fintech", "digital wallet", "lending platform"], payment: ["payment", "card", "merchant", "digital wallet"],
+  gold: ["gold", "precious metal", "mining"], lithium: ["lithium", "battery"], oil: ["oil", "crude", "exploration and production", "petroleum"], gas: ["natural gas", "lng", "midstream", "pipeline"],
+  pipeline: ["pipeline", "midstream"], casino: ["casino", "gaming", "resort", "sports betting"], betting: ["sports betting", "igaming", "wagering", "casino"],
+  streaming: ["streaming", "video", "content"], cannabis: ["cannabis"], water: ["water", "wastewater"], infrastructure: ["infrastructure", "engineering and construction", "utility"],
+  "medical device": ["medical device", "surgical", "implant", "diagnostic"], surgical: ["surgical", "surgery", "robotic"], railroad: ["railroad", "rail"],
+  shipping: ["shipping", "tanker", "vessel", "container"], airline: ["airline", "air carrier", "flights"], restaurant: ["restaurant", "franchise", "dining"],
+};
+const stem = w => w.length <= 4 ? w.replace(/s$/, "") : w.replace(/(ics|ies|ing|ers|ed|s)$/, m => m === "ies" ? "y" : "");
+function searchTerms(q) {
+  const ql = q.toLowerCase().trim(), words = ql.split(/[\s,]+/).filter(w => w.length > 1);
+  const groups = words.map(w => { const st = stem(w); const syn = THEMES[w] || THEMES[st] || THEMES[st + "s"] || [];
+    return {w, st: st.length >= 3 ? st : w, syn: syn.filter(x => !x.trim().startsWith(st))}; });
+  if (THEMES[ql] && words.length > 1) groups.splice(0, groups.length, {w: ql, st: ql, syn: THEMES[ql]});
+  return {ql, groups};
+}
+const RX = {};
+function cnt(text, term) {   // matches at the start of a word; short terms (AI, EV, 5G) only as whole words
+  if (!text || !term) return 0;
+  const rx = RX[term] || (RX[term] = new RegExp("\\b" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + (term.length <= 3 ? "\\b" : ""), "g"));
+  return (text.match(rx) || []).length;
+}
+function searchScore(r, T) {
+  const t = r.t.toLowerCase(), n = r.n.toLowerCase(), meta = `${r.ind || ""} ${r.sec || ""}`.toLowerCase(), desc = (SEARCH?.[r.t] || "").toLowerCase();
+  if (t === T.ql) return {s: 1e6};
+  let total = 0, hit = null;
+  if (t.startsWith(T.ql) && !THEMES[T.ql] && !THEMES[stem(T.ql)]) total += 5e4;   // ticker prefix, unless it's a theme word like "ev"
+  if (cnt(n, T.ql)) total += 2e4;
+  for (const g of T.groups) {            // every word must match somewhere (AND), synonyms count as matches
+    let gs = 0;
+    if (cnt(n, g.st)) gs += 400;
+    if (cnt(meta, g.st)) gs += 300;
+    const c1 = cnt(desc, g.st);
+    if (c1) { gs += 60 + 15 * Math.min(c1, 6); hit = hit || g.st; }
+    for (const x0 of g.syn) { const x = x0.trim(); if (cnt(meta, x)) gs += 120; const c2 = cnt(desc, x); if (c2) { gs += 25 + 6 * Math.min(c2, 5); hit = hit || x; } }
+    if (!gs && !((t.startsWith(T.ql) && !THEMES[T.ql]) || cnt(n, T.ql))) return null;
+    total += gs;
+  }
+  return total ? {s: total, hit} : null;
+}
+function snippet(t, term) {
+  const d = SEARCH?.[t] || ""; const i = d.toLowerCase().indexOf(term); if (i < 0) return "";
+  const a = Math.max(0, d.lastIndexOf(" ", Math.max(0, i - 50))), b = d.indexOf(" ", Math.min(d.length, i + term.length + 60));
+  return (a > 0 ? "…" : "") + d.slice(a, b < 0 ? d.length : b).trim() + (b > 0 && b < d.length ? "…" : "");
+}
 const UI = {calFilter: "top", mk: {ins: true, cong: true}, scope: "all", page: 1, tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
 try { Object.assign(UI, JSON.parse(localStorage.getItem("ss-ui2") || "{}")); } catch (e) {}
 UI.q = ""; UI.dtab = "overview";
@@ -566,7 +630,7 @@ function stockRow(r, extra = "") {
   const d = r.d || {};
   const pos = d.pos != null ? Math.max(0, Math.min(1, d.pos)) : null;
   return `<button class="row" data-t="${esc(r.t)}">
-    <div class="id"><div class="tk">${esc(r.t)}</div><div class="nm">${esc(r.n)}</div>${extra}</div>
+    <div class="id"><div class="tk">${esc(r.t)}${partial(r) ? `<span class="ptl" title="Scored in only ${nCats(r)} of 7 categories, so it ranks after fully scored stocks">${nCats(r)}/7 scored</span>` : ""}</div><div class="nm">${esc(r.n)}</div>${extra}</div>
     <div class="px">${fmtMoney(d.px)}<small class="${cls(d.c1)}">${pct(d.c1, 2)}</small>${pos != null ? `<div class="r52" title="52-week range: ${fmtMoney(d.lo)} – ${fmtMoney(d.hi)}"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
     <div class="ov">${chip(r.ov, "Overall")}</div>
     ${scores7(r)}</button>`;
@@ -580,13 +644,23 @@ function whyChips(r) {
 }
 const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
 const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc"};
+// A stock needs scores in at least MIN_CATS of the 7 categories to rank by overall score; thinner ones sort after it.
+const MIN_CATS = 5, nCats = r => (r.cs || []).filter(x => x != null).length, partial = r => nCats(r) < MIN_CATS;
+const SEARCH_HITS = {};
 function sortedFiltered() {
-  const q = UI.q.toLowerCase();
-  let rows = ROWS.filter(r => inScope(r) && (!q || r.t.toLowerCase().startsWith(q) || r.n.toLowerCase().includes(q)) && UI.filters.every(f => passes(r, f)));
+  const q = UI.q.trim();
+  let rows = ROWS.filter(r => inScope(r) && UI.filters.every(f => passes(r, f)));
+  if (q) {
+    if (!SEARCH) loadSearch();
+    const T = searchTerms(q), sc = new Map();
+    for (const r of rows) { const m = searchScore(r, T); if (m) { sc.set(r.t, m.s); SEARCH_HITS[r.t] = m.hit; } }
+    rows = rows.filter(r => sc.has(r.t));
+    if (UI.sort === "overall" && UI.dir === "desc") return rows.sort((a, b) => sc.get(b.t) - sc.get(a.t) || (b.ov ?? 0) - (a.ov ?? 0));   // default sort → relevance
+  }
   const k = UI.sort, dir = UI.dir === "asc" ? 1 : -1;
   rows.sort((a, b) => { if (k === "ticker") return dir * a.t.localeCompare(b.t);
+    if (k === "overall") { const pa = partial(a), pb = partial(b); if (pa !== pb) return pa ? 1 : -1; }
     const va = FIELDS[k]?.get(a), vb = FIELDS[k]?.get(b); if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; return dir * (va - vb) || (b.ov ?? 0) - (a.ov ?? 0); });
-  if (q) rows.sort((a, b) => (b.t.toLowerCase() === q) - (a.t.toLowerCase() === q));
   return rows;
 }
 const PAGE = 120;
@@ -597,7 +671,7 @@ function viewStocks() {
   const shown = rows.slice(0, PAGE * UI.page);
   $("#view").innerHTML = `
     <div class="bar">
-      <input class="search" id="q" type="search" placeholder="Search ticker or name" value="${esc(UI.q)}" aria-label="Search">
+      <input class="search" id="q" type="search" placeholder="Search ticker, name or theme (e.g. robotics, nuclear, AI chips)" value="${esc(UI.q)}" aria-label="Search">
       <button class="btn" id="openF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filters${nf ? ` <span class="count-dot">${nf}</span>` : ""}</button>
       <select class="sel" id="sort" aria-label="Sort by">${SORTS.map(([v, l]) => `<option value="${v}" ${v === UI.sort ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
       <button class="btn small" id="dir" aria-label="Sort direction" title="Reverse order">${UI.dir === "asc" ? "↑" : "↓"}</button>
@@ -605,7 +679,8 @@ function viewStocks() {
     <div class="seg" id="scope" style="margin-bottom:10px">${SCOPES.map(([v, l]) => `<button data-sc="${v}" aria-pressed="${UI.scope === v}">${l}</button>`).join("")}</div>
     ${nf ? `<div class="fchips">${UI.filters.map((f, i) => `<span class="fchip"><button class="edit" data-i="${i}">${esc(describe(f))}</button><button data-x="${i}" aria-label="Remove filter">×</button></span>`).join("")}<button class="link" id="clearF" style="font-size:13px">Clear all</button></div>`
       : `<div class="presets">${PRESETS.map(([l], i) => `<button data-p="${i}">${esc(l)}</button>`).join("")}</div>`}
-    <div class="list">${headRow(rows.length.toLocaleString() + " of " + ROWS.length.toLocaleString() + " stocks")}${shown.map(r => stockRow(r, nf ? `<div class="why">${whyChips(r)}</div>` : "")).join("") || `<div class="empty">No stocks match these filters.<br><button class="btn small" id="clearF2" style="margin-top:10px">Clear filters</button></div>`}</div>
+    <div class="list">${headRow(rows.length.toLocaleString() + " of " + ROWS.length.toLocaleString() + " stocks")}${UI.q.trim() && !SEARCH ? `<div class="faint small" style="padding:8px 12px">Loading company descriptions for theme search…</div>` : ""}${shown.map(r => { const hit = UI.q.trim() && SEARCH_HITS[r.t]; const sn = hit ? snippet(r.t, hit) : "";
+      return stockRow(r, (nf ? `<div class="why">${whyChips(r)}</div>` : "") + (sn ? `<div class="snip">${esc(sn)}</div>` : "")); }).join("") || `<div class="empty">No stocks match these filters.<br><button class="btn small" id="clearF2" style="margin-top:10px">Clear filters</button></div>`}</div>
     ${rows.length > shown.length ? `<div style="text-align:center;margin-top:12px"><button class="btn" id="more">Show ${Math.min(PAGE, rows.length - shown.length)} more of ${(rows.length - shown.length).toLocaleString()}</button></div>` : ""}
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   $$("[data-sc]").forEach(b => b.onclick = () => { UI.scope = b.dataset.sc; UI.page = 1; saveUI(); viewStocks(); });
@@ -1030,7 +1105,7 @@ ${stockContext(s)}`;
 };
 
 // ================================================================ detail sheet
-const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["chart", "Chart & momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["financials", "Financials"], ["notes", "Notes"]];
+const DTABS = [["overview", "Overview"], ["financials", "Financials"], ["scores", "Scores"], ["chart", "Chart & momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["notes", "Notes"]];
 const Sheet = {
   t: null,
   async open(t) {
@@ -1146,6 +1221,9 @@ function overviewHtml(s) {
       <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px"><div class="overall" style="color:${sc(s.overall)}">${s.overall != null ? s.overall.toFixed(1) : "—"}<small> / 10</small></div></div>
       <div class="catlist">${CATS.map(c => { const k = s.categories?.[c] || {}; return `<button class="cat" data-goto="scores" data-cat="${esc(c)}"><span><span class="cat-name">${esc(c)}</span>${k.na ? ` <span class="cat-na">· ${esc(k.na)}</span>` : ""}</span>${chip(k.score)}${ruler(k.score)}</button>`; }).join("")}</div>
     </div>
+    ${(() => { const t = s.ttm || {}, ch = finChart(s); return `<div class="card"><h3>Financials <span class="label">quarterly</span><button class="link" data-goto="financials" style="margin-left:auto">Details</button></h3>
+      ${ch || `<p class="muted">No quarterly figures in SEC filings for this company.</p>`}
+      <dl class="kv" style="margin-top:10px"><dt>Revenue, TTM</dt><dd>${fmtBig(t.revenue)}</dd><dt>Net income, TTM</dt><dd>${fmtBig(t.net_income)}</dd><dt>Free cash flow, TTM</dt><dd>${fmtBig(t.fcf)}</dd></dl></div>`; })()}
     <div class="card ai"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>AI analyst</h3><div id="aiBox"><p class="muted">Loading…</p></div></div>
     ${momentumCard(s, true)}
     <div class="card">
@@ -1258,16 +1336,21 @@ function sharesCard(s) {
     <dl class="kv" style="margin-top:8px">${[[1, "1 year"], [3, "3 years"], [5, "5 years"], [10, "10 years"]].map(([y, l]) => { const c = chg(y); return c == null ? "" : `<dt>${l}</dt><dd class="${c < 0 ? "up" : c > 0 ? "down" : ""}">${pct(c)}</dd>`; }).join("")}</dl>
     <p class="faint" style="font-size:11.5px;margin:6px 0 0">Diluted weighted-average shares from 10-K filings, adjusted for stock splits. Latest: ${(last / 1e6).toLocaleString(undefined, {maximumFractionDigits: 0})}M.</p></div>`;
 }
-function fundCard(s) {
-  const t = s.ttm || {}, q = (s.quarterly || []).filter(x => x.revenue != null);
+function finChart(s) {
+  const q = (s.quarterly || []).filter(x => x.revenue != null);
+  if (!q.length) return "";
   const W = 340, H = 110, mx = Math.max(...q.map(x => Math.abs(x.revenue)), 1), bw = W / Math.max(q.length, 1);
   const bars = q.map((x, i) => { const h = Math.abs(x.revenue) / mx * (H - 22), hn = x.net_income != null ? Math.max(0, x.net_income) / mx * (H - 22) : 0;
     return `<rect x="${(i * bw + 2).toFixed(1)}" y="${(H - 16 - h).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--line)"><title>${x.end}: revenue ${fmtBig(x.revenue)}</title></rect>
       <rect x="${(i * bw + 2 + bw * .22).toFixed(1)}" y="${(H - 16 - hn).toFixed(1)}" width="${(bw * .56 - 4).toFixed(1)}" height="${hn.toFixed(1)}" rx="1.5" fill="var(--accent)"><title>${x.end}: net income ${fmtBig(x.net_income)}</title></rect>
       ${i % 2 === q.length % 2 ? "" : `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 3}" font-size="9.5" text-anchor="middle" fill="var(--muted)">${x.end.slice(2, 7).replace("-", "/")}</text>`}`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Quarterly revenue and net income">${bars}</svg><div class="legend"><span><i style="background:var(--line)"></i>Quarterly revenue</span><span><i style="background:var(--accent)"></i>Net income</span></div>`;
+}
+function fundCard(s) {
+  const t = s.ttm || {};
   const rows = [["Revenue", t.revenue], ["Operating income", t.operating_income], ["Net income", t.net_income], ["Free cash flow", t.fcf], ["EBITDA", t.ebitda], ...(s.metric_set === "reit" ? [["FFO (approx.)", t.ffo]] : []), ["Dividends paid", t.dividends_paid ? Math.abs(t.dividends_paid) : null], ["Debt", t.debt], ["Cash & short-term inv.", t.cash_total], ["Equity", t.equity]];
   return `<div class="card"><h3>Financials <span class="label">trailing 12 months</span></h3>
-    ${q.length ? `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Quarterly revenue and net income">${bars}</svg><div class="legend"><span><i style="background:var(--line)"></i>Quarterly revenue</span><span><i style="background:var(--accent)"></i>Net income</span></div>` : ""}
+    ${finChart(s)}
     <dl class="kv" style="margin-top:10px">${rows.map(([l, v]) => `<dt>${l}</dt><dd>${fmtBig(v)}</dd>`).join("")}</dl>
     <p class="faint" style="font-size:11.5px;margin:6px 0 0">From SEC XBRL filings through ${esc(fmtDate(s.latest_period))}. Market cap source: ${esc(s.mcap_source || "—")}.</p>
     ${eventsHtml(s)}</div>`;
@@ -1312,7 +1395,7 @@ const sizeOf = r => r.ix?.includes("IJR") ? "Small cap" : r.ix?.includes("IJH") 
 // One ranking across all sizes (no size slots). At most 10 per sector so one cheap sector can't fill the pool.
 const PICKS_N = 25;
 function candidates(n = 45) {
-  const ranked = ROWS.filter(inScopeIdeas).map(r => ({s: r, o: opportunity(r), size: sizeOf(r)})).sort((a, b) => b.o.score - a.o.score);
+  const ranked = ROWS.filter(r => inScopeIdeas(r) && !partial(r)).map(r => ({s: r, o: opportunity(r), size: sizeOf(r)})).sort((a, b) => b.o.score - a.o.score);
   const per = {}, out = [];
   for (const x of ranked) { if (out.length >= n) break; if ((per[x.s.sec] = (per[x.s.sec] || 0) + 1) <= 10) out.push(x); }
   return out;
@@ -1323,10 +1406,10 @@ async function viewIdeas() {
   const week = isoWeek(DATA.lastDate), key = "picks_" + week.replace("-", "_");
   const cands = candidates();
   $("#view").innerHTML = `
-    <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Tickers of the week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
+    <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Top picks this week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
-    <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector), and Claude picks the best ${PICKS_N}.</p>
+    <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
     <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
     <div class="list">${headRow("Opportunity score")}${cands.map(({s, o, size}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span><span class="badge">${esc(size || sizeOf(s))}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
