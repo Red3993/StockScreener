@@ -44,7 +44,7 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;text
 .brand b{color:var(--accent)}
 .asof{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
 main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--gut);padding-right:var(--gut-r)}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 .tabs button{background:none;border:0;padding:10px 4px 9px;font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabs button svg{width:22px;height:22px}
 .tabs button[aria-current="page"]{color:var(--accent)}
@@ -89,6 +89,7 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 .r52{position:relative;height:4px;border-radius:2px;background:var(--sunk);margin-top:5px}
 .r52 i{position:absolute;top:-2px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--fg)}
 .why{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.why .badge{white-space:normal;text-align:left}
 .head{display:none}
 @media (min-width:760px){
   .row{grid-template-columns:minmax(0,1.3fr) 120px 52px minmax(0,320px);grid-template-areas:"id px ov s7"}
@@ -222,6 +223,23 @@ textarea{width:100%;box-sizing:border-box;min-height:70px;border:1px solid var(-
 .toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:14px;z-index:60}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);padding:16px;max-width:min(440px,calc(100vw - 32px));width:100%;box-sizing:border-box}
 dialog::backdrop{background:rgba(10,14,20,.45)}
+.spark{display:block;width:72px;height:22px}
+.trend{font:600 12px var(--f-mono);white-space:nowrap}
+.toggles{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.tog{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.tog[aria-pressed="true"]{border-color:var(--accent);color:var(--fg);background:var(--accent-soft)}
+.tog i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.mklist{display:grid;gap:0;margin-top:8px;max-height:220px;overflow-y:auto}
+.mklist>div{display:grid;grid-template-columns:70px 16px minmax(0,1fr) auto;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px;align-items:baseline}
+.gauge{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--s1),var(--s5),var(--s10));margin:8px 0 4px}
+.gauge i{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;border-radius:2px;background:var(--fg)}
+.gauge.stretch{background:linear-gradient(90deg,var(--s9),var(--s5),var(--s1))}
+.regime{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-family:var(--f-display);font-size:18px}
+.regime i{width:10px;height:10px;border-radius:50%}
+.compbar{display:grid;grid-template-columns:130px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:13px;margin-top:6px}
+.pick{display:grid;gap:8px}
+.pick h3{margin:0}
+.conv{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 @media (prefers-reduced-motion:no-preference){.row,.cat,.btn{transition:background-color .12s}}
 </style>
 
@@ -235,6 +253,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <nav class="tabs" aria-label="Sections">
   <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
   <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
+  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Ideas</button>
   <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
   <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
 </nav>
@@ -283,10 +302,10 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 // ================================================================ state
 let DATA = null, BY = {}, DER = {};
-const UI = {tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calFilter: "all", calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
+const UI = {mk: {ins: true, cong: true}, tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calFilter: "all", calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
 try { Object.assign(UI, JSON.parse(localStorage.getItem("ss-ui2") || "{}")); } catch (e) {}
 UI.q = ""; UI.dtab = "overview";
-const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
+const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, mk: UI.mk, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
 
 // Watchlists, notes, saved screens: owner-only database doc; AI synopses: one doc per stock. Browser fallback.
 const Store = {
@@ -323,6 +342,14 @@ const Store = {
       } else { try { localStorage.setItem("ss-state", JSON.stringify(body)); } catch (e) {} }
       this.pending = false;
     }, 350);
+  },
+  async getDoc(key) {
+    if (this.db) { try { const s = await this.db.doc("app/" + key).get(); return s.exists ? s.data() : null; } catch (e) { return null; } }
+    try { return JSON.parse(localStorage.getItem("ss-" + key) || "null"); } catch (e) { return null; }
+  },
+  async setDoc(key, body) {
+    if (this.db) { try { await this.db.doc("app/" + key).set(body); return; } catch (e) {} }
+    try { localStorage.setItem("ss-" + key, JSON.stringify(body)); } catch (e) {}
   },
   async getSyn(t) {
     const key = "syn_" + t.replace(/[^A-Za-z0-9_.-]/g, "_");
@@ -389,6 +416,8 @@ function derive(s) {
     upgrades90: s.analyst?.upgrades_90d ?? null, downgrades90: s.analyst?.downgrades_90d ?? null,
     nAnalysts: s.analyst?.n_analysts ?? null, upside: s.analyst?.targets?.mean && last ? s.analyst.targets.mean / last - 1 : null,
     daysToEarnings: daysTo, beta: p.beta ?? null, divYieldY: p.dividendYield ?? null,
+    congBuys90: (s.congress || []).filter(t => t.relevant && /Purchase/.test(t.type || "") && (t.date || "") >= cut(90)).length,
+    news7: (s.news || []).filter(n => (n.date || "") >= cut(7)).length,
   };
 }
 
@@ -411,6 +440,10 @@ F("r21", {group: "Price & size", label: "Change, 1 month", unit: "%", get: (s, d
 F("r63", {group: "Price & size", label: "Change, 3 months", unit: "%", get: (s, d) => P100(d.r63)});
 F("r252", {group: "Price & size", label: "Change, 1 year", unit: "%", get: (s, d) => P100(d.r252)});
 F("beta", {group: "Price & size", label: "Beta", unit: "", get: (s, d) => d.beta});
+F("mom", {group: "Technical", label: "Momentum score (0–100)", unit: "", get: s => s.momentum?.score ?? null, hint: "Trend + relative strength + buying pressure, ranked vs ~1,650 stocks"});
+F("stretch", {group: "Technical", label: "Stretch (0–100)", unit: "", get: s => s.momentum?.stretch ?? null, hint: "How extended the price is; above ~75 = overextended"});
+F("pcv", {group: "Technical", label: "Put/call ratio (volume)", unit: "", get: s => s.momentum?.inputs?.put_call_volume ?? null, hint: "Above 1 = more puts than calls (fear); below 0.5 = complacent"});
+F("shortPct", {group: "Technical", label: "Short interest (% of float)", unit: "%", get: s => P100(s.momentum?.inputs?.short_pct_float)});
 F("rsi", {group: "Technical", label: "RSI (14-day)", unit: "", get: (s, d) => d.rsi, hint: "Below 30 = oversold, above 70 = overbought"});
 F("vs50", {group: "Technical", label: "% vs 50-day average", unit: "%", get: (s, d) => P100(d.vs50)});
 F("vs200", {group: "Technical", label: "% vs 200-day average", unit: "%", get: (s, d) => P100(d.vs200)});
@@ -419,6 +452,7 @@ F("nAnalysts", {group: "Analysts & insiders", label: "Number of analysts", unit:
 F("ratingMean", {group: "Analysts & insiders", label: "Consensus rating (1 = strong buy)", unit: "", get: s => s.analyst?.rating_mean ?? null});
 F("buys90", {group: "Analysts & insiders", label: "Insider buys, last 90 days", unit: "", get: (s, d) => d.buys90});
 F("discSales90", {group: "Analysts & insiders", label: "Discretionary insider sales, 90 days", unit: "", get: (s, d) => d.discSales90});
+F("congress90", {group: "Analysts & insiders", label: "Committee-relevant congressional buys, 90 days", unit: "", get: (s, d) => d.congBuys90});
 F("daysToEarnings", {group: "Analysts & insiders", label: "Days until earnings", unit: "days", get: (s, d) => d.daysToEarnings != null && d.daysToEarnings >= 0 ? d.daysToEarnings : null});
 const METRIC_LABELS = {};
 // technical / event flags: within the last N trading days
@@ -435,6 +469,9 @@ const STATE_FLAGS = {
   goldenState: ["50-day above 200-day (uptrend)", (s, d) => d.golden === true], deathState: ["50-day below 200-day (downtrend)", (s, d) => d.golden === false],
   insiderBuy90: ["Any insider buy, 90 days", (s, d) => d.buys90 > 0], ceoBuy90: ["CEO or CFO buy, 90 days", (s, d) => d.ceo90], cluster90: ["Cluster buy, 90 days", (s, d) => d.cluster90],
   upgrade90: ["Net analyst upgrades, 90 days", (s, d) => (d.upgrades90 ?? 0) > (d.downgrades90 ?? 0)],
+  knife: ["Momentum: falling knife", s => s.momentum?.regime === "Falling knife"], basing: ["Momentum: basing / turning", s => s.momentum?.regime === "Basing / turning"],
+  healthy: ["Momentum: healthy uptrend", s => s.momentum?.regime === "Healthy uptrend"], extended: ["Momentum: overextended", s => s.momentum?.regime === "Overextended"],
+  congBuy90: ["Committee-relevant congressional buy, 90 days", (s, d) => d.congBuys90 > 0],
   paysDiv: ["Pays a dividend", s => s.categories?.Dividends?.score != null], thinCov: ["Thin analyst coverage", s => !!s.analyst?.thin_coverage],
 };
 function buildMetricFields() {
@@ -500,7 +537,7 @@ $$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!DATA) return;
   $$(".tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === UI.tab ? "page" : "false"));
-  ({stocks: viewStocks, watch: viewWatch, cal: viewCal, about: viewAbout})[UI.tab]();
+  ({stocks: viewStocks, watch: viewWatch, ideas: viewIdeas, cal: viewCal, about: viewAbout})[UI.tab]();
 }
 function rerender() { if (!DATA) return; if ($("#fpanel").hidden) render(); if (!$("#sheet").hidden && Sheet.t) Sheet.refreshLists(); }
 
@@ -522,7 +559,7 @@ function whyChips(s) {
     if (f.type === "flag") { const b = d.ev[f.key]; return `<span class="badge acc">${esc(FLAGS[f.key].split(" (")[0])} ${b === 0 ? "today" : b + "d ago"}</span>`; }
     const fd = FIELDS[f.key]; return `<span class="badge">${esc(fd.label.replace(/…$/, ""))}: ${fmtU(fd.get(s, d), fd.unit)}</span>`; }).join("");
 }
-const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["ticker", "Ticker A–Z"]];
+const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["ticker", "Ticker A–Z"]];
 const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc"};
 function sortedFiltered() {
   let rows = DATA.stocks.filter(s => (!UI.q || (s.ticker + " " + s.name).toLowerCase().includes(UI.q.toLowerCase())) && UI.filters.every(f => passes(s, f)));
@@ -614,8 +651,8 @@ const Filters = {
   pickerHtml() {
     const groups = {};
     for (const f of Object.values(FIELDS)) (groups[f.group] ||= []).push(["range|" + f.key, f.label]);
-    const tech = Object.entries(FLAGS).map(([k, l]) => ["flag|" + k, l + " (recent)"]).concat([["state|above200", STATE_FLAGS.above200[0]], ["state|below200", STATE_FLAGS.below200[0]], ["state|goldenState", STATE_FLAGS.goldenState[0]], ["state|deathState", STATE_FLAGS.deathState[0]]]);
-    const ev = ["insiderBuy90","ceoBuy90","cluster90","upgrade90","paysDiv","thinCov"].map(k => ["state|" + k, STATE_FLAGS[k][0]]);
+    const tech = ["knife","basing","healthy","extended"].map(k => ["state|" + k, STATE_FLAGS[k][0]]).concat(Object.entries(FLAGS).map(([k, l]) => ["flag|" + k, l + " (recent)"]).concat([["state|above200", STATE_FLAGS.above200[0]], ["state|below200", STATE_FLAGS.below200[0]], ["state|goldenState", STATE_FLAGS.goldenState[0]], ["state|deathState", STATE_FLAGS.deathState[0]]]));
+    const ev = ["insiderBuy90","ceoBuy90","cluster90","congBuy90","upgrade90","paysDiv","thinCov"].map(k => ["state|" + k, STATE_FLAGS[k][0]]);
     const tabs = {"Scores": groups["Scores"], "52-week & price": [...groups["52-week range"], ...groups["Price & size"]], "Technical": [...tech, ...groups["Technical"]],
       "Financial metrics": Object.entries(groups).filter(([g]) => g.startsWith("Financial metrics")).flatMap(([g, items]) => items.map(x => [x[0], x[1], g.split(" · ")[1]])),
       "Analysts & insiders": [...groups["Analysts & insiders"], ...ev], "Sector": [["sector|", "Sector"]]};
@@ -771,9 +808,31 @@ function priceChart(s, range) {
     <path d="${path(all)}" fill="none" stroke="var(--price)" stroke-width="1.8" stroke-linejoin="round"/>
     ${sigs.map(g => { const [sym, col, lab] = SIG[g.type]; const k = pos[g.date]; const v = all[idx[k]]; return `<g><title>${lab} · ${fmtDate(g.date)}</title><circle cx="${X(k)}" cy="${Y(v)}" r="7" fill="${col}"/><text x="${X(k)}" y="${Y(v) + 3.5}" font-size="9" font-weight="700" fill="var(--surface)" text-anchor="middle">${sym}</text></g>`; }).join("")}
     <circle cx="${X(idx.length - 1)}" cy="${Y(all[idx[idx.length - 1]])}" r="3.5" fill="var(--price)"/>
+    ${chartMarkers(s, idx).map(m => { const x = X(m.k), y = Y(all[idx[m.k]]); const n = m.items.length; const t = m.items.map(i => i.label).join("\n");
+      if (m.kind === "ins-buy") return `<g><title>${esc(t)}</title><path d="M${x} ${y + 9}l6 10h-12z" fill="var(--up)"/>${n > 1 ? `<text x="${x}" y="${y + 31}" font-size="9" text-anchor="middle" fill="var(--up)">${n}</text>` : ""}</g>`;
+      if (m.kind === "ins-sell") return `<g><title>${esc(t)}</title><path d="M${x} ${y - 9}l6 -10h-12z" fill="var(--down)"/>${n > 1 ? `<text x="${x}" y="${y - 23}" font-size="9" text-anchor="middle" fill="var(--down)">${n}</text>` : ""}</g>`;
+      const off = m.kind === "cong-buy" ? 26 : -26; return `<g><title>${esc(t)}</title><path d="M${x} ${y + off - 6}l6 6-6 6-6-6z" fill="${m.kind === "cong-buy" ? "var(--sma200)" : "var(--surface)"}" stroke="var(--sma200)" stroke-width="2"/></g>`; }).join("")}
     <g id="hover" visibility="hidden"><line id="hl" y1="${padT}" y2="${H - padB}" stroke="var(--muted)" stroke-dasharray="3 3"/><rect id="hb" rx="5" height="36" width="132" fill="var(--fg)"/><text id="ht1" font-size="11" fill="var(--bg)"></text><text id="ht2" font-size="12" font-weight="600" fill="var(--bg)" font-family="IBM Plex Mono,monospace"></text></g>
     <rect x="${padL}" y="${padT}" width="${W - padL - padR}" height="${H - padT - padB}" fill="transparent" id="hz"/></svg>`;
 }
+function nearestIdx(idx, date) { const ds = DATA.dates; for (let k = 0; k < idx.length; k++) if (ds[idx[k]] >= date) return k; return null; }
+function markerItems(s) {
+  const out = [];
+  if (UI.mk.ins) for (const t of s.insiders?.trades || []) {
+    if (!t.date || (t.code === "S" && t.plan_10b5_1)) continue;
+    out.push({date: t.date, kind: t.code === "P" ? "ins-buy" : "ins-sell", label: `${fmtShort(t.date)} · Insider ${t.code === "P" ? "buy" : "sale"}: ${t.owner} (${(t.roles || []).join(", ")}) · ${fmtBig(t.value)}`}); }
+  if (UI.mk.cong) for (const t of s.congress || []) {
+    if (!t.date || (!t.relevant && !UI.mk.congAll)) continue;
+    const buy = /Purchase/.test(t.type || ""), sell = /Sale/.test(t.type || ""); if (!buy && !sell) continue;
+    out.push({date: t.date, kind: buy ? "cong-buy" : "cong-sell", label: `${fmtShort(t.date)} · ${t.name} (${t.party?.[0] || "?"}-${t.state || ""}) ${buy ? "bought" : "sold"} ${amtRange(t)}${t.owner && t.owner !== "Self" ? " (" + t.owner.toLowerCase() + ")" : ""}${t.asset_type === "OP" ? " · options" : ""}${t.committees?.length ? " · " + t.committees[0] : t.tracked ? " · tracked" : ""}`}); }
+  return out;
+}
+function chartMarkers(s, idx) {
+  const groups = {};
+  for (const m of markerItems(s)) { const k = nearestIdx(idx, m.date); if (k == null || DATA.dates[idx[0]] > m.date) continue; const key = k + "|" + m.kind; (groups[key] ||= {k, kind: m.kind, items: []}).items.push(m); }
+  return Object.values(groups);
+}
+const amtRange = t => t.amount_low == null ? "amount n/a" : t.amount_high ? `${fmtBig(t.amount_low).replace(".0", "")}–${fmtBig(t.amount_high).replace(".0", "")}` : `over ${fmtBig(t.amount_low)}`;
 function bindChart(s, range) {
   const svg = $("#pchart"); if (!svg) return; const idx = chartIdx(s, range), W = 680, padL = 8, padR = 52, g = $("#hover", svg);
   const move = e => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * W; let k = Math.round((x - padL) / (W - padL - padR) * (idx.length - 1)); k = Math.max(0, Math.min(idx.length - 1, k));
@@ -819,6 +878,10 @@ function stockContext(s, full = true) {
     const et = a.eps_trend?.["0y"]; if (et) L.push(`Current-year EPS estimate ${fmtMoney(et.current)} vs ${fmtMoney(et["90daysAgo"])} 90 days ago.`);
     const acts = (a.actions || []).slice(0, 6).map(x => `${x.date} ${x.firm} ${x.action} ${x.to || ""}${x.pt ? " PT $" + x.pt : ""}`).join("; "); if (acts) L.push("Recent analyst actions: " + acts + ".");
     L.push(`Insiders (12 months, open market): ${ins.buys || 0} buys (${fmtBig(ins.buy_value || 0)}), ${ins.disc_sales || 0} discretionary sales (${fmtBig(ins.disc_sale_value || 0)}), ${ins.plan_sales || 0} 10b5-1 plan sales (${fmtBig(ins.plan_sale_value || 0)}).${(s.insiders?.clusters || []).length ? " Cluster buys: " + s.insiders.clusters.map(c => c.start).join(", ") + "." : ""}`);
+    const mo = s.momentum; if (mo?.score != null) L.push(`Momentum: ${mo.regime} (momentum ${mo.score}/100, stretch ${mo.stretch}/100${mo.reasons?.length ? "; " + mo.reasons.join("; ") : ""}). Put/call (volume) ${mo.inputs?.put_call_volume?.toFixed?.(2) ?? "n/a"}; short interest ${mo.inputs?.short_pct_float != null ? (mo.inputs.short_pct_float * 100).toFixed(1) + "% of float" : "n/a"}.`);
+    const cg = (s.congress || []).filter(t => t.relevant).slice(0, 8).map(t => `${t.date} ${t.name} (${t.party?.[0] || "?"}) ${t.type} ${amtRange(t)}${t.owner && t.owner !== "Self" ? " by " + t.owner.toLowerCase() : ""}${t.committees?.length ? " — sits on " + t.committees[0] : t.tracked ? " — tracked trader" : ""}`).join("; ");
+    L.push(cg ? "Committee-relevant congressional trades (House, 3y): " + cg + "." : "No committee-relevant congressional trades reported (House, 3y).");
+    const shh = s.score_history || []; if (shh.length > 4) L.push("Score trend (ex-analyst, quarterly): " + shh.filter((_, i) => i % 2 === 0 || i === shh.length - 1).map(p => `${p.date.slice(0, 7)} ${p.overall_ex_analyst}`).join(", ") + ".");
     const sh = s.shares_history || []; if (sh.length > 3) L.push(`Diluted share count: ${(sh[sh.length - 1][1] / 1e6).toFixed(0)}M, ${pct(sh[sh.length - 1][1] / sh[sh.length - 4][1] - 1)} over 3 fiscal years.`);
     const c = s.calendar || {}; L.push(`Next earnings: ${(c.earnings || [])[0] || "not announced"}${c.ex_dividend ? `; last/next ex-dividend ${c.ex_dividend}` : ""}.`);
     if (p.longBusinessSummary) L.push("Business: " + p.longBusinessSummary.slice(0, 900));
@@ -836,6 +899,7 @@ const AI = {
     try { this.sample = window.claude?.use ? await window.claude.use("sample") : null; } catch (e) { this.sample = null; }
     if (this.sample) { try { const lim = await this.sample.limits(); this.tools = !!lim?.tools; } catch (e) { this.tools = false; } }
     this.ready = true;
+    if (UI.tab === "ideas" && $("#sheet").hidden) render();
     if (!$("#sheet").hidden && Sheet.t && UI.dtab === "overview") this.mount(BY[Sheet.t]);
   },
   errText(e) { return ({not_granted: "Claude access wasn’t allowed for this page.", sampling_disabled: "Claude isn’t available for this account.", rate_limited: "You’ve hit a usage limit. Try again in a little while.", session_expired: "Sign in to Claude again, then retry.", refused: "Claude declined this request.", prompt_too_large: "Too much data for one request.", upstream_error: "The answer was interrupted. Try again."})[e?.code] || "Something went wrong. Try again."; },
@@ -927,7 +991,7 @@ ${stockContext(s)}`;
 };
 
 // ================================================================ detail sheet
-const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["chart", "Chart"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["financials", "Financials"], ["notes", "Notes"]];
+const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["chart", "Chart & momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["financials", "Financials"], ["notes", "Notes"]];
 const Sheet = {
   t: null,
   open(t) { this.t = t; UI.openCat = null; UI.dtab = "overview"; const el = $("#sheet"); el.hidden = false; document.body.style.overflow = "hidden"; this.render(); el.scrollTop = 0; history.pushState({sheet: t}, ""); },
@@ -953,7 +1017,8 @@ const Sheet = {
     const s = BY[this.t], el = $("#dbody"); const T = UI.dtab;
     if (T === "overview") el.innerHTML = overviewHtml(s);
     if (T === "scores") el.innerHTML = `<div class="card">${scoresHtml(s)}</div>`;
-    if (T === "chart") el.innerHTML = chartCard(s) + `<div style="margin-top:14px">${signalsCard(s)}</div>`;
+    if (T === "chart") el.innerHTML = chartCard(s) + `<div class="grid2" style="margin-top:14px">${momentumCard(s)}${signalsCard(s)}</div>`;
+    if (T === "congress") el.innerHTML = congressCard(s);
     if (T === "analysts") el.innerHTML = analystCard(s);
     if (T === "insiders") el.innerHTML = insiderCard(s);
     if (T === "financials") el.innerHTML = `<div class="grid2">${fundCard(s)}${sharesCard(s)}</div>`;
@@ -962,9 +1027,11 @@ const Sheet = {
   },
   bind(s) {
     const el = $("#sheet");
-    $$("#rng button", el).forEach(b => b.onclick = () => { UI.range = b.dataset.r; saveUI(); $("#chartWrap").innerHTML = priceChart(s, UI.range); bindChart(s, UI.range); $$("#rng button").forEach(x => x.setAttribute("aria-pressed", x.dataset.r === UI.range)); });
+    $$("#rng button", el).forEach(b => b.onclick = () => { UI.range = b.dataset.r; saveUI(); $("#chartWrap").innerHTML = priceChart(s, UI.range); $("#mkWrap").innerHTML = markerList(s); bindChart(s, UI.range); $$("#rng button").forEach(x => x.setAttribute("aria-pressed", x.dataset.r === UI.range)); });
     if ($("#pchart")) bindChart(s, UI.range);
+    $$("[data-mk]", el).forEach(b => b.onclick = () => { UI.mk[b.dataset.mk] = !UI.mk[b.dataset.mk]; saveUI(); const st = el.scrollTop; this.body(); el.scrollTop = st; });
     $$(".cat", el).forEach(b => b.onclick = () => { const st = el.scrollTop; UI.openCat = UI.openCat === b.dataset.cat ? null : b.dataset.cat; this.body(); el.scrollTop = st; });
+    $$("#congF button", el).forEach(b => b.onclick = () => { UI.congAll = b.dataset.f === "all"; const st = el.scrollTop; this.body(); el.scrollTop = st; });
     $$("#insF button", el).forEach(b => b.onclick = () => { UI.insiderFilter = b.dataset.f; saveUI(); const st = el.scrollTop; this.body(); el.scrollTop = st; });
     $$("[data-goto]", el).forEach(b => b.onclick = () => { UI.dtab = b.dataset.goto; if (b.dataset.cat) UI.openCat = b.dataset.cat; $$("[data-dt]", el).forEach(x => x.setAttribute("aria-selected", x.dataset.dt === UI.dtab)); this.body(); el.scrollTop = 0; });
     $("#moreBio") && ($("#moreBio").onclick = e => { $("#bio").classList.toggle("clamp"); e.target.textContent = $("#bio").classList.contains("clamp") ? "More" : "Less"; });
@@ -1035,6 +1102,7 @@ function overviewHtml(s) {
       <div class="catlist">${CATS.map(c => { const k = s.categories?.[c] || {}; return `<button class="cat" data-goto="scores" data-cat="${esc(c)}"><span><span class="cat-name">${esc(c)}</span>${k.na ? ` <span class="cat-na">· ${esc(k.na)}</span>` : ""}</span>${chip(k.score)}${ruler(k.score)}</button>`; }).join("")}</div>
     </div>
     <div class="card ai"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>AI analyst</h3><div id="aiBox"><p class="muted">Loading…</p></div></div>
+    ${momentumCard(s, true)}
     <div class="card">
       <h3>Signals <button class="link" data-goto="chart" style="margin-left:auto">Chart</button></h3>
       <div class="pill-row">${d.above200 != null ? `<span class="badge ${d.above200 ? "good" : "bad"}">${d.above200 ? "Above" : "Below"} 200-day (${pct(d.vs200)})</span>` : ""}${d.golden != null ? `<span class="badge ${d.golden ? "good" : "bad"}">50-day ${d.golden ? "above" : "below"} 200-day</span>` : ""}
@@ -1043,6 +1111,7 @@ function overviewHtml(s) {
       <dl class="kv" style="margin-top:12px">
         <dt>Analysts</dt><dd>${a.n_analysts ? `${a.n_analysts} · consensus ${a.rating_mean?.toFixed(2)} · target ${pct(d.upside)}` : "—"}</dd>
         <dt>Insiders, 12 months</dt><dd>${ins.buys || 0} buys · ${ins.disc_sales || 0} discretionary sales</dd>
+        <dt>Congress, 12 months</dt><dd>${(() => { const c = (s.congress || []).filter(t => t.relevant && (t.date || "") >= new Date(Date.parse(DATA.lastDate) - 365 * 864e5).toISOString().slice(0, 10)); const b = c.filter(t => /Purchase/.test(t.type)).length; return c.length ? `${b} buys · ${c.length - b} sales <button class="link" data-goto="congress">View</button>` : "None relevant"; })()}</dd>
         <dt>Next earnings</dt><dd>${nextE ? esc(fmtDate(nextE)) + (d.daysToEarnings >= 0 ? ` (${d.daysToEarnings}d)` : "") : "Not announced"}</dd>
       </dl>
     </div>
@@ -1057,7 +1126,17 @@ function chartInner(s) {
   return `<div class="bar" style="justify-content:space-between;margin-bottom:6px"><h3 style="margin:0">Price</h3>
       <div class="seg" id="rng">${["3m","6m","1y","3y"].map(r => `<button data-r="${r}" aria-pressed="${UI.range === r}">${r.toUpperCase()}</button>`).join("")}</div></div>
     <div id="chartWrap">${priceChart(s, UI.range)}</div>
-    <div class="legend"><span><i style="background:var(--price)"></i>Close</span><span><i style="background:var(--sma50)"></i>50-day avg ${fmtMoney(d.sma50)}</span><span><i style="background:var(--sma200)"></i>200-day avg ${fmtMoney(d.sma200)}</span></div>`;
+    <div class="legend"><span><i style="background:var(--price)"></i>Close</span><span><i style="background:var(--sma50)"></i>50-day avg ${fmtMoney(d.sma50)}</span><span><i style="background:var(--sma200)"></i>200-day avg ${fmtMoney(d.sma200)}</span></div>
+    <div class="toggles"><button class="tog" data-mk="ins" aria-pressed="${!!UI.mk.ins}"><i style="background:var(--up)"></i>Insider trades</button><button class="tog" data-mk="cong" aria-pressed="${!!UI.mk.cong}"><i style="background:var(--sma200);transform:rotate(45deg)"></i>Congress trades</button>${UI.mk.cong ? `<button class="tog" data-mk="congAll" aria-pressed="${!!UI.mk.congAll}">Include non-committee trades</button>` : ""}</div>
+    <div id="mkWrap">${markerList(s)}</div>`;
+}
+function markerList(s) {
+  const idx = chartIdx(s, UI.range), from = DATA.dates[idx[0]];
+  const items = markerItems(s).filter(m => m.date >= from).sort((a, b) => b.date.localeCompare(a.date));
+  if (!UI.mk.ins && !UI.mk.cong) return "";
+  if (!items.length) return `<p class="faint small" style="margin:8px 0 0">No ${UI.mk.ins && UI.mk.cong ? "insider or relevant congressional" : UI.mk.ins ? "open-market insider" : "relevant congressional"} trades in this range. ▲ green = insider buy, ▼ red = discretionary insider sale, ◆ = congressional buy (filled) or sale (outline).</p>`;
+  const icon = k => k === "ins-buy" ? `<span class="up">▲</span>` : k === "ins-sell" ? `<span class="down">▼</span>` : k === "cong-buy" ? `<span style="color:var(--sma200)">◆</span>` : `<span style="color:var(--sma200)">◇</span>`;
+  return `<div class="mklist">${items.slice(0, 40).map(m => `<div><span class="faint num">${esc(fmtShort(m.date))}</span>${icon(m.kind)}<span>${esc(m.label.split(" · ").slice(1).join(" · "))}</span><span></span></div>`).join("")}</div>`;
 }
 function chartCard(s) { return `<div class="card">${chartInner(s)}</div>`; }
 function signalsCard(s) {
@@ -1070,18 +1149,19 @@ function scoresHtml(s) {
   return `<div class="label">Overall score</div>
     <div style="display:flex;align-items:flex-end;gap:12px;margin:6px 0 10px"><div class="overall" style="color:${sc(s.overall)}">${s.overall != null ? s.overall.toFixed(1) : "—"}<small> / 10</small></div></div>
     ${ruler(s.overall)}
+    ${(() => { const t = catTrend(s, "overall"); return t.svg ? `<div style="display:flex;align-items:center;gap:10px;margin-top:10px">${t.svg}${deltaTxt(t.delta)}<span class="faint small">Quarterly, 3 years · trend excludes Analyst (no history)</span></div>` : ""; })()}
     ${(s.excluded || []).length ? `<p class="faint" style="font-size:12px;margin:8px 0 0">Excludes ${s.excluded.map(c => `${esc(c)} (${esc(s.categories[c].na)})`).join(", ")}.</p>` : ""}
     <div class="catlist" style="margin-top:10px">${CATS.map(c => { const k = s.categories?.[c] || {}; return `
-      <button class="cat" data-cat="${esc(c)}" aria-expanded="${UI.openCat === c}"><span><span class="cat-name">${esc(c)}</span>${k.na ? ` <span class="cat-na">· ${esc(k.na)}</span>` : (c === "Analyst" && s.analyst?.thin_coverage ? ` <span class="badge warn">Thin coverage</span>` : "")}</span>${chip(k.score)}${ruler(k.score)}</button>
+      <button class="cat" data-cat="${esc(c)}" aria-expanded="${UI.openCat === c}"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="cat-name">${esc(c)}</span>${k.na ? ` <span class="cat-na">· ${esc(k.na)}</span>` : (c === "Analyst" && s.analyst?.thin_coverage ? ` <span class="badge warn">Thin coverage</span>` : "")}${c !== "Analyst" ? (() => { const t = catTrend(s, c); return t.svg + deltaTxt(t.delta); })() : ""}</span>${chip(k.score)}${ruler(k.score)}</button>
       ${UI.openCat === c ? `<div class="metrics">${metricTable(s, c)}</div>` : ""}`; }).join("")}</div>
     <p class="faint" style="font-size:12px;margin:8px 0 0">Tap a category to see its metrics. Latest filing period: ${esc(fmtDate(s.latest_period))}.</p>`;
 }
 function metricTable(s, c) {
   const k = s.categories[c]; if (!k) return "";
-  return `<table><thead><tr><th>Metric</th><th class="r">Value</th><th>Rank</th></tr></thead><tbody>${k.metrics.map(m => {
-    if (m.value == null) return `<tr><td>${esc(m.label)}</td><td class="r faint">N/A</td><td class="faint" style="font-size:12px">${esc(m.na || "")}</td></tr>`;
+  return `<table><thead><tr><th>Metric <span class="faint" style="text-transform:none;letter-spacing:0">(most important first)</span></th><th class="r">Value · trend</th><th>Rank</th></tr></thead><tbody>${k.metrics.map((m, mi) => {
+    if (m.value == null) return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(m.label)}</td><td class="r faint">N/A</td><td class="faint" style="font-size:12px">${esc(m.na || "")}</td></tr>`;
     const p = m.pct ?? 0, basis = m.basis === "sector" ? `vs ${m.peers} ${esc(s.sector)} stocks` : `vs all ${m.peers} stocks with data`;
-    return `<tr><td>${esc(m.label)}</td><td class="r num">${fmtMetric(m.key, m.value)}</td><td style="min-width:140px">
+    return `<tr><td><span class="faint num">${mi + 1}.</span> ${esc(m.label)}</td><td class="r num">${fmtMetric(m.key, m.value)}${metricTrend(s, m.key, m.value)}</td><td style="min-width:140px">
       <div class="pctbar" title="${p.toFixed(0)}th percentile"><i style="width:${p}%;background:${sc(p / 10 + 0.5)}"></i></div>
       <div class="faint" style="font-size:11.5px;margin-top:3px">${ord(m.pct_peer)} pct ${basis}${m.pct_own != null ? ` · ${ord(m.pct_own)} vs own 3y` : m.own_na ? ` · own history N/A` : ""}</div></td></tr>`; }).join("")}</tbody></table>
     <p class="faint" style="font-size:11.5px;margin:6px 0 0">Higher rank is better. ${c === "Valuation" ? "Ratios blend sector rank and own-history rank 50/50; 100 means cheapest. " : ""}Category score ${k.score ?? "N/A"} = average rank ${k.avg_pct != null ? k.avg_pct.toFixed(0) : "—"}${k.n_used ? ` across ${k.n_used} of ${k.n_total} metrics` : ""}.</p>`;
@@ -1153,6 +1233,188 @@ function eventsHtml(s) {
   if (c.ex_dividend) ev.push([c.ex_dividend, "Ex-dividend date", "ex_div"]); if (c.dividend_pay) ev.push([c.dividend_pay, "Dividend paid", "pay"]);
   ev.sort((a, b) => a[0].localeCompare(b[0]));
   return `<div class="label" style="margin-top:16px">Dates</div>${ev.length ? ev.map(([d, l, k]) => `<div class="ev"><i class="dot" style="background:${EVC[k]}"></i><span style="flex:1">${esc(l)}</span><span class="num faint">${esc(fmtDate(d))}${d < DATA.lastDate ? " (past)" : ""}</span></div>`).join("") : `<p class="muted">No dates announced.</p>`}`;
+}
+
+// ================================================================ ideas: tickers of the week
+function isoWeek(ds) { const d = new Date(ds + "T12:00:00"); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return `${t.getUTCFullYear()}-W${String(Math.ceil(((t - y0) / 864e5 + 1) / 7)).padStart(2, "0")}`; }
+function opportunity(s) {
+  const d = DER[s.ticker], c = k => s.categories?.[k]?.score, m = s.momentum || {};
+  const own = (s.categories?.Valuation?.metrics || []).map(x => x.pct_own).filter(x => x != null);
+  const ownCheap = own.length ? own.reduce((a, b) => a + b, 0) / own.length : null;
+  const value = [c("Valuation") != null ? c("Valuation") * 10 : null, ownCheap].filter(x => x != null);
+  const vScore = value.length ? value.reduce((a, b) => a + b, 0) / value.length : 40;
+  const q = [c("Profitability"), c("Financial Health")].filter(x => x != null), qScore = q.length ? q.reduce((a, b) => a + b, 0) / q.length * 10 : 40;
+  const why = [];
+  let setup = {"Basing / turning": 18, "Healthy uptrend": 4, "Neutral": 0, "Overextended": -18, "Falling knife": -25}[m.regime] ?? 0;
+  if (m.regime === "Basing / turning") why.push("Momentum basing / turning");
+  if (m.regime === "Falling knife") why.push("Falling knife (penalized)");
+  if (d.fromLow != null && d.fromLow < 0.15 && m.regime !== "Falling knife") { setup += 10; why.push(`${pct(d.fromLow)} above 52-week low`); }
+  if (d.rsi != null && d.rsi < 35) { setup += 5; why.push(`RSI ${d.rsi.toFixed(0)}`); }
+  let cat = 0;
+  if (d.buys90) { cat += 10; why.push(`${d.buys90} insider buy${d.buys90 > 1 ? "s" : ""} (90d)`); } if (d.ceo90) cat += 5; if (d.cluster90) { cat += 10; why.push("Insider cluster buy"); }
+  if (d.congBuys90) { cat += 8; why.push(`${d.congBuys90} committee-relevant congressional buy${d.congBuys90 > 1 ? "s" : ""}`); }
+  if ((d.upgrades90 ?? 0) > (d.downgrades90 ?? 0)) { cat += 5; why.push("Net analyst upgrades"); }
+  if ((d.metrics.eps_rev_90d ?? 0) > 0.01) { cat += 5; why.push("EPS estimates rising"); }
+  if (d.news7 >= 4) { cat += 3; why.push(`${d.news7} headlines this week`); }
+  if (d.daysToEarnings != null && d.daysToEarnings >= 0 && d.daysToEarnings <= 21) { cat += 3; why.push(`Earnings in ${d.daysToEarnings}d`); }
+  if (vScore >= 65) why.unshift(`Cheap: valuation ${c("Valuation") ?? "–"}/10${ownCheap != null ? `, ${ord(ownCheap)} pct vs own 3y` : ""}`);
+  if (qScore >= 70) why.push("High quality");
+  const score = Math.max(0, Math.min(100, 0.45 * vScore + 0.25 * qScore + setup + cat));
+  return {score, why, vScore, qScore};
+}
+function candidates(n = 15) { return DATA.stocks.map(s => ({s, o: opportunity(s)})).sort((a, b) => b.o.score - a.o.score).slice(0, n); }
+const Ideas = {state: null, loadedWeek: null, busy: false, ctl: null};
+async function viewIdeas() {
+  const week = isoWeek(DATA.lastDate), key = "picks_" + week.replace("-", "_");
+  const cands = candidates();
+  $("#view").innerHTML = `
+    <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Tickers of the week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
+    <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
+    <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
+    <p class="muted small" style="margin:0 0 10px">The app ranks all ${DATA.top_n} stocks on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). Claude picks from the top ${cands.length}.</p>
+    <div class="list">${headRow("Opportunity score")}${cands.map(({s, o}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
+    <p class="disclaimer">For personal research. Not financial advice.</p>`;
+  bindRows($("#view"));
+  if (Ideas.loadedWeek !== week) { Ideas.state = await Store.getDoc(key); Ideas.loadedWeek = week; }
+  if (UI.tab === "ideas") renderPicks(week, key, cands);
+}
+function renderPicks(week, key, cands) {
+  const box = $("#picksCard"); if (!box) return;
+  const st = Ideas.state, res = st?.result;
+  const head = `<h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:18px;height:18px;color:var(--accent)"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>Claude’s picks</h3>`;
+  if (!AI.sample) { box.innerHTML = head + `<p class="muted">${AI.ready ? "The AI analyst isn’t available in this view. Open this page inside Claude while signed in." : "Checking AI availability…"}</p>`; if (!AI.ready) setTimeout(() => UI.tab === "ideas" && renderPicks(week, key, cands), 1500); return; }
+  const THEME_C = {"Undervalued": "good", "Turnaround setup": "warn", "Catalyst": "acc", "Quality on sale": "good", "Momentum": "acc"};
+  box.innerHTML = head + (res ? `
+    ${res.week_summary ? `<p style="margin-top:0">${esc(res.week_summary)}</p>` : ""}
+    <div style="display:grid;gap:14px">${(res.picks || []).filter(p => BY[p.ticker]).map(p => { const s = BY[p.ticker], d = DER[s.ticker]; return `<div class="card pick" style="background:var(--bg)">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(s.name)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
+      <b>${esc(p.headline || "")}</b>
+      <div class="pill-row">${chip(s.overall, "Overall")}<span class="badge">Valuation ${s.categories?.Valuation?.score ?? "–"}/10</span><span class="badge">${esc(s.momentum?.regime || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span></div>
+      <div><div class="label">Why it’s flagged</div><ul style="margin:4px 0;padding-left:18px">${(p.why_now || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
+      <div class="md">${md(p.synopsis || "")}</div>
+      ${(p.risks || []).length ? `<div><div class="label">Risks</div><ul style="margin:4px 0;padding-left:18px" class="muted">${p.risks.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+      ${p.watch ? `<p class="small muted" style="margin:0"><b>Watch:</b> ${esc(p.watch)}</p>` : ""}
+      <div class="bar" style="margin:4px 0 0"><button class="btn small" data-open="${esc(p.ticker)}">Open ${esc(p.ticker)}</button><button class="btn primary small" data-wl="${esc(p.ticker)}">${inLists(p.ticker).length ? "★ On a watchlist" : "+ Watchlist"}</button></div>
+    </div>`; }).join("")}</div>
+    <p class="faint small">Picked ${esc(new Date(st.generated).toLocaleString())} from data as of ${esc(fmtDate(st.dataAsof))}.${st.dataAsof !== DATA.lastDate ? " Newer data is available." : ""}</p>
+    <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Pick again</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
+    : `<p class="muted" style="margin-top:0">Claude reviews the top ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks 3–5 and explains why each is worth a look. It uses your Claude usage and takes about a minute.</p>
+       <div class="bar" style="margin:0"><button class="btn primary" id="pickGo">Pick this week’s tickers</button><button class="btn small" id="pickStop" hidden>Stop</button></div><div id="pickOut"></div>`);
+  $("#pickGo").onclick = () => runPicks(week, key, cands);
+  $("#pickStop").onclick = () => Ideas.ctl?.abort();
+  $$("[data-open]", box).forEach(b => b.onclick = () => Sheet.open(b.dataset.open));
+  $$("[data-wl]", box).forEach(b => b.onclick = () => Sheet.pickList(BY[b.dataset.wl]));
+}
+async function runPicks(week, key, cands) {
+  if (Ideas.busy) return; Ideas.busy = true; Ideas.ctl = new AbortController();
+  $("#pickGo").disabled = true; $("#pickStop").hidden = false;
+  let out = $("#pickOut"); if (!out) { $("#picksCard").insertAdjacentHTML("beforeend", `<div id="pickOut"></div>`); out = $("#pickOut"); }
+  out.innerHTML = `<p class="thinking">Reviewing ${cands.length} candidates… this usually takes 30–90 seconds.</p>`;
+  const block = ({s, o}) => { const d = DER[s.ticker];
+    const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${m.label} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
+    const news = (s.news || []).slice(0, 5).map(n => `  - ${n.date}: ${n.title}`).join("\n");
+    const cg = (s.congress || []).filter(t => t.relevant).slice(0, 4).map(t => `${t.date} ${t.name} ${t.type} ${amtRange(t)}${t.committees?.[0] ? " (" + t.committees[0] + ")" : t.tracked ? " (tracked)" : ""}`).join("; ");
+    return `### ${s.ticker} — ${s.name} (${s.sector})
+Opportunity score ${Math.round(o.score)} (${o.why.join("; ")}).
+${stockContext(s, false)}
+Valuation detail: ${val}.
+Momentum: ${s.momentum?.regime} (score ${s.momentum?.score}, stretch ${s.momentum?.stretch}); put/call ${s.momentum?.inputs?.put_call_volume?.toFixed?.(2) ?? "n/a"}; short ${s.momentum?.inputs?.short_pct_float != null ? (s.momentum.inputs.short_pct_float * 100).toFixed(1) + "%" : "n/a"}.
+Insiders 12m: ${s.insiders?.summary?.buys || 0} buys, ${s.insiders?.summary?.disc_sales || 0} discretionary sales. Congress (relevant): ${cg || "none"}.
+Headlines:
+${news || "  (none)"}`; };
+  const prompt = `${RULES}
+
+TASK: From the candidate stocks below, pick the 3 to 5 most interesting ideas for the week of ${DATA.lastDate}, with a bias toward undervalued opportunities (cheap versus sector and versus the stock's own history, with acceptable quality and a setup that is not a falling knife). Prefer a mix of themes. Skip a candidate if the data argues against it, even if its opportunity score is high.
+
+Reply with ONLY a JSON object of this shape:
+{"week_summary": "1-2 sentences on the common thread this week",
+ "picks": [{"ticker": "XYZ", "theme": "Undervalued" | "Quality on sale" | "Turnaround setup" | "Catalyst" | "Momentum",
+            "conviction": "High" | "Medium" | "Low",
+            "headline": "one line, under 15 words",
+            "why_now": ["3 short bullets with specific numbers from the data"],
+            "synopsis": "90-140 words of plain prose: what the company does, why it looks mispriced or interesting now, what would make the idea work",
+            "risks": ["2 short bullets"],
+            "watch": "the next date or signal that would confirm or break the idea"}]}
+
+CANDIDATES
+${cands.map(block).join("\n\n")}`;
+  try {
+    const result = await AI.sample.json(prompt, {signal: Ideas.ctl.signal, cache: false});
+    if (!result || !Array.isArray(result.picks)) throw {code: "invalid_json"};
+    const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker)};
+    await Store.setDoc(key, body); Ideas.state = body;
+    if (UI.tab === "ideas") renderPicks(week, key, cands);
+  } catch (e) {
+    out.innerHTML = e?.code === "cancelled" ? `<p class="faint small">Stopped.</p>` : `<p class="down small">${esc(e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : AI.errText(e))}</p>`;
+  } finally { Ideas.busy = false; const g = $("#pickGo"); if (g) g.disabled = false; const st = $("#pickStop"); if (st) st.hidden = true; }
+}
+
+// ================================================================ momentum, congress, trends
+const REGIME_C = {"Falling knife": "var(--down)", "Basing / turning": "var(--warn)", "Healthy uptrend": "var(--up)", "Overextended": "var(--s3)", "Neutral": "var(--faint)"};
+function momentumCard(s, compact = false) {
+  const m = s.momentum; if (!m || m.score == null) return `<div class="card"><h3>Momentum</h3><p class="muted">Not enough price history.</p></div>`;
+  const i = m.inputs || {}, c = m.components || {};
+  const pc = i.put_call_volume, pcTxt = pc == null ? "—" : pc.toFixed(2) + (pc > 1.2 ? " (fearful)" : pc < 0.5 ? " (complacent)" : " (neutral)");
+  const bar = (l, v) => `<div class="compbar"><span class="muted">${l}</span><div class="pctbar"><i style="width:${v ?? 0}%;background:${sc((v ?? 0) / 10 + .5)}"></i></div><span class="num small">${v == null ? "—" : Math.round(v)}</span></div>`;
+  return `<div class="card"><h3>Momentum & sentiment ${compact ? `<button class="link" data-goto="chart" style="margin-left:auto">Details</button>` : ""}</h3>
+    <div class="regime"><i style="background:${REGIME_C[m.regime] || "var(--faint)"}"></i>${esc(m.regime)}</div>
+    ${(m.reasons || []).length ? `<ul class="small muted" style="margin:6px 0 0;padding-left:18px">${m.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
+    <div class="stats" style="margin-top:12px;grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div><div class="label">Momentum ${Math.round(m.score)}/100</div><div class="gauge"><i style="left:${m.score}%"></i></div><div class="faint small">weak ← → strong</div></div>
+      <div><div class="label">Stretch ${Math.round(m.stretch)}/100</div><div class="gauge stretch"><i style="left:${m.stretch}%"></i></div><div class="faint small">room to run ← → overextended</div></div>
+    </div>
+    ${compact ? "" : `<div style="margin-top:12px">${bar("Trend", c.trend)}${bar("Relative strength", c.relative_strength)}${bar("Buying pressure", c.buying_pressure)}</div>`}
+    <dl class="kv" style="margin-top:12px">
+      <dt>Put/call ratio (options volume)</dt><dd>${pcTxt}</dd>
+      ${compact ? "" : `<dt>Put/call (open interest)</dt><dd>${i.put_call_oi != null ? i.put_call_oi.toFixed(2) : "—"}</dd>`}
+      <dt>Short interest</dt><dd>${i.short_pct_float != null ? (i.short_pct_float * 100).toFixed(1) + "% of float" : "—"}${i.short_change_1m != null ? ` <span class="${i.short_change_1m > 0 ? "down" : "up"}">(${pct(i.short_change_1m)} m/m)</span>` : ""}</dd>
+      ${compact ? "" : `<dt>Up-day volume share, 20 days</dt><dd>${i.up_volume_share_20d != null ? (i.up_volume_share_20d * 100).toFixed(0) + "%" : "—"}</dd>
+      <dt>Volume vs 6-month average</dt><dd>${i.rel_volume != null ? i.rel_volume.toFixed(2) + "×" : "—"}</dd>
+      <dt>12-month return (ex last month)</dt><dd class="${cls(i.r12_1)}">${pct(i.r12_1)}</dd><dt>3-month return</dt><dd class="${cls(i.r3m)}">${pct(i.r3m)}</dd>
+      <dt>vs 200-day average</dt><dd>${pct(i.vs200)} (${i.vs200_z != null ? (i.vs200_z > 0 ? "+" : "") + i.vs200_z.toFixed(1) + "σ vs own 3y" : ""})</dd><dt>RSI (14-day)</dt><dd>${i.rsi != null ? i.rsi.toFixed(0) : "—"}</dd>`}
+    </dl>
+    ${compact ? "" : `<p class="faint small" style="margin-bottom:0">Momentum = 35% trend (price vs 50/200-day averages and their slope) + 35% relative strength (12-month-minus-last-month and 3-month returns) + 30% buying pressure (up-day volume share and On-Balance Volume), each ranked against ~1,650 stocks. Stretch blends RSI, distance above the 200-day versus the stock’s own 3-year range, and closeness to the 52-week high. Put/call and short interest are shown as context, not scored. Options data covers the two nearest expiries.</p>`}
+  </div>`;
+}
+function congressCard(s) {
+  const all = s.congress || [], rel = all.filter(t => t.relevant), show = UI.congAll ? all : rel;
+  const st = DATA.politics_stats || {};
+  return `<div class="card"><h3>Congressional trades <span class="label">${rel.length} relevant of ${all.length} in 3 years</span></h3>
+    <div class="seg" id="congF" style="margin-bottom:10px"><button data-f="rel" aria-pressed="${!UI.congAll}">Committee-relevant & tracked</button><button data-f="all" aria-pressed="${!!UI.congAll}">All members</button></div>
+    ${show.length ? `<div style="overflow-x:auto;max-height:520px;overflow-y:auto"><table><thead><tr><th>Traded</th><th>Member</th><th>Trade</th><th class="r">Amount</th></tr></thead><tbody>${show.slice(0, 150).map(t => `<tr>
+      <td class="num" style="white-space:nowrap">${esc(fmtShort(t.date))}<div class="faint" style="font-size:11px">filed ${esc(fmtShort(t.filed || t.date))}</div></td>
+      <td>${esc(t.name)} <span class="faint">${esc((t.party || "?")[0])}-${esc(t.state || "")}</span>${t.tracked ? ` <span class="badge acc">Tracked</span>` : ""}
+        <div class="faint" style="font-size:11.5px">${t.committees?.length ? "Committee: " + esc(t.committees.join("; ")) : t.tracked ? esc(t.tracked) : "No committee link"}</div></td>
+      <td><span class="${/Purchase/.test(t.type) ? "up" : /Sale/.test(t.type) ? "down" : ""}">${esc(t.type || "")}</span>${t.asset_type === "OP" ? ` <span class="badge warn">Options</span>` : ""}<div class="faint" style="font-size:11.5px">${esc(t.owner || "")}${t.desc ? " · " + esc(t.desc) : ""}</div></td>
+      <td class="r num">${esc(amtRange(t))}${t.url ? `<div><a class="link" href="${esc(t.url)}" target="_blank" rel="noopener">Filing</a></div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="muted">${UI.congAll ? "No House member reported trading this stock in the last 3 years." : "No trades by members whose committees oversee this sector, or by tracked traders."}</p>`}
+    <p class="faint small" style="margin:8px 0 0">House periodic transaction reports, parsed from the Clerk’s e-filed PDFs (${st.filings ?? "?"} filings; ${st.paper_skipped ?? "?"} scanned paper filings not read). Senate trades aren’t included yet: the Senate site blocks cloud servers. Members must report within 45 days, so filings lag trades. Amounts are ranges. Committee links use current assignments, which may differ from when the trade happened.</p></div>`;
+}
+function spark(vals, w = 72, h = 22, color = "var(--accent)") {
+  const v = vals.map((x, i) => [i, x]).filter(p => p[1] != null && isFinite(p[1])); if (v.length < 2) return "";
+  const xs = v.map(p => p[0]), ys = v.map(p => p[1]); const x0 = Math.min(...xs), x1 = Math.max(...xs); let y0 = Math.min(...ys), y1 = Math.max(...ys); if (y0 === y1) { y0 -= 1; y1 += 1; }
+  const X = x => 2 + (x - x0) / (x1 - x0 || 1) * (w - 4), Y = y => h - 3 - (y - y0) / (y1 - y0) * (h - 6);
+  const d = v.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+  const L = v[v.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/><circle cx="${X(L[0])}" cy="${Y(L[1])}" r="2.3" fill="${color}"/></svg>`;
+}
+function catTrend(s, c) {
+  const h = s.score_history || []; if (h.length < 3) return {svg: "", delta: null};
+  const vals = h.map(p => c === "overall" ? p.overall_ex_analyst : p.cats?.[c]);
+  const now = vals[vals.length - 1], ago = vals.length > 4 ? vals[vals.length - 5] : vals[0];
+  return {svg: spark(vals), delta: now != null && ago != null ? now - ago : null};
+}
+const deltaTxt = d => d == null ? "" : `<span class="trend ${d > 0 ? "up" : d < 0 ? "down" : "faint"}">${d > 0 ? "▲" : d < 0 ? "▼" : "■"} ${d > 0 ? "+" : ""}${Math.round(d * 10) / 10} vs 1y</span>`;
+function metricTrend(s, key, now) {
+  const h = s.metric_history?.[key]; if (!h) return "";
+  const ds = Object.keys(h).sort(); const vals = ds.map(d => h[d]).concat([now]);
+  const ago = ds.length >= 4 ? h[ds[ds.length - 4]] : null;
+  const dir = DATA.directions?.[key] ?? 1;
+  let arrow = "";
+  if (ago != null && now != null && ago !== 0) { const better = (now - ago) * dir > 0, same = Math.abs(now - ago) <= Math.abs(ago) * 0.02;
+    arrow = `<span class="trend ${same ? "faint" : better ? "up" : "down"}" title="1 year ago: ${esc(fmtMetric(key, ago))}">${same ? "■" : now > ago ? "▲" : "▼"} ${esc(fmtMetric(key, ago))} 1y ago</span>`; }
+  return `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:3px">${spark(vals, 56, 16, "var(--muted)")}</div>${arrow ? `<div style="text-align:right">${arrow}</div>` : ""}`;
 }
 
 load();

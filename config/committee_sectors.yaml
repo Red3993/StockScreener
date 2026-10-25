@@ -24,43 +24,50 @@ energy_sic: &energy_sic [[1300, 1389], [2900, 2999], [4900, 4991]]
 mining_sic: &mining_sic [[1000, 1499]]
 cyber_sic: &cyber_sic [[7370, 7379], [3570, 3579], [3670, 3679]]
 
+semis_sic: &semis_sic [[3670, 3679]]
+# Named lists where an SIC range would be far too broad (all of software, all of tech)
+cyber_tickers: &cyber_tickers [CRWD, PANW, FTNT, ZS, OKTA, S, CYBR, NET, CHKP, TENB, RPD, QLYS, VRNS, LDOS, BAH, SAIC, CACI, PLTR, KTOS]
+big_tech: &big_tech [GOOGL, GOOG, META, AMZN, AAPL, MSFT, NVDA]
+china_exposed_tech: &china_exposed_tech [AAPL, NVDA, AMD, MU, AVGO, QCOM, INTC, TSLA, AMAT, LRCX, KLAC]
+
 committees:
+  # Names are quoted because several contain commas. `tickers` adds named stocks on top of sectors/SIC.
   # ---------------- House
-  HSAG: {name: House Agriculture, sectors: [Consumer Staples], sic: *ag_food_sic}
-  HSAS: {name: House Armed Services, sectors: [], sic: *defense_sic}
-  HSBA: {name: House Financial Services, sectors: [Financials, Real Estate], sic: *bank_sic}
-  HSED: {name: House Education and Workforce, sectors: [], sic: [[8200, 8299]]}
-  HSFA: {name: House Foreign Affairs, sectors: [], sic: *defense_sic}
-  HSGO: {name: House Oversight, sectors: [], sic: []}
-  HSHM: {name: House Homeland Security, sectors: [], sic: [*defense_sic, *cyber_sic]}
-  HSIF: {name: House Energy and Commerce, sectors: [Energy, Health Care, Communication, Utilities], sic: [*energy_sic, *telecom_sic, *pharma_sic]}
-  HSII: {name: House Natural Resources, sectors: [Energy, Materials], sic: *mining_sic}
-  HLIG: {name: House Intelligence, sectors: [], sic: [*defense_sic, *cyber_sic]}
-  HSJU: {name: House Judiciary (antitrust), sectors: [Communication, Information Technology], sic: []}
-  HSPW: {name: House Transportation and Infrastructure, sectors: [Industrials], sic: *transport_sic}
-  HSSM: {name: House Small Business, sectors: [], sic: []}
-  HSSY: {name: House Science, Space, and Technology, sectors: [Information Technology], sic: [[3760, 3769], [3812, 3812]]}
-  HSVR: {name: House Veterans' Affairs, sectors: [Health Care], sic: *pharma_sic}
-  HSWM: {name: House Ways and Means (tax, trade, Medicare), sectors: [Health Care], sic: *insurance_sic}
-  HSZS: {name: House Select Committee on the CCP, sectors: [Information Technology], sic: [[3670, 3679]]}
+  HSAG: {name: "House Agriculture", sectors: [Consumer Staples], sic: *ag_food_sic}
+  HSAS: {name: "House Armed Services", sectors: [], sic: *defense_sic}
+  HSBA: {name: "House Financial Services", sectors: [Financials, Real Estate], sic: *bank_sic}
+  HSED: {name: "House Education and Workforce", sectors: [], sic: [[8200, 8299]]}
+  HSFA: {name: "House Foreign Affairs", sectors: [], sic: *defense_sic}
+  HSGO: {name: "House Oversight", sectors: [], sic: []}
+  HSHM: {name: "House Homeland Security", sectors: [], sic: *defense_sic, tickers: *cyber_tickers}
+  HSIF: {name: "House Energy and Commerce", sectors: [Energy, Health Care, Communication, Utilities], sic: [*energy_sic, *telecom_sic, *pharma_sic]}
+  HSII: {name: "House Natural Resources", sectors: [Energy, Materials], sic: *mining_sic}
+  HLIG: {name: "House Intelligence", sectors: [], sic: *defense_sic, tickers: *cyber_tickers}
+  HSJU: {name: "House Judiciary (antitrust)", sectors: [], sic: [], tickers: *big_tech}
+  HSPW: {name: "House Transportation and Infrastructure", sectors: [], sic: [*transport_sic, [1600, 1629]]}
+  HSSM: {name: "House Small Business", sectors: [], sic: []}
+  HSSY: {name: "House Science, Space, and Technology", sectors: [], sic: [[3760, 3769], [3812, 3812], [3670, 3679]]}
+  HSVR: {name: "House Veterans' Affairs", sectors: [Health Care], sic: *pharma_sic}
+  HSWM: {name: "House Ways and Means (tax, trade, Medicare)", sectors: [Health Care], sic: *insurance_sic}
+  HSZS: {name: "House Select Committee on the CCP", sectors: [], sic: *semis_sic, tickers: *china_exposed_tech}
 
   # ---------------- Senate
-  SSAF: {name: Senate Agriculture, sectors: [Consumer Staples], sic: *ag_food_sic}
-  SSAS: {name: Senate Armed Services, sectors: [], sic: *defense_sic}
-  SSBK: {name: Senate Banking, Housing, and Urban Affairs, sectors: [Financials, Real Estate], sic: *bank_sic}
-  SSCM: {name: Senate Commerce, Science, and Transportation, sectors: [Communication, Industrials], sic: [*telecom_sic, *transport_sic]}
-  SSEG: {name: Senate Energy and Natural Resources, sectors: [Energy, Utilities, Materials], sic: [*energy_sic, *mining_sic]}
-  SSEV: {name: Senate Environment and Public Works, sectors: [Utilities, Industrials], sic: [[1600, 1629]]}
-  SSFI: {name: Senate Finance (tax, trade, Medicare), sectors: [Health Care], sic: *insurance_sic}
-  SSFR: {name: Senate Foreign Relations, sectors: [], sic: *defense_sic}
-  SSGA: {name: Senate Homeland Security, sectors: [], sic: [*defense_sic, *cyber_sic]}
-  SSHR: {name: Senate HELP, sectors: [Health Care], sic: *pharma_sic}
-  SLIN: {name: Senate Intelligence, sectors: [], sic: [*defense_sic, *cyber_sic]}
-  SSJU: {name: Senate Judiciary (antitrust), sectors: [Communication, Information Technology], sic: []}
-  SSVA: {name: Senate Veterans' Affairs, sectors: [Health Care], sic: *pharma_sic}
-  SPAG: {name: Senate Aging, sectors: [Health Care], sic: *pharma_sic}
-  SLIA: {name: Senate Indian Affairs, sectors: [], sic: [[7990, 7999]]}
+  SSAF: {name: "Senate Agriculture", sectors: [Consumer Staples], sic: *ag_food_sic}
+  SSAS: {name: "Senate Armed Services", sectors: [], sic: *defense_sic}
+  SSBK: {name: "Senate Banking, Housing, and Urban Affairs", sectors: [Financials, Real Estate], sic: *bank_sic}
+  SSCM: {name: "Senate Commerce, Science, and Transportation", sectors: [Communication], sic: [*telecom_sic, *transport_sic]}
+  SSEG: {name: "Senate Energy and Natural Resources", sectors: [Energy, Utilities, Materials], sic: [*energy_sic, *mining_sic]}
+  SSEV: {name: "Senate Environment and Public Works", sectors: [Utilities], sic: [[1600, 1629], [4950, 4959]]}
+  SSFI: {name: "Senate Finance (tax, trade, Medicare)", sectors: [Health Care], sic: *insurance_sic}
+  SSFR: {name: "Senate Foreign Relations", sectors: [], sic: *defense_sic}
+  SSGA: {name: "Senate Homeland Security", sectors: [], sic: *defense_sic, tickers: *cyber_tickers}
+  SSHR: {name: "Senate HELP", sectors: [Health Care], sic: *pharma_sic}
+  SLIN: {name: "Senate Intelligence", sectors: [], sic: *defense_sic, tickers: *cyber_tickers}
+  SSJU: {name: "Senate Judiciary (antitrust)", sectors: [], sic: [], tickers: *big_tech}
+  SSVA: {name: "Senate Veterans' Affairs", sectors: [Health Care], sic: *pharma_sic}
+  SPAG: {name: "Senate Aging", sectors: [Health Care], sic: *pharma_sic}
+  SLIA: {name: "Senate Indian Affairs", sectors: [], sic: [[7990, 7999]]}
 
   # ---------------- Joint
-  JSTX: {name: Joint Committee on Taxation, sectors: [], sic: []}
-  JSEC: {name: Joint Economic Committee, sectors: [], sic: []}
+  JSTX: {name: "Joint Committee on Taxation", sectors: [], sic: []}
+  JSEC: {name: "Joint Economic Committee", sectors: [], sic: []}

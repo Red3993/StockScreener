@@ -16,12 +16,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -r jobs/requirements.txt
+      - name: Get congress trades
+        run: git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no politics data yet"
       - name: Build
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}

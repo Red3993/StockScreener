@@ -122,40 +122,42 @@ directions:
 valuation_metrics_with_own_history: [pe, pfcf, ps, ev_ebitda, pb, ptbv, pffo]
 
 metric_sets:
+  # Within each category, metrics are listed in order of importance (most decision-relevant first).
+  # The app shows them in this order. Scores are still a simple average; weights can be added later.
   default:
-    Valuation:        [pe, pfcf, ps, ev_ebitda, peg]
-    Profitability:    [gross_margin, operating_margin, net_margin, fcf_margin, roic, roe, op_margin_trend]
-    Financial Health: [current_ratio, debt_to_equity, interest_coverage, altman_z, net_cash_to_mcap]
-    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, fcf_growth_1y, fcf_growth_3y, growth_consistency]
-    Dividends:        [div_yield, payout_earnings, payout_fcf, div_growth_streak, div_fcf_coverage]
-    Management:       [share_change_1y, share_change_3y, roic_minus_coc, insider_net_buy_pct]
-    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+    Valuation:        [ev_ebitda, pfcf, pe, peg, ps]
+    Profitability:    [roic, fcf_margin, operating_margin, gross_margin, roe, net_margin, op_margin_trend]
+    Financial Health: [debt_to_equity, interest_coverage, net_cash_to_mcap, altman_z, current_ratio]
+    Growth:           [eps_growth_3y, rev_growth_3y, fcf_growth_3y, rev_growth_1y, eps_growth_1y, growth_consistency, rev_growth_5y, eps_growth_5y, fcf_growth_1y]
+    Dividends:        [payout_fcf, div_growth_streak, div_yield, payout_earnings, div_fcf_coverage]
+    Management:       [roic_minus_coc, share_change_3y, insider_net_buy_pct, share_change_1y]
+    Analyst:          [eps_rev_90d, net_upgrades_90d, target_upside, eps_revisions_net_30d, rating_mean]
   utility:            # same as default; percentiles are within-sector, so high D/E isn't penalized vs other sectors
     inherit: default
   bank:
-    Valuation:        [pb, ptbv, pe, peg]
+    Valuation:        [ptbv, pe, pb, peg]
     Profitability:    [roe, roa, efficiency_ratio, nii_to_assets, net_margin]
     Financial Health: [tangible_equity_ratio, debt_to_equity]
-    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, growth_consistency]
-    Dividends:        [div_yield, payout_earnings, div_growth_streak]
-    Management:       [share_change_1y, share_change_3y, insider_net_buy_pct]
-    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+    Growth:           [eps_growth_3y, rev_growth_3y, rev_growth_1y, eps_growth_1y, growth_consistency, rev_growth_5y, eps_growth_5y]
+    Dividends:        [payout_earnings, div_growth_streak, div_yield]
+    Management:       [share_change_3y, insider_net_buy_pct, share_change_1y]
+    Analyst:          [eps_rev_90d, net_upgrades_90d, target_upside, eps_revisions_net_30d, rating_mean]
   insurance:
-    Valuation:        [pb, pe, ps, peg]
-    Profitability:    [roe, roa, net_margin]          # combined ratio: not reliably tagged in XBRL -> N/A
-    Financial Health: [debt_to_equity, interest_coverage, tangible_equity_ratio]
-    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, eps_growth_1y, eps_growth_3y, eps_growth_5y, growth_consistency]
-    Dividends:        [div_yield, payout_earnings, payout_fcf, div_growth_streak]
-    Management:       [share_change_1y, share_change_3y, roic_minus_coc, insider_net_buy_pct]
-    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+    Valuation:        [pb, pe, peg, ps]
+    Profitability:    [roe, net_margin, roa]          # combined ratio: not reliably tagged in XBRL -> N/A
+    Financial Health: [debt_to_equity, tangible_equity_ratio, interest_coverage]
+    Growth:           [eps_growth_3y, rev_growth_3y, rev_growth_1y, eps_growth_1y, growth_consistency, rev_growth_5y, eps_growth_5y]
+    Dividends:        [payout_fcf, div_growth_streak, div_yield, payout_earnings]
+    Management:       [roic_minus_coc, share_change_3y, insider_net_buy_pct, share_change_1y]
+    Analyst:          [eps_rev_90d, net_upgrades_90d, target_upside, eps_revisions_net_30d, rating_mean]
   reit:
     Valuation:        [pffo, ev_ebitda, pb]
     Profitability:    [operating_margin, fcf_margin, roe]
     Financial Health: [debt_to_equity, interest_coverage, net_cash_to_mcap]
-    Growth:           [rev_growth_1y, rev_growth_3y, rev_growth_5y, ffo_growth_1y, ffo_growth_3y, growth_consistency]
-    Dividends:        [div_yield, payout_ffo, div_growth_streak]
-    Management:       [share_change_1y, share_change_3y, insider_net_buy_pct]
-    Analyst:          [rating_mean, target_upside, eps_rev_90d, eps_revisions_net_30d, net_upgrades_90d]
+    Growth:           [ffo_growth_3y, rev_growth_3y, ffo_growth_1y, rev_growth_1y, growth_consistency, rev_growth_5y]
+    Dividends:        [payout_ffo, div_growth_streak, div_yield]
+    Management:       [share_change_3y, insider_net_buy_pct, share_change_1y]
+    Analyst:          [eps_rev_90d, net_upgrades_90d, target_upside, eps_revisions_net_30d, rating_mean]
 
 labels:
   pe: P/E

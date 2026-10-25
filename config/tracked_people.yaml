@@ -1,0 +1,8 @@
+# People whose congressional trades are always shown, even without a committee link.
+# Match is by bioguide id (preferred) or by the filer's last name + state/district prefix.
+# Add more as you like; reason is shown in the app.
+people:
+  - name: Nancy Pelosi
+    bioguide: P000197
+    match: {last: Pelosi, district_prefix: CA}
+    reason: Widely followed trading record (trades are reported under her spouse)

@@ -35,6 +35,8 @@ from jobs.lib.form4 import cluster_buys, parse_form4  # noqa: E402
 from jobs.lib.metrics import Fundamentals, metric_set_for  # noqa: E402
 from jobs.lib.scoring import own_history_pct, score_rows  # noqa: E402
 from jobs.lib.xbrl import CompanyFacts  # noqa: E402
+from jobs.lib.momentum import momentum_block, universe_stats  # noqa: E402
+from jobs.lib.politics_match import CommitteeMatcher  # noqa: E402
 
 try:
     import orjson
@@ -157,9 +159,9 @@ def map_ciks(uni: dict, sec: SEC) -> None:
 
 
 # ------------------------------------------------------------------ prices (yfinance)
-def download_prices(tickers: list[str], period: str, chunk: int = 150) -> tuple[pd.DataFrame, pd.DataFrame]:
+def download_prices(tickers: list[str], period: str, chunk: int = 150) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     import yfinance as yf
-    closes, splits = [], []
+    closes, splits, vols = [], [], []
     for i in range(0, len(tickers), chunk):
         part = tickers[i:i + chunk]
         for attempt in range(3):
@@ -177,6 +179,8 @@ def download_prices(tickers: list[str], period: str, chunk: int = 150) -> tuple[
             continue
         c = df["Close"] if isinstance(df.columns, pd.MultiIndex) else df[["Close"]].rename(columns={"Close": part[0]})
         closes.append(c)
+        if isinstance(df.columns, pd.MultiIndex) and "Volume" in df.columns.get_level_values(0):
+            vols.append(df["Volume"])
         if isinstance(df.columns, pd.MultiIndex) and "Stock Splits" in df.columns.get_level_values(0):
             splits.append(df["Stock Splits"])
         time.sleep(2)
@@ -185,7 +189,9 @@ def download_prices(tickers: list[str], period: str, chunk: int = 150) -> tuple[
     close = close.dropna(how="all")
     spl = pd.concat(splits, axis=1) if splits else pd.DataFrame()
     spl = spl.loc[:, ~spl.columns.duplicated()] if not spl.empty else spl
-    return close, spl
+    vol = pd.concat(vols, axis=1) if vols else pd.DataFrame()
+    vol = vol.loc[:, ~vol.columns.duplicated()].reindex(close.index) if not vol.empty else vol
+    return close, spl, vol
 
 
 def split_list(spl: pd.DataFrame, t: str) -> list[tuple[date, float]]:
@@ -227,6 +233,17 @@ def yahoo_detail(t: str) -> dict:
 
     grab("info", lambda: tk.info)
     grab("news", lambda: (tk.get_news(count=12) if hasattr(tk, "get_news") else tk.news))
+
+    def opt_summary():
+        ex = list(tk.options or [])[:2]
+        tot = {"call_vol": 0.0, "put_vol": 0.0, "call_oi": 0.0, "put_oi": 0.0, "expiries": ex}
+        for e in ex:
+            ch = tk.option_chain(e)
+            tot["call_vol"] += float(ch.calls["volume"].fillna(0).sum()); tot["put_vol"] += float(ch.puts["volume"].fillna(0).sum())
+            tot["call_oi"] += float(ch.calls["openInterest"].fillna(0).sum()); tot["put_oi"] += float(ch.puts["openInterest"].fillna(0).sum())
+            time.sleep(0.25)
+        return tot
+    grab("options", opt_summary)
     for name in ["recommendations_summary", "analyst_price_targets", "upgrades_downgrades", "earnings_estimate",
                  "eps_trend", "eps_revisions", "calendar"]:
         grab(name, lambda n=name: getattr(tk, n))
@@ -368,7 +385,8 @@ def filings_block(cik: int, sub: dict, days: int = 120) -> list[dict]:
 
 PROFILE_KEYS = ["longBusinessSummary", "industry", "website", "fullTimeEmployees", "beta", "fiftyTwoWeekHigh",
                 "fiftyTwoWeekLow", "trailingPE", "forwardPE", "dividendYield", "averageVolume", "city", "state",
-                "country", "regularMarketPrice", "regularMarketTime", "previousClose"]
+                "country", "regularMarketPrice", "regularMarketTime", "previousClose", "shortPercentOfFloat", "shortRatio",
+                "sharesShort", "sharesShortPriorMonth", "dateShortInterest", "heldPercentInsiders", "heldPercentInstitutions"]
 
 
 def profile_block(y: dict) -> dict:
@@ -550,6 +568,8 @@ def main() -> int:
     ap.add_argument("--insider-days", type=int, default=365)
     ap.add_argument("--out", default="demo-data/demo.json")
     ap.add_argument("--zip", default="/tmp/companyfacts.zip")
+    ap.add_argument("--politics", default="politics.json")
+    ap.add_argument("--hist-quarters", type=int, default=12)
     args = ap.parse_args()
     sec = SEC()
 
@@ -585,11 +605,12 @@ def main() -> int:
 
     # prices
     ytick = {t: u.get("sec_ticker", t) for t, u in mapped.items()}
-    log("prices: universe 1y")
-    uclose, usplit = download_prices(sorted(set(ytick.values())), "1y")
+    log("prices: universe 3y")
+    uclose, usplit, _ = download_prices(sorted(set(ytick.values())), "3y")
     log(f"prices: universe got {uclose.shape[1]} tickers")
     log("prices: top 3y")
-    tclose, tsplit = download_prices([ytick[t] for t in top], "3y", chunk=50)
+    tclose, tsplit, tvol = download_prices([ytick[t] for t in top], "3y", chunk=50)
+    U = universe_stats(uclose)
     log(f"prices: top got {tclose.shape[1]} tickers, {len(tclose)} days")
 
     # yahoo analyst + calendar (top N)
@@ -625,6 +646,34 @@ def main() -> int:
     def read_cf(cik: int):
         n = f"CIK{cik:010d}.json"
         return loads(zf.read(n)) if n in names else None
+
+    # quarter-end dates for score history (as-of, filed-date based: no look-ahead)
+    hist_dates = []
+    qd = date(TODAY.year, ((TODAY.month - 1) // 3) * 3 + 1, 1) - timedelta(days=1)
+    for _ in range(args.hist_quarters):
+        hist_dates.append(qd)
+        qd = date(qd.year, ((qd.month - 1) // 3) * 3 + 1, 1) - timedelta(days=1)
+    hist_dates.sort()
+    hist_rows: dict[date, list] = {d: [] for d in hist_dates}
+    uidx = uclose.index
+
+    def price_at(yt: str, d: date):
+        if yt not in uclose.columns:
+            return None
+        s_ = uclose[yt].loc[:pd.Timestamp(d)].dropna()
+        return float(s_.iloc[-1]) if len(s_) and (d - s_.index[-1].date()).days < 10 else None
+
+    pol = {"trades": [], "members": {}, "stats": {}}
+    try:
+        pol = json.loads(Path(args.politics).read_text())
+        log(f"politics: {len(pol.get('trades', []))} trades, {len(pol.get('members', {}))} members")
+    except Exception as e:  # noqa: BLE001
+        health("politics", f"no politics.json: {e}")
+    pol_by_ticker: dict[str, list] = {}
+    for tr in pol.get("trades", []):
+        if tr.get("ticker") and tr.get("asset_type") in ("ST", "OP", None):
+            pol_by_ticker.setdefault(tr["ticker"].replace(".", "-").upper(), []).append(tr)
+    matcher = CommitteeMatcher(ROOT / "config/committee_sectors.yaml", ROOT / "config/tracked_people.yaml")
 
     rows, detail, validation = [], {}, []
     preds = OVR.get("predecessor_ciks") or {}
@@ -688,6 +737,14 @@ def main() -> int:
                     "yahoo_errors": (ydata.get(t) or {}).get("_errors", []),
                     "news": news_block(ydata.get(t, {})) or finnhub_news(t, u["name"]),
                     "filings": filings_block(u["cik"], subs.get(t, {})), "profile": profile_block(ydata.get(t, {})),
+                    "momentum": momentum_block(px_series, tvol[yt] if yt in tvol.columns else None, U,
+                                               (ydata.get(t) or {}).get("options"), profile_block(ydata.get(t, {})),
+                                               extra.get("eps_rev_90d"),
+                                               sum(1 for x in (insiders.get(t) or {}).get("trades", []) if x["code"] == "P"
+                                                   and (x["date"] or "") >= (TODAY - timedelta(days=90)).isoformat())),
+                    "congress": matcher.annotate(pol_by_ticker.get(t, []) + (pol_by_ticker.get(t.replace("-", ".")) or []),
+                                                 pol.get("members", {}), sector, u.get("sic"), t),
+                    "volume": [None if pd.isna(x) else int(x) for x in tvol[yt].reindex(tclose.index)] if yt in tvol.columns else [],
                 }
                 yr, yn = yinfo.get("totalRevenue"), yinfo.get("netIncomeToCommon")
                 validation.append({"ticker": t, "rev_xbrl": g.get("revenue"), "rev_yahoo": yr,
@@ -695,6 +752,20 @@ def main() -> int:
                                    "rev_diff": (g["revenue"] / yr - 1) if g.get("revenue") and yr else None,
                                    "ni_diff": (g["net_income"] / yn - 1) if g.get("net_income") and yn else None})
             rows.append(row)
+            usplits = split_list(usplit, yt)
+            p_now = price_at(yt, TODAY) or price
+            for hd in hist_dates:
+                ph = price_at(yt, hd)
+                if ph is None:
+                    continue
+                fh = Fundamentals(cf, CFG["concepts"], hd, CFG)
+                soh = cf.shares_outstanding(hd)
+                if mcap_src == "Yahoo" or not soh:
+                    mh = mcap * ph / p_now if mcap and p_now else None
+                else:
+                    mh = ph * soh[0] * split_factor(usplits, soh[1])
+                hist_rows[hd].append({"ticker": t, "sector": sector, "set": mset, "metrics": fh.compute(mh), "na": {},
+                                      "pays_dividend": fh.pays_dividend, "has_analyst": False})
         except Exception as e:  # noqa: BLE001
             health("fundamentals", f"{t}: {type(e).__name__}: {e}")
             traceback.print_exc()
@@ -704,6 +775,27 @@ def main() -> int:
     log("scoring")
     scores = score_rows(rows, CFG, score_only=top_set)
     rowmap = {r["ticker"]: r for r in rows}
+    log("score history")
+    score_hist: dict[str, list] = {t: [] for t in top}
+    metric_hist: dict[str, dict] = {t: {} for t in top}
+    for hd in hist_dates:
+        hs = score_rows(hist_rows[hd], CFG, score_only=top_set)
+        hrow = {r["ticker"]: r for r in hist_rows[hd]}
+        for t in top:
+            if t not in hs:
+                continue
+            cats = {c: v.get("score") for c, v in hs[t]["categories"].items() if c != "Analyst"}
+            av = [v for v in cats.values() if v is not None]
+            score_hist[t].append({"date": hd.isoformat(), "overall_ex_analyst": round(sum(av) / len(av), 1) if av else None, "cats": cats})
+            for k, v in hrow[t]["metrics"].items():
+                if isinstance(v, (int, float)) and v is not None:
+                    metric_hist[t].setdefault(k, {})[hd.isoformat()] = v
+    for t in top:
+        if t in scores:
+            cats = {c: v.get("score") for c, v in scores[t]["categories"].items() if c != "Analyst"}
+            av = [v for v in cats.values() if v is not None]
+            score_hist[t].append({"date": TODAY.isoformat(), "overall_ex_analyst": round(sum(av) / len(av), 1) if av else None,
+                                  "cats": cats, "current": True})
 
     # common trading calendar for the top-N price arrays
     tdates = [d.date().isoformat() for d in tclose.index]
@@ -740,7 +832,7 @@ def main() -> int:
                        "sic_desc": u.get("sic_desc"), "cik": u["cik"], "metric_set": rowmap[t]["set"],
                        "ivv_weight": u["ivv_weight"], "chg_1d": (closes[-1] / prev - 1) if closes and prev and closes[-1] else None,
                        "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"),
-                       "closes": closes, **d})
+                       "closes": closes, "score_history": score_hist.get(t, []), "metric_history": metric_hist.get(t, {}), **d})
     vv = [v for v in validation if v["rev_diff"] is not None]
     summary = {
         "rev_within_2pct": sum(abs(v["rev_diff"]) <= 0.02 for v in vv), "rev_within_5pct": sum(abs(v["rev_diff"]) <= 0.05 for v in vv),
@@ -753,7 +845,8 @@ def main() -> int:
            "universe_count": len(uni), "universe_mapped": len(mapped), "fundamentals_rows": len(rows),
            "top_n": len(stocks), "dates": tdates, "stocks": stocks, "macro": macro_calendar(),
            "validation": summary, "health": HEALTH, "runtime_s": round(time.time() - T0),
-           "sec_calls": sec.calls,
+           "directions": CFG["directions"], "labels": CFG["labels"],
+           "sec_calls": sec.calls, "politics_stats": pol.get("stats", {}), "politics_generated": pol.get("generated"),
            "sector_counts": pd.Series([r["sector"] for r in rows]).value_counts().to_dict()}
     p = ROOT / args.out
     p.parent.mkdir(parents=True, exist_ok=True)
