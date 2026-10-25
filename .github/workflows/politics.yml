@@ -1,5 +1,5 @@
 name: Congress trades
-# House PTRs (+ Senate from scripts/senate on a home computer) -> politics.json on the `politics-data` branch (incremental: only new filings are fetched).
+# House PTRs + Senate (open Kadoa dataset, MIT) -> politics.json on the `politics-data` branch (incremental: only new filings are fetched).
 on:
   workflow_dispatch:
   push:
@@ -24,7 +24,9 @@ jobs:
       - name: Restore cache
         run: |
           git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no cache yet"
-          git fetch origin senate-data && git show origin/senate-data:senate.json > senate.json || echo "no senate data yet"
+      - name: Senate (open Kadoa dataset; falls back to the home-computer script's file)
+        run: |
+          python jobs/politics/senate_kadoa.py --out senate.json --years 3 || { rm -f senate.json; git fetch origin senate-data && git show origin/senate-data:senate.json > senate.json || echo "no senate data"; }
       - name: Build
         run: python jobs/politics/build_politics.py --cache politics.json --out politics.json --senate senate.json --years 3 2>&1 | tee politics.log
       - name: Publish

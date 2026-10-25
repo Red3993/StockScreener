@@ -3,8 +3,8 @@
 
 Reads the previous politics.json (if any) so already-processed DocIDs are never fetched again.
 Writes: trades (stocks/options with tickers), members (bioguide, party, state, committees), stats.
-Senate eFD blocks datacenter IPs (403 from GitHub runners, verified 2026-10-24), so the Senate is
-not covered here; see CLAUDE.md.
+Senate eFD blocks datacenter IPs (403 from GitHub runners, verified 2026-10-24); Senate trades come
+from --senate (jobs/politics/senate_kadoa.py, the open Kadoa dataset; or the home-computer script).
 
     python jobs/politics/build_politics.py --cache politics.json --out politics.json --years 3
 """
@@ -124,6 +124,8 @@ def main() -> int:
         sj = json.loads(Path(args.senate).read_text())
         sens = [b for b, m in by_bio.items() if m["chamber"] == "Senate"]
         def match(t):
+            if t.get("bioguide") in by_bio:
+                return t["bioguide"]
             last, first = (t.get("last") or "").lower(), (t.get("first") or "").lower()
             c = [b for b in sens if by_bio[b]["last"].lower() == last]
             if len(c) > 1:
@@ -136,7 +138,8 @@ def main() -> int:
             t2.update(chamber="Senate", name=t.get("name"), bioguide=b, district=by_bio[b]["state"] if b else None)
             trades.append(t2)
             n += 1
-        senate_stats = {"trades": n, "generated": sj.get("generated"), "reports": (sj.get("stats") or {}).get("reports")}
+        senate_stats = {"trades": n, "generated": sj.get("generated"), "reports": (sj.get("stats") or {}).get("reports"),
+                        "source": sj.get("source") or "home-computer eFD script", "matched": sum(1 for t in trades if t.get("chamber") == "Senate" and t.get("bioguide"))}
         log(f"senate: merged {n} trades (file generated {sj.get('generated')})")
     else:
         log("senate: no senate.json (run scripts/senate/senate_trades.py on a home computer)")

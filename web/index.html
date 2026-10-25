@@ -1309,14 +1309,13 @@ function opportunity(r) {
   return {score, why, vScore, qScore};
 }
 const sizeOf = r => r.ix?.includes("IJR") ? "Small cap" : r.ix?.includes("IJH") ? "Mid cap" : "Large cap";
-// Equal slots per size group so small and mid caps aren't crowded out by large caps.
-function candidates(n = 15) {
+// One ranking across all sizes (no size slots). At most 10 per sector so one cheap sector can't fill the pool.
+const PICKS_N = 25;
+function candidates(n = 45) {
   const ranked = ROWS.filter(inScopeIdeas).map(r => ({s: r, o: opportunity(r), size: sizeOf(r)})).sort((a, b) => b.o.score - a.o.score);
-  const groups = [...new Set(ranked.map(x => x.size))];
-  if (groups.length <= 1) return ranked.slice(0, n);
-  const per = Math.floor(n / groups.length), out = [];
-  for (const g of ["Large cap", "Mid cap", "Small cap"]) out.push(...ranked.filter(x => x.size === g).slice(0, per));
-  return out.sort((a, b) => b.o.score - a.o.score);
+  const per = {}, out = [];
+  for (const x of ranked) { if (out.length >= n) break; if ((per[x.s.sec] = (per[x.s.sec] || 0) + 1) <= 10) out.push(x); }
+  return out;
 }
 const inScopeIdeas = r => (UI.ideasScope || "all") === "all" || r.ix?.includes(UI.ideasScope);
 const Ideas = {state: null, loadedWeek: null, busy: false, ctl: null};
@@ -1327,7 +1326,7 @@ async function viewIdeas() {
     <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Tickers of the week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
-    <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). Candidates get equal slots by size (large, mid and small caps; ${cands.length} in all), and Claude picks evenly across them.</p>
+    <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector), and Claude picks the best ${PICKS_N}.</p>
     <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
     <div class="list">${headRow("Opportunity score")}${cands.map(({s, o, size}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span><span class="badge">${esc(size || sizeOf(s))}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
@@ -1344,8 +1343,8 @@ function renderPicks(week, key, cands) {
   const THEME_C = {"Undervalued": "good", "Turnaround setup": "warn", "Catalyst": "acc", "Quality on sale": "good", "Momentum": "acc"};
   box.innerHTML = head + (res ? `
     ${res.week_summary ? `<p style="margin-top:0">${esc(res.week_summary)}</p>` : ""}
-    <div style="display:grid;gap:14px">${(res.picks || []).filter(p => RB[p.ticker]).map(p => { const r = RB[p.ticker], d = {price: r.d?.px, fromHigh: r.d?.fh}; return `<div class="card pick" style="background:var(--bg)">
-      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="badge">${esc(sizeOf(r))}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
+    <div style="display:grid;gap:14px">${(res.picks || []).filter(p => RB[p.ticker]).map((p, k) => { const r = RB[p.ticker], d = {price: r.d?.px, fromHigh: r.d?.fh}; return `<div class="card pick" style="background:var(--bg)">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="faint num">#${k + 1}</span><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="badge">${esc(sizeOf(r))}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
       <b>${esc(p.headline || "")}</b>
       <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span></div>
       <div><div class="label">Why it’s flagged</div><ul style="margin:4px 0;padding-left:18px">${(p.why_now || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
@@ -1356,7 +1355,7 @@ function renderPicks(week, key, cands) {
     </div>`; }).join("")}</div>
     <p class="faint small">Picked ${esc(new Date(st.generated).toLocaleString())} from data as of ${esc(fmtDate(st.dataAsof))}.${st.dataAsof !== DATA.lastDate ? " Newer data is available." : ""}</p>
     <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Pick again</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
-    : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below (equal slots for large, mid and small caps), with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks two per size group and explains why each is worth a look. Each pick carries equal weight. It uses your Claude usage and takes about a minute.</p>
+    : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks the top ${PICKS_N} regardless of company size and explains why each is worth a look. It uses your Claude usage and takes about a minute.</p>
        <div class="bar" style="margin:0"><button class="btn primary" id="pickGo">Pick this week’s tickers</button><button class="btn small" id="pickStop" hidden>Stop</button></div><div id="pickOut"></div>`);
   $("#pickGo").onclick = () => runPicks(week, key, cands);
   $("#pickStop").onclick = () => Ideas.ctl?.abort();
@@ -1370,7 +1369,7 @@ async function runPicks(week, key, cands) {
   out.innerHTML = `<p class="thinking">Loading candidate details…</p>`;
   try { await Promise.all(cands.map(c => getDetail(c.s.t))); } catch (e) { out.innerHTML = `<p class="down small">Couldn’t load stock details. Try again.</p>`; Ideas.busy = false; $("#pickGo").disabled = false; $("#pickStop").hidden = true; return; }
   cands = cands.map(c => ({s: BY[c.s.t], o: c.o, size: c.size || sizeOf(c.s)})).filter(c => c.s);
-  out.innerHTML = `<p class="thinking">Reviewing ${cands.length} candidates… this usually takes 30–90 seconds.</p>`;
+  out.innerHTML = `<p class="thinking">Reviewing ${cands.length} candidates… this usually takes 1–3 minutes.</p>`;
   const block = ({s, o, size}) => { const d = DER[s.ticker];
     const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
     const news = (s.news || []).slice(0, 5).map(n => `  - ${n.date}: ${n.title}`).join("\n");
@@ -1385,22 +1384,22 @@ Headlines:
 ${news || "  (none)"}`; };
   const prompt = `${RULES}
 
-TASK: From the candidate stocks below, pick the most interesting ideas for the week of ${DATA.lastDate}, with a bias toward undervalued opportunities (cheap versus sector and versus the stock's own history, with acceptable quality and a setup that is not a falling knife). Every pick carries equal weight regardless of company size: pick 2 from each size group present (large, mid, small cap), so 6 picks when all three groups are present. Do not favor large caps for being well known; judge each on its data. Prefer a mix of themes. Skip a candidate if the data argues against it, even if its opportunity score is high, and pick fewer from a group if none of its candidates hold up.
+TASK: From the candidate stocks below, pick the most interesting ideas for the week of ${DATA.lastDate}, with a bias toward undervalued opportunities (cheap versus sector and versus the stock's own history, with acceptable quality and a setup that is not a falling knife). Pick the ${PICKS_N} best, ranked best first, regardless of company size: large, mid and small caps compete equally, so don't favor large caps for being well known and don't force a size mix; judge each on its data. Avoid piling into one sector unless the data clearly argues for it. Skip a candidate if the data argues against it, even if its opportunity score is high; return fewer than ${PICKS_N} only if fewer hold up.
 
 Reply with ONLY a JSON object of this shape:
 {"week_summary": "1-2 sentences on the common thread this week",
  "picks": [{"ticker": "XYZ", "size": "Large cap" | "Mid cap" | "Small cap", "theme": "Undervalued" | "Quality on sale" | "Turnaround setup" | "Catalyst" | "Momentum",
             "conviction": "High" | "Medium" | "Low",
             "headline": "one line, under 15 words",
-            "why_now": ["3 short bullets with specific numbers from the data"],
-            "synopsis": "90-140 words of plain prose: what the company does, why it looks mispriced or interesting now, what would make the idea work",
-            "risks": ["2 short bullets"],
+            "why_now": ["2-3 short bullets with specific numbers from the data"],
+            "synopsis": "45-70 words of plain prose: what the company does, why it looks mispriced or interesting now, what would make the idea work",
+            "risks": ["1-2 short bullets"],
             "watch": "the next date or signal that would confirm or break the idea"}]}
 
 CANDIDATES
 ${cands.map(block).join("\n\n")}`;
   try {
-    const result = await AI.sample.json(prompt, {signal: Ideas.ctl.signal, cache: false});
+    const result = await AI.sample.json(prompt, {signal: Ideas.ctl.signal, cache: false, modelTier: "complex"});
     if (!result || !Array.isArray(result.picks)) throw {code: "invalid_json"};
     const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all"};
     await Store.setDoc(key, body); Ideas.state = body;

@@ -82,11 +82,15 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Output on `app-data` branch: `index.json` (light rows for ~1,650 stocks) + `detail/NN.json` (96 shards, crc32).
   Caches on `cache-data` branch: yahoo (top 100 daily, rest weekly rotation), insiders (incremental Form 4, 1 year —
   Tom OK'd 1 year), news (Finnhub, same rotation). `demo-build.yml` is now manual-only.
-  Senate: `scripts/senate/` runs on Tom's computer (eFD blocks cloud IPs) → `senate-data` branch → merged by politics job
+  Senate (2026-10-24): primary source is the open **Kadoa dataset** (github.com/kadoa-org/congress-trading-monitor, MIT,
+  daily refresh of Senate eFD PTRs as static JSON, public/data/filer/senate_*.json; ~64 senators, ~9k trades since 2011).
+  `jobs/politics/senate_kadoa.py` sparse-clones it in the politics job → senate.json (bioguide from photo_url) → merged.
+  eFD direct still 403 from runners even with an honest UA (re-tested). Fallback if Kadoa fails: `scripts/senate/` on
+  Tom's computer → `senate-data` branch. Capitol Trades not scraped (2iQ commercial data, terms).
   (now 23:17 UTC). Tom asked about scraping Capitol Trades instead: declined — commercial vendor (2iQ) data, terms
   almost certainly prohibit scraping, fragile; kept official source.
-  Ideas: no size penalty; equal candidate slots for large/mid/small (S&P 500 / 400 / 600 membership) and Claude picks
-  2 per size group, equal weight (Tom's request).
+  Ideas (Tom, 2026-10-24, supersedes equal size slots): one opportunity ranking across all sizes, top 45 candidates
+  (max 10 per sector), Claude picks the **top 25 regardless of large/mid/small cap**, ranked, short synopses.
   **Scheduled task** "Publish StockScreener data" (trig_019ShUgBg9BzCSG4EziRkwnv): weekdays 7:35am ET, cloud session
   clones app-data + web/index.html and republishes the artifact. Auto-approval mode.
 - Known gaps: 13F, divergence, Telegram not in prototype.
