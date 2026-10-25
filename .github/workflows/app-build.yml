@@ -1,0 +1,56 @@
+name: Build app data (full universe)
+# ~1,650 stocks. Heavy per-ticker data is cached on the `cache-data` branch so daily runs only fetch what changed.
+# Output (index.json + detail shards) goes to the `app-data` branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/app/**", ".github/workflows/app-build.yml"]
+  schedule:
+    - cron: "31 1 * * 2-6"   # Tue–Sat 01:31 UTC = Mon–Fri ~9:30pm ET, after daily bars are final
+permissions:
+  contents: write
+concurrency:
+  group: app-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt
+      - name: Restore caches and congress data
+        run: |
+          mkdir -p cache
+          git fetch origin cache-data && for f in yahoo insiders news; do git show origin/cache-data:$f.json.gz > cache/$f.json.gz || true; done || echo "no cache yet"
+          git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no politics data"
+      - name: Build
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python jobs/app/build_all.py --out app-data --cache cache 2>&1 | tee app-build.log
+      - name: Save caches
+        if: always()
+        run: |
+          mkdir -p /tmp/c && cp cache/*.json.gz /tmp/c/ 2>/dev/null || true
+          git config user.name "app-bot"; git config user.email "app-bot@users.noreply.github.com"
+          git stash -u -q || true
+          git checkout --orphan cache-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name app-data ! -name app-build.log -exec rm -rf {} +
+          cp /tmp/c/*.json.gz . 2>/dev/null || true
+          git add *.json.gz 2>/dev/null && git commit -qm "cache ${{ github.run_id }}" && git push -f origin HEAD:cache-data || echo "no cache to save"
+      - name: Publish app data
+        if: success()
+        run: |
+          cp -r app-data /tmp/ad && cp app-build.log /tmp/ad/ || true
+          git checkout --orphan app-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/ad app-data
+          git add app-data && git commit -qm "app data ${{ github.run_id }} ($(date -u +%FT%TZ))"
+          git push -f origin HEAD:app-data

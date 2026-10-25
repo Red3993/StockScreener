@@ -2,12 +2,7 @@ name: Build demo data
 # Prototype: full-universe fundamentals for peer ranking + full detail for the top 100.
 # Output is committed to the `demo-data` branch (JSON only, no database yet).
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ["jobs/demo/**", "jobs/lib/**", "config/**", ".github/workflows/demo-build.yml"]
-  schedule:
-    - cron: "41 22 * * 1-5"   # weekdays ~6:40pm ET, after the close
+  workflow_dispatch:   # superseded by app-build.yml (full universe); kept for manual runs
 permissions:
   contents: write
 concurrency:
