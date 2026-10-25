@@ -78,7 +78,18 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   - Metric lists in `config/scoring.yaml` ordered by importance (display order; scoring still simple average).
   - App: chart markers (insider buys/sales, congress buys/sales) with toggles; Congress tab; momentum card;
     score + metric trend sparklines; Ideas tab = opportunity score shortlist → Claude picks (saved `app/picks_YYYY_Www`).
-- Known gaps: Senate trades, 13F, divergence, Telegram not in prototype.
+- 2026-10-24 v5 (full universe): `jobs/app/build_all.py` + `.github/workflows/app-build.yml` (Tue–Sat 01:31 UTC).
+  Output on `app-data` branch: `index.json` (light rows for ~1,650 stocks) + `detail/NN.json` (96 shards, crc32).
+  Caches on `cache-data` branch: yahoo (top 100 daily, rest weekly rotation), insiders (incremental Form 4, 1 year —
+  Tom OK'd 1 year), news (Finnhub, same rotation). `demo-build.yml` is now manual-only.
+  Senate: `scripts/senate/` runs on Tom's computer (eFD blocks cloud IPs) → `senate-data` branch → merged by politics job
+  (now 23:17 UTC). Tom asked about scraping Capitol Trades instead: declined — commercial vendor (2iQ) data, terms
+  almost certainly prohibit scraping, fragile; kept official source.
+  Ideas: no size penalty; equal candidate slots for large/mid/small (S&P 500 / 400 / 600 membership) and Claude picks
+  2 per size group, equal weight (Tom's request).
+  **Scheduled task** "Publish StockScreener data" (trig_019ShUgBg9BzCSG4EziRkwnv): weekdays 7:35am ET, cloud session
+  clones app-data + web/index.html and republishes the artifact. Auto-approval mode.
+- Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
 
