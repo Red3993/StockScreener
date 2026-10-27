@@ -199,6 +199,18 @@ def main() -> int:
 
     # prices: 3y for the whole universe, with volume
     uclose, usplit, uvol = B.download_prices(sorted(set(ytick.values())), "3y")
+    # Yahoo's long-period download sometimes lacks the latest session for most tickers (seen 2026-10-26: 99% missing
+    # at 8:50pm ET) while a short-period request has it, so fill the last ~2 weeks from a 10-day download.
+    try:
+        tc, _ts, tv = B.download_prices(sorted(set(ytick.values())), "10d")
+        if len(tc):
+            before = uclose.index[-1].date() if len(uclose) else None
+            uclose = tc.combine_first(uclose).sort_index()
+            if len(tv):
+                uvol = tv.combine_first(uvol).sort_index() if len(uvol) else tv
+            log(f"prices: recent-session fill {before} -> {uclose.index[-1].date()}")
+    except Exception as e:  # noqa: BLE001
+        health("prices", f"recent-session fill failed: {e}")
     if len(uclose) and uclose.iloc[-1].isna().mean() > 0.3:
         log(f"dropping incomplete last session {uclose.index[-1].date()} ({uclose.iloc[-1].isna().mean():.0%} missing)")
         uclose, uvol = uclose.iloc[:-1], uvol.iloc[:-1] if len(uvol) else uvol

@@ -71,7 +71,7 @@ def parse_form4(xml_bytes: bytes, accn: str, filed: str) -> list[dict]:
         o = owners[0]
         title = o["title"] or ""
         out.append({
-            "date": _t(tx, "transactionDate/value"), "filed": filed, "accn": accn,
+            "date": (_t(tx, "transactionDate/value") or "")[:10] or None, "filed": filed, "accn": accn,   # some filers append a UTC offset
             "owner": o["name"], "owners": len(owners), "roles": o["roles"],
             "ceo": bool(CEO_RE.search(title)), "cfo": bool(CFO_RE.search(title)),
             "code": code, "shares": shares, "price": price,
@@ -89,8 +89,8 @@ def cluster_buys(trades: list[dict], window_days: int = 14, min_insiders: int = 
     buys = sorted((t for t in trades if t["code"] == "P" and t["date"]), key=lambda t: t["date"])
     clusters, i = [], 0
     while i < len(buys):
-        d0 = date.fromisoformat(buys[i]["date"])
-        win = [t for t in buys[i:] if date.fromisoformat(t["date"]) <= d0 + timedelta(days=window_days)]
+        d0 = date.fromisoformat(buys[i]["date"][:10])
+        win = [t for t in buys[i:] if date.fromisoformat(t["date"][:10]) <= d0 + timedelta(days=window_days)]
         names = {t["owner"] for t in win}
         if len(names) >= min_insiders:
             clusters.append({"start": buys[i]["date"], "end": win[-1]["date"], "insiders": sorted(names),

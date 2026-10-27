@@ -131,7 +131,7 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
 - 2026-10-27 speed: the fundamentals + score-history pass (~65 min at 3,000 stocks) now runs on 4 forked processes
   (`--workers`, per-process zip handle, closure via module-level `_ONE`); health entries returned to the parent.
 - Known gaps: 13F, divergence, Telegram not in prototype.
-  Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
+  Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
 
 ### Phase 1 progress (2026-10-20)
