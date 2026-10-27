@@ -35,6 +35,21 @@ def main() -> int:
     idx = json.loads((root / "index.json").read_text())
     rows = {r["t"]: r for r in idx["rows"]}
     asof = idx["dates"][-1]
+    qp = root / "prices.json"   # quick closing prices newer than the full build (same overlay the app applies)
+    if qp.exists():
+        q = json.loads(qp.read_text())
+        new = [d for d in q.get("dates", []) if d > asof]
+        if new:
+            k0 = q["dates"].index(new[0])
+            for t, r in rows.items():
+                vals = [v for v in (q["px"].get(t) or [])[k0:]]
+                d = r.get("d") or {}
+                last = next((v for v in reversed(vals) if v is not None), None)
+                if last is None or not d.get("px"):
+                    continue
+                prev = vals[-2] if len(vals) > 1 and vals[-2] is not None else d["px"]
+                d["c1"], d["px"] = last / prev - 1, last
+            asof = new[-1]
     since = (date.fromisoformat(asof) - timedelta(days=a.days)).isoformat()
     week = (date.fromisoformat(asof) + timedelta(days=7)).isoformat()
     watch = [t.strip().upper() for t in a.watch.split(",") if t.strip() and t.strip().upper() in rows]
