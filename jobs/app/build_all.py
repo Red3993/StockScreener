@@ -369,7 +369,7 @@ def main() -> int:
                     continue
                 seen_c.add(key)
                 if x["relevant"] or (x["date"] or "") >= cut365:
-                    cong2.append(x if x["relevant"] else {k: x[k] for k in ("date", "filed", "name", "party", "state", "owner", "type",
+                    cong2.append(x if x["relevant"] else {k: x.get(k) for k in ("date", "filed", "name", "party", "state", "chamber", "owner", "type",
                                                                          "asset_type", "amount_low", "amount_high", "committees", "tracked", "relevant")})
             res["detail"] = {
                 "price": price, "mcap": mcap, "mcap_source": mcap_src, "latest_period": f.latest_period, "shares_source": f.shares_source,
