@@ -18,12 +18,14 @@ import gzip
 import json
 import re
 import math
+import multiprocessing as mp
+import os
 import sys
 import time
 import traceback
 import zipfile
 import zlib
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -45,6 +47,14 @@ SHARDS = 96
 TOP_N = 100
 ROTATE_DAYS = 5          # each non-top stock refreshes Yahoo + news once per ~week
 INSIDER_DAYS = 365
+
+
+_ONE = None
+
+
+def _call_one(args):
+    """Runs the per-ticker fundamentals closure in a forked worker (set as _ONE before the pool starts)."""
+    return _ONE(*args)
 
 
 def rss_mb() -> int:
@@ -145,6 +155,7 @@ def main() -> int:
     ap.add_argument("--form4-budget", type=int, default=30000)   # caps a cold backfill so the run finishes; the rest fills in on later nights
     ap.add_argument("--yahoo-threads", type=int, default=3)
     ap.add_argument("--yahoo-budget", type=int, default=2600)
+    ap.add_argument("--workers", type=int, default=4, help="processes for the fundamentals/history pass")
     ap.add_argument("--limit", type=int, default=0, help="debug: only first N tickers")
     args = ap.parse_args()
     out, cdir = ROOT / args.out, ROOT / args.cache
@@ -270,23 +281,33 @@ def main() -> int:
             with open(zp, "wb") as fh:
                 for chunk in r.iter_content(1 << 22):
                     fh.write(chunk)
-    zf = zipfile.ZipFile(zp)
-    names = set(zf.namelist())
+    with zipfile.ZipFile(zp) as z0:
+        names = set(z0.namelist())
+    zfs: dict[int, zipfile.ZipFile] = {}
 
-    def read_cf(cik):
+    def read_cf(cik):   # one zip handle per process (forked workers must not share a file offset)
         n = f"CIK{cik:010d}.json"
-        return B.loads(zf.read(n)) if n in names else None
+        if n not in names:
+            return None
+        z = zfs.get(os.getpid()) or zfs.setdefault(os.getpid(), zipfile.ZipFile(zp))
+        return B.loads(z.read(n))
 
     rows, detail, validation = [], {}, []
     preds = OVR.get("predecessor_ciks") or {}
     cut90 = (TODAY - timedelta(days=90)).isoformat()
     cut365 = (TODAY - timedelta(days=365)).isoformat()
-    for i, (t, u) in enumerate(mapped.items()):
+    def one(i, t, u):
+        res = {"t": t, "row": None, "hist": [], "detail": None, "val": None}
+        h0 = len(B.HEALTH)
+
+        def done():
+            res["health"] = B.HEALTH[h0:]
+            return res
         try:
             raw = read_cf(u["cik"])
             if raw is None:
                 health("xbrl_missing", f"{t}: no companyfacts")
-                continue
+                return done()
             cf = CompanyFacts(raw, [p for c in preds.get(t, []) if (p := read_cf(c))])
             f = Fundamentals(cf, CFG["concepts"], TODAY, CFG)
             yt = ytick[t]
@@ -316,7 +337,7 @@ def main() -> int:
             cur = {k: m.get(k) for k in CFG["valuation_metrics_with_own_history"]}
             own, own_na, monthly = B.own_history(cf, subs.get(t, {}), px_series, splits, mcap, shares_adj, cur) if mcap else ({}, {}, {})
             row["own_pct"], row["own_na"] = own, own_na
-            rows.append(row)
+            res["row"] = row
             usp = splits
             for hd in hist_dates:
                 try:
@@ -326,8 +347,8 @@ def main() -> int:
                     fh = Fundamentals(cf, CFG["concepts"], hd, CFG)
                     soh = cf.shares_outstanding(hd)
                     mh = (mcap * ph / price if mcap and price else None) if (mcap_src == "Yahoo" or not soh) else ph * soh[0] * B.split_factor(usp, soh[1])
-                    hist_rows[hd].append({"ticker": t, "sector": sector, "set": mset, "metrics": fh.compute(mh if mh and mh > 0 else None),
-                                          "na": {}, "pays_dividend": fh.pays_dividend, "has_analyst": False})
+                    res["hist"].append((hd, {"ticker": t, "sector": sector, "set": mset, "metrics": fh.compute(mh if mh and mh > 0 else None),
+                                          "na": {}, "pays_dividend": fh.pays_dividend, "has_analyst": False}))
                 except Exception as e:  # noqa: BLE001
                     health("history", f"{t} @ {hd}: {type(e).__name__}: {e}")
             g = f.inputs
@@ -350,7 +371,7 @@ def main() -> int:
                 if x["relevant"] or (x["date"] or "") >= cut365:
                     cong2.append(x if x["relevant"] else {k: x[k] for k in ("date", "filed", "name", "party", "state", "owner", "type",
                                                                          "asset_type", "amount_low", "amount_high", "committees", "tracked", "relevant")})
-            detail[t] = {
+            res["detail"] = {
                 "price": price, "mcap": mcap, "mcap_source": mcap_src, "latest_period": f.latest_period, "shares_source": f.shares_source,
                 "analyst": ab, "calendar": yc.get("cal") or {}, "insiders": ins, "tech": B.technicals(px_series),
                 "shares_history": [[d.isoformat(), v] for d, v in list(sc.items())[-11:]],
@@ -361,13 +382,39 @@ def main() -> int:
                 "momentum": mom, "congress": cong2, "derived": dv, "yahoo_fetched": yc.get("fetched"),
             }
             if yc.get("yrev") and g.get("revenue"):
-                validation.append({"ticker": t, "rev_diff": g["revenue"] / yc["yrev"] - 1, "rev_xbrl": g["revenue"], "rev_yahoo": yc["yrev"],
+                res["val"] = ({"ticker": t, "rev_diff": g["revenue"] / yc["yrev"] - 1, "rev_xbrl": g["revenue"], "rev_yahoo": yc["yrev"],
                                    "ni_diff": (g["net_income"] / yc["yni"] - 1) if g.get("net_income") and yc.get("yni") else None})
         except Exception as e:  # noqa: BLE001
             health("fundamentals", f"{t}: {type(e).__name__}: {e}")
             traceback.print_exc()
-        if i % 200 == 0:
-            log(f"fundamentals {i}/{len(mapped)}")
+        return done()
+
+    global _ONE
+    _ONE = one
+    items = [(i, t, u) for i, (t, u) in enumerate(mapped.items())]
+    nw = max(1, min(args.workers, os.cpu_count() or 1))
+    log(f"fundamentals: {len(items)} tickers on {nw} processes")
+    if nw > 1:
+        ex = ProcessPoolExecutor(nw, mp_context=mp.get_context("fork"))
+        results = ex.map(_call_one, items, chunksize=12)
+    else:
+        ex, results = None, map(_call_one, items)
+    for k, res in enumerate(results):
+        t = res["t"]
+        if res["row"] is not None:
+            rows.append(res["row"])
+        for hd, hr in res["hist"]:
+            hist_rows[hd].append(hr)
+        if res["detail"] is not None:
+            detail[t] = res["detail"]
+        if res["val"] is not None:
+            validation.append(res["val"])
+        if nw > 1:
+            B.HEALTH.extend(res.get("health") or [])
+        if k % 200 == 0:
+            log(f"fundamentals {k}/{len(items)} (rss {rss_mb()} MB)")
+    if ex:
+        ex.shutdown()
 
     log(f"scoring (rss {rss_mb()} MB)")
     all_t = {r["ticker"] for r in rows}

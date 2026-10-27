@@ -128,6 +128,8 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   and DATA.dates; header "· scores updating"). Evening task publishes prices.json first, then the full build.
   Live per-ticker price pulls not possible: artifact pages can't call Yahoo (CORS/no key) — explained to Tom.
   Price filter: "Max $" box on the Stocks bar, presets "Under $10" / "Under $20, overall ≥ 6", sort by share price.
+- 2026-10-27 speed: the fundamentals + score-history pass (~65 min at 3,000 stocks) now runs on 4 forked processes
+  (`--workers`, per-process zip handle, closure via module-level `_ONE`); health entries returned to the parent.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
