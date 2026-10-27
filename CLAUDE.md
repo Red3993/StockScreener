@@ -117,6 +117,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Next idea offered to Tom: thematic ETF holdings (nuclear, quantum, robotics, space, cyber…) as theme tags/extra tickers.
 - 2026-10-26: Tom wants end-of-day updates (he works mornings). Congress job 21:37 UTC, app build 22:07 UTC Mon–Fri
   (6:07pm EDT / 5:07pm EST); the publish + digest task moved to 7:47pm ET and waits for that day's build.
+- 2026-10-26 v9: tab renamed **Claude's Picks**. Picks doc now stores `px` (S&P 500 + Russell 2000 prices at pick time)
+  and `prev` (previous tickers). Banner when newer data exists: median S&P 500 / Russell 2000 move since the picks and
+  the picks' average return; highlighted when |S&P| ≥ 3% or |R2000| ≥ 4%, with "Refresh Claude's picks". Refresh
+  prompt includes that context; UI shows new/dropped names and each pick's return since picked. With no picks yet
+  this week, last week's are shown.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

@@ -255,7 +255,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <nav class="tabs" aria-label="Sections">
   <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
   <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
-  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Top Picks</button>
+  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Claude’s Picks</button>
   <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
   <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
 </nav>
@@ -1521,7 +1521,7 @@ async function viewIdeas() {
   const week = isoWeek(DATA.lastDate), key = "picks_" + week.replace("-", "_");
   const cands = candidates();
   $("#view").innerHTML = `
-    <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Top picks this week</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
+    <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Claude’s picks</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
     <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
@@ -1530,21 +1530,48 @@ async function viewIdeas() {
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   bindRows($("#view"));
   $$("[data-is]").forEach(b => b.onclick = () => { UI.ideasScope = b.dataset.is; viewIdeas(); });
-  if (Ideas.loadedWeek !== week) { Ideas.state = await Store.getDoc(key); Ideas.loadedWeek = week; }
+  if (Ideas.loadedWeek !== week) {
+    Ideas.state = await Store.getDoc(key); Ideas.loadedWeek = week;
+    if (!Ideas.state) {   // nothing picked yet this week: show last week's picks, marked as older, with the refresh banner
+      const pw = isoWeek(new Date(Date.parse(DATA.lastDate) - 7 * 864e5).toISOString().slice(0, 10));
+      const last = await Store.getDoc("picks_" + pw.replace("-", "_")); if (last?.result) Ideas.state = {...last, lastWeek: pw};
+    }
+  }
   if (UI.tab === "ideas") renderPicks(week, key, cands);
+}
+// Market move since a set of picks: median change of S&P 500 stocks from the prices saved with the picks.
+function pxSnapshot() { const o = {}; for (const r of ROWS) if (r.d?.px != null && (r.ix?.includes("IVV") || r.ix?.includes("IWM"))) o[r.t] = r.d.px; return o; }
+function medianMove(snap, filter) { const ch = []; for (const [t, p0] of Object.entries(snap || {})) { const r = RB[t]; if (r && r.d?.px && p0 && (!filter || filter(r))) ch.push(r.d.px / p0 - 1); }
+  if (ch.length < 30) return null; ch.sort((a, b) => a - b); return ch[Math.floor(ch.length / 2)]; }
+function sinceMove(st) {
+  if (!st?.px) return st && st.dataAsof !== DATA.lastDate ? {stale: true, big: false} : null;
+  const sp = medianMove(st.px, r => r.ix?.includes("IVV")), sm = medianMove(st.px, r => r.ix?.includes("IWM") && !r.ix?.includes("IVV"));
+  const picks = (st.result?.picks || []).map(p => { const r = RB[p.ticker], p0 = st.px[p.ticker]; return r?.d?.px && p0 ? r.d.px / p0 - 1 : null; }).filter(x => x != null);
+  const avg = picks.length ? picks.reduce((a, b) => a + b, 0) / picks.length : null;
+  const big = (sp != null && Math.abs(sp) >= 0.03) || (sm != null && Math.abs(sm) >= 0.04);
+  return {sp, sm, avg, big, stale: st.dataAsof !== DATA.lastDate};
 }
 function renderPicks(week, key, cands) {
   const box = $("#picksCard"); if (!box) return;
   const st = Ideas.state, res = st?.result;
   const head = `<h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:18px;height:18px;color:var(--accent)"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>Claude’s picks</h3>`;
+  const mv = st ? sinceMove(st) : null;
   if (!AI.sample) { box.innerHTML = head + `<p class="muted">${AI.ready ? "The AI analyst isn’t available in this view. Open this page inside Claude while signed in." : "Checking AI availability…"}</p>`; if (!AI.ready) setTimeout(() => UI.tab === "ideas" && renderPicks(week, key, cands), 1500); return; }
   const THEME_C = {"Undervalued": "good", "Turnaround setup": "warn", "Catalyst": "acc", "Quality on sale": "good", "Momentum": "acc"};
-  box.innerHTML = head + (res ? `
+  const prevT = new Set(st?.prev?.tickers || []), curT = (res?.picks || []).map(p => p.ticker);
+  const added = st?.prev ? curT.filter(t => !prevT.has(t)) : [], dropped = st?.prev ? [...prevT].filter(t => !curT.includes(t)) : [];
+  const banner = mv && mv.stale ? `<div class="card" style="background:var(--bg);border-color:${mv.big ? "var(--warn)" : "var(--line)"};margin:0 0 12px">
+      <b>${mv.big ? "The market has moved a lot since these picks." : "There’s newer data since these picks."}</b>
+      <span class="small">${mv.sp != null || mv.sm != null ? `Since ${esc(fmtDate(st.dataAsof))}: S&amp;P 500 stocks ${mv.sp != null ? `<span class="${cls(mv.sp)}">${pct(mv.sp)}</span>` : "n/a"} (median)${mv.sm != null ? `, Russell 2000 small caps <span class="${cls(mv.sm)}">${pct(mv.sm)}</span>` : ""}${mv.avg != null ? `; these picks <span class="${cls(mv.avg)}">${pct(mv.avg)}</span> on average` : ""}.` : `Picked from data as of ${esc(fmtDate(st.dataAsof))}.`}</span>
+      <div class="bar" style="margin:8px 0 0"><button class="btn ${mv.big ? "primary" : ""} small" id="pickGo2">Refresh Claude’s picks with today’s data</button></div></div>` : "";
+  box.innerHTML = head + banner + (res ? `
+    ${st.lastWeek ? `<p class="small muted" style="margin-top:0">These are last week’s picks (${esc(st.lastWeek)}). Refresh to pick for this week.</p>` : ""}
     ${res.week_summary ? `<p style="margin-top:0">${esc(res.week_summary)}</p>` : ""}
+    ${st?.prev ? `<p class="small muted" style="margin-top:0">Refreshed from the ${esc(fmtDate(st.prev.dataAsof))} picks: ${added.length ? `new <b>${added.map(esc).join(", ")}</b>` : "no new names"}${dropped.length ? `; dropped ${dropped.map(esc).join(", ")}` : ""}.</p>` : ""}
     <div style="display:grid;gap:14px">${(res.picks || []).filter(p => RB[p.ticker]).map((p, k) => { const r = RB[p.ticker], d = {price: r.d?.px, fromHigh: r.d?.fh}; return `<div class="card pick" style="background:var(--bg)">
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="faint num">#${k + 1}</span><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="badge">${esc(sizeOf(r))}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
       <b>${esc(p.headline || "")}</b>
-      <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span></div>
+      <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span>${st.px?.[p.ticker] && d.price ? `<span class="badge ${d.price >= st.px[p.ticker] ? "good" : "bad"}">${pct(d.price / st.px[p.ticker] - 1)} since picked</span>` : ""}</div>
       <div><div class="label">Why it’s flagged</div><ul style="margin:4px 0;padding-left:18px">${(p.why_now || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
       <div class="md">${md(p.synopsis || "")}</div>
       ${(p.risks || []).length ? `<div><div class="label">Risks</div><ul style="margin:4px 0;padding-left:18px" class="muted">${p.risks.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
@@ -1552,10 +1579,11 @@ function renderPicks(week, key, cands) {
       <div class="bar" style="margin:4px 0 0"><button class="btn small" data-open="${esc(p.ticker)}">Open ${esc(p.ticker)}</button><button class="btn primary small" data-wl="${esc(p.ticker)}">${inLists(p.ticker).length ? "★ On a watchlist" : "+ Watchlist"}</button></div>
     </div>`; }).join("")}</div>
     <p class="faint small">Picked ${esc(new Date(st.generated).toLocaleString())} from data as of ${esc(fmtDate(st.dataAsof))}.${st.dataAsof !== DATA.lastDate ? " Newer data is available." : ""}</p>
-    <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Pick again</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
+    <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Refresh picks</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
     : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks the top ${PICKS_N} regardless of company size and explains why each is worth a look. It uses your Claude usage and takes about a minute.</p>
        <div class="bar" style="margin:0"><button class="btn primary" id="pickGo">Pick this week’s tickers</button><button class="btn small" id="pickStop" hidden>Stop</button></div><div id="pickOut"></div>`);
   $("#pickGo").onclick = () => runPicks(week, key, cands);
+  $("#pickGo2") && ($("#pickGo2").onclick = () => runPicks(week, key, cands));
   $("#pickStop").onclick = () => Ideas.ctl?.abort();
   $$("[data-open]", box).forEach(b => b.onclick = () => Sheet.open(b.dataset.open));
   $$("[data-wl]", box).forEach(b => b.onclick = async () => { const s = await getDetail(b.dataset.wl); if (s) Sheet.pickList(s); });
@@ -1582,7 +1610,7 @@ Headlines:
 ${news || "  (none)"}`; };
   const prompt = `${RULES}
 
-TASK: From the candidate stocks below, pick the most interesting ideas for the week of ${DATA.lastDate}, with a bias toward undervalued opportunities (cheap versus sector and versus the stock's own history, with acceptable quality and a setup that is not a falling knife). Pick the ${PICKS_N} best, ranked best first, regardless of company size: large, mid and small caps compete equally, so don't favor large caps for being well known and don't force a size mix; judge each on its data. Avoid piling into one sector unless the data clearly argues for it. Skip a candidate if the data argues against it, even if its opportunity score is high; return fewer than ${PICKS_N} only if fewer hold up.
+${(() => { const o = Ideas.state, m = o ? sinceMove(o) : null; return m && m.stale ? `CONTEXT: This refreshes picks made from data as of ${o.dataAsof} (${(o.result?.picks || []).map(p => p.ticker).join(", ")}). Since then the median S&P 500 stock moved ${m.sp != null ? (m.sp * 100).toFixed(1) + "%" : "n/a"} and the median Russell 2000 small cap ${m.sm != null ? (m.sm * 100).toFixed(1) + "%" : "n/a"}. Keep earlier picks only if the data still supports them; in week_summary, say briefly what changed and why.\n\n` : ""; })()}TASK: From the candidate stocks below, pick the most interesting ideas for the week of ${DATA.lastDate}, with a bias toward undervalued opportunities (cheap versus sector and versus the stock's own history, with acceptable quality and a setup that is not a falling knife). Pick the ${PICKS_N} best, ranked best first, regardless of company size: large, mid and small caps compete equally, so don't favor large caps for being well known and don't force a size mix; judge each on its data. Avoid piling into one sector unless the data clearly argues for it. Skip a candidate if the data argues against it, even if its opportunity score is high; return fewer than ${PICKS_N} only if fewer hold up.
 
 Reply with ONLY a JSON object of this shape:
 {"week_summary": "1-2 sentences on the common thread this week",
@@ -1599,7 +1627,9 @@ ${cands.map(block).join("\n\n")}`;
   try {
     const result = await AI.sample.json(prompt, {signal: Ideas.ctl.signal, cache: false, modelTier: "complex"});
     if (!result || !Array.isArray(result.picks)) throw {code: "invalid_json"};
-    const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all"};
+    const old = Ideas.state, pickPx = {}; for (const p of result.picks) if (RB[p.ticker]?.d?.px != null) pickPx[p.ticker] = RB[p.ticker].d.px;
+    const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all",
+                  px: {...pxSnapshot(), ...pickPx}, prev: old?.result ? {dataAsof: old.dataAsof, generated: old.generated, tickers: (old.result.picks || []).map(p => p.ticker)} : null};
     await Store.setDoc(key, body); Ideas.state = body;
     if (UI.tab === "ideas") renderPicks(week, key, cands);
   } catch (e) {
