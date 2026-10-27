@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths: ["jobs/politics/**", ".github/workflows/politics.yml"]
   schedule:
-    - cron: "17 23 * * 1-5"   # weekdays ~7:15pm ET: after the Senate script (6:15pm on Tom's computer), before the app build
+    - cron: "37 21 * * 1-5"   # weekdays 21:37 UTC, just before the app build (22:07 UTC)
 permissions:
   contents: write
 concurrency:

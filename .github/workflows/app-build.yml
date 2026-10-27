@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths: ["jobs/app/**", ".github/workflows/app-build.yml"]
   schedule:
-    - cron: "31 1 * * 2-6"   # Tue–Sat 01:31 UTC = Mon–Fri ~9:30pm ET, after daily bars are final
+    - cron: "7 22 * * 1-5"    # Mon–Fri 22:07 UTC = 6:07pm EDT / 5:07pm EST, after the close (Tom wants end-of-day data)
 permissions:
   contents: write
 concurrency:

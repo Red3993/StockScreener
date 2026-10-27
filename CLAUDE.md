@@ -115,6 +115,8 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Form 4 budget per run lowered to 30,000 so the cold backfill can't time out; Yahoo budget 2,600.
   Published data will exceed 60 MB → the weekday task splits into two publishes.
   Next idea offered to Tom: thematic ETF holdings (nuclear, quantum, robotics, space, cyber…) as theme tags/extra tickers.
+- 2026-10-26: Tom wants end-of-day updates (he works mornings). Congress job 21:37 UTC, app build 22:07 UTC Mon–Fri
+  (6:07pm EDT / 5:07pm EST); the publish + digest task moved to 7:47pm ET and waits for that day's build.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
