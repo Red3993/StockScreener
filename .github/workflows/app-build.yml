@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["jobs/app/**", ".github/workflows/app-build.yml"]
+    paths: ["jobs/app/**", "!jobs/app/prices_quick.py", "!jobs/app/daily_digest.py", ".github/workflows/app-build.yml"]
   schedule:
     - cron: "7 22 * * 1-5"    # Mon–Fri 22:07 UTC = 6:07pm EDT / 5:07pm EST, after the close (Tom wants end-of-day data)
 permissions:
