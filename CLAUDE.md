@@ -122,6 +122,12 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   the picks' average return; highlighted when |S&P| ≥ 3% or |R2000| ≥ 4%, with "Refresh Claude's picks". Refresh
   prompt includes that context; UI shows new/dropped names and each pick's return since picked. With no picks yet
   this week, last week's are shown.
+- 2026-10-26 v10 (Tom: "prioritize price updates"): `prices.yml` (21:17 UTC weekdays, ~5 min) runs
+  `jobs/app/prices_quick.py` → `prices.json` on `price-data` (closes dated after app-data's last date, ticker→Yahoo
+  map from the detail shards). The app layers it on (px, c1, returns, 52w hi/lo/pos; appends closes to each detail
+  and DATA.dates; header "· scores updating"). Evening task publishes prices.json first, then the full build.
+  Live per-ticker price pulls not possible: artifact pages can't call Yahoo (CORS/no key) — explained to Tom.
+  Price filter: "Max $" box on the Stocks bar, presets "Under $10" / "Under $20, overall ≥ 6", sort by share price.
 - Known gaps: 13F, divergence, Telegram not in prototype.
   Prices end one trading day early when the build runs right after the close (Yahoo daily bar not final).
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

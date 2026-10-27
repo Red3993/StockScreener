@@ -54,6 +54,8 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .snip{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ptl{font-size:10.5px;color:var(--faint);margin-left:6px;font-weight:500}
+.pxbox{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0 10px;font-size:13px;color:var(--muted)}
+.pxbox input{width:64px;border:0;background:none;color:var(--fg);font:inherit;padding:9px 0;outline:none}
 .search{flex:1 1 180px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
 .sel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
 .btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px}
@@ -311,7 +313,7 @@ async function getDetail(t) {
   const r = RB[t]; if (!r) return null;
   if (!SHARD_CACHE[r.sh]) SHARD_CACHE[r.sh] = fetch(`detail/${pad2(r.sh)}.json`, {cache: "no-cache"}).then(x => { if (!x.ok) throw new Error("HTTP " + x.status); return x.json(); });
   const shard = await SHARD_CACHE[r.sh];
-  for (const [k, v] of Object.entries(shard)) if (!BY[k]) { BY[k] = v; DER[k] = derive(v); }
+  for (const [k, v] of Object.entries(shard)) if (!BY[k]) { patchCloses(k, v); BY[k] = v; DER[k] = derive(v); }
   return BY[t] || null;
 }
 const lab = m => DATA.labels?.[m.key] || m.label || m.key;
@@ -588,6 +590,8 @@ function describe(f) {
   return "";
 }
 const PRESETS = [
+  ["Under $10", [{type: "range", key: "price", min: "", max: 10}]],
+  ["Under $20, overall ≥ 6", [{type: "range", key: "price", min: "", max: 20}, {type: "range", key: "overall", min: 6, max: ""}]],
   ["Near 52-week low", [{type: "range", key: "fromLow", min: "", max: 10}]],
   ["Golden cross this week", [{type: "flag", key: "golden_up", days: 7}]],
   ["Death cross this week", [{type: "flag", key: "golden_down", days: 7}]],
@@ -599,16 +603,42 @@ const PRESETS = [
   ["Earnings in 2 weeks", [{type: "range", key: "daysToEarnings", min: 0, max: 14}]],
 ];
 
+// ================================================================ quick closing prices (prices.json, published right after the close,
+// before the slower full build). Newer closes are layered onto the rows and appended to each stock's history.
+let QP = null;
+async function applyQuickPrices() {
+  try { const r = await fetch("prices.json", {cache: "no-cache"}); if (!r.ok) return; QP = await r.json(); } catch (e) { return; }
+  const nd = (QP?.dates || []).filter(d => d > DATA.lastDate); if (!nd.length) { QP = null; return; }
+  const k0 = QP.dates.indexOf(nd[0]);
+  for (const r of ROWS) {
+    const a = QP.px?.[r.t]; const d = r.d; if (!a || !d) continue;
+    const vals = a.slice(k0), last = vals.filter(v => v != null).pop(); if (last == null) continue;
+    const prev = vals.length > 1 && vals[vals.length - 2] != null ? vals[vals.length - 2] : d.px;
+    if (prev) d.c1 = last / prev - 1;
+    for (const k of ["r5", "r21", "r63", "r252"]) if (d[k] != null && d.px) d[k] = (1 + d[k]) * (last / d.px) - 1;
+    d.px = last; for (const v of vals) if (v != null) { if (d.hi != null && v > d.hi) d.hi = v; if (d.lo != null && v < d.lo) d.lo = v; }
+    if (d.hi && d.lo) { d.fl = last / d.lo - 1; d.fh = last / d.hi - 1; d.pos = d.hi > d.lo ? (last - d.lo) / (d.hi - d.lo) : null; }
+  }
+  QP.k0 = k0; QP.n = nd.length;
+  DATA.dates = DATA.dates.concat(nd); DATA.lastDate = nd[nd.length - 1]; DATA.quickPrices = true;
+}
+function patchCloses(t, v) {   // extend a stock's daily closes with the quick prices so charts and RSI include today
+  if (!QP || !v?.closes || v.closes.length !== DATA.dates.length - QP.n) return;
+  const a = QP.px?.[t] || []; for (let i = 0; i < QP.n; i++) v.closes.push(a[QP.k0 + i] ?? null);
+  const r = RB[t]; if (r?.d?.px != null) { v.price = r.d.px; v.chg_1d = r.d.c1; }
+}
+
 // ================================================================ load
 async function load() {
   try { const r = await fetch("index.json", {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status); DATA = await r.json(); }
   catch (e) { $("#view").innerHTML = `<div class="empty">Couldn’t load the data file (${esc(e.message)}). Reload the page to try again.</div>`; $("#asof").textContent = "No data"; return; }
   DATA.lastDate = DATA.dates[DATA.dates.length - 1];
   ROWS = DATA.rows; ROWS.forEach(r => { RB[r.t] = r; });
+  await applyQuickPrices();
   DATA.top_n = DATA.count;
   buildMetricFields();
   UI.filters = (UI.filters || []).filter(f => f.type !== "range" || FIELDS[f.key]);
-  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
+  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}${DATA.quickPrices ? ` <span class="faint" title="Closing prices are in; scores, news and filings update when tonight's full build finishes">· scores updating</span>` : ""}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
   render();
   await Store.init();
   AI.init();
@@ -642,8 +672,8 @@ function whyChips(r) {
     if (f.type === "flag") { const b = r.d?.ev?.[f.key]; return `<span class="badge acc">${esc(FLAGS[f.key].split(" (")[0])} ${b === 0 ? "today" : b + "d ago"}</span>`; }
     const fd = FIELDS[f.key]; return `<span class="badge">${esc(fd.label.replace(/…$/, ""))}: ${fmtU(fd.get(r), fd.unit)}</span>`; }).join("");
 }
-const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
-const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc"};
+const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["price", "Share price"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
+const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc", price: "asc"};
 // A stock needs scores in at least MIN_CATS of the 7 categories to rank by overall score; thinner ones sort after it.
 const MIN_CATS = 5, nCats = r => (r.cs || []).filter(x => x != null).length, partial = r => nCats(r) < MIN_CATS;
 const SEARCH_HITS = {};
@@ -672,6 +702,7 @@ function viewStocks() {
   $("#view").innerHTML = `
     <div class="bar">
       <input class="search" id="q" type="search" placeholder="Search ticker, name or theme (e.g. robotics, nuclear, AI chips)" value="${esc(UI.q)}" aria-label="Search">
+      <label class="pxbox" title="Show only stocks at or below this share price"><span>Max $</span><input id="maxpx" type="number" inputmode="decimal" min="0" step="any" placeholder="any" value="${esc(String(UI.filters.find(f => f.type === "range" && f.key === "price")?.max ?? ""))}" aria-label="Maximum share price"></label>
       <button class="btn" id="openF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filters${nf ? ` <span class="count-dot">${nf}</span>` : ""}</button>
       <select class="sel" id="sort" aria-label="Sort by">${SORTS.map(([v, l]) => `<option value="${v}" ${v === UI.sort ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
       <button class="btn small" id="dir" aria-label="Sort direction" title="Reverse order">${UI.dir === "asc" ? "↑" : "↓"}</button>
@@ -689,6 +720,10 @@ function viewStocks() {
   $("#sort").onchange = e => { UI.page = 1; UI.sort = e.target.value; UI.dir = DEFAULT_DIR[UI.sort] || "desc"; saveUI(); viewStocks(); };
   $("#dir").onclick = () => { UI.dir = UI.dir === "asc" ? "desc" : "asc"; saveUI(); viewStocks(); };
   $("#openF").onclick = () => Filters.open();
+  $("#maxpx").onchange = e => { const v = e.target.value.trim(); const i = UI.filters.findIndex(f => f.type === "range" && f.key === "price");
+    if (!v) { if (i >= 0) { const f = UI.filters[i]; if (f.min === "" || f.min == null) UI.filters.splice(i, 1); else f.max = ""; } }
+    else if (i >= 0) UI.filters[i].max = +v; else UI.filters.push({type: "range", key: "price", min: "", max: +v});
+    UI.page = 1; saveUI(); viewStocks(); };
   $$("[data-p]").forEach(b => b.onclick = () => { UI.filters = JSON.parse(JSON.stringify(PRESETS[+b.dataset.p][1])); const k0 = UI.filters[0]; if (k0.key === "fromLow") { UI.sort = "fromLow"; UI.dir = "asc"; } saveUI(); viewStocks(); });
   $$("[data-x]").forEach(b => b.onclick = () => { UI.filters.splice(+b.dataset.x, 1); saveUI(); viewStocks(); });
   $$(".fchip .edit").forEach(b => b.onclick = () => Filters.open());

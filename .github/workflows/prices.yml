@@ -1,0 +1,36 @@
+name: Closing prices (quick)
+# ~3,000 closing prices a few minutes after the close -> prices.json on the `price-data` branch.
+# The evening publish task puts this live first; the full build (scores, insiders, news) follows.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/app/prices_quick.py", ".github/workflows/prices.yml"]
+  schedule:
+    - cron: "17 21 * * 1-5"   # 21:17 UTC = 5:17pm EDT / 4:17pm EST
+permissions:
+  contents: write
+concurrency:
+  group: prices
+  cancel-in-progress: true
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt
+      - name: Last published app data (ticker list)
+        run: git fetch --depth 1 origin app-data && git --work-tree=. checkout origin/app-data -- app-data && git reset -q
+      - name: Download closes
+        run: python jobs/app/prices_quick.py --app-data app-data --out /tmp/prices.json
+      - name: Publish
+        run: |
+          git config user.name "prices-bot"; git config user.email "prices-bot@users.noreply.github.com"
+          git checkout -q --orphan price-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp /tmp/prices.json .
+          git add prices.json && git commit -qm "prices $(date -u +%FT%TZ)" && git push -f origin HEAD:price-data
