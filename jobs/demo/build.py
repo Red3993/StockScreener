@@ -118,6 +118,27 @@ class SEC:
 
 
 # ------------------------------------------------------------------ universe
+def _num(v) -> float:
+    try:
+        return float(str(v).replace(",", "").replace("%", "").replace("$", "").strip() or 0)
+    except ValueError:
+        return 0.0
+
+
+def _ishares_weight(x: dict) -> float:
+    """IVV weight from an iShares holdings row. iShares renamed the "Weight (%)" column in Oct 2026
+    (KeyError broke the build), so match any header that starts with "weight"; fall back to
+    market value (same ordering) so the top-100-by-weight selection still works."""
+    keys = {re.sub(r"[^a-z]", "", (k or "").lower()): k for k in x}
+    for nk, k in keys.items():
+        if nk.startswith("weight"):
+            return _num(x[k])
+    for nk in ("marketvalue", "notionalvalue"):
+        if nk in keys:
+            return _num(x[keys[nk]])
+    return 0.0
+
+
 def load_universe() -> dict[str, dict]:
     uni: dict[str, dict] = {}
     for etf, pid in ISHARES.items():
@@ -136,9 +157,11 @@ def load_universe() -> dict[str, dict]:
             if etf not in u["etfs"]:
                 u["etfs"].append(etf)
             if etf == "IVV":
-                u["ivv_weight"] = float(x["Weight (%)"].replace(",", "") or 0)
+                u["ivv_weight"] = _ishares_weight(x)
             n += 1
         log(f"universe {etf}: {n} equities")
+        if etf == "IVV" and rows and not any(_ishares_weight(x) for x in rows):
+            log(f"universe IVV: no usable weight column; headers = {list(rows[0].keys())}")
     log(f"universe union: {len(uni)} tickers")
     return uni
 
