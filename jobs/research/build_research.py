@@ -308,9 +308,15 @@ def main() -> int:
         cfg = [f for f in cfg if f["name"].lower() in keep]
     cdir = Path(a.cache)
     cdir.mkdir(parents=True, exist_ok=True)
-    cache = json.loads((cdir / "cusip_map.json").read_text()) if (cdir / "cusip_map.json").exists() else {}
+    def load_json(p):
+        try:
+            return json.loads(p.read_text()) if p.exists() and p.stat().st_size else {}
+        except Exception as e:  # noqa: BLE001
+            log(f"cache {p.name} unreadable ({e}); starting fresh")
+            return {}
+    cache = load_json(cdir / "cusip_map.json")
     cache = {k: v for k, v in cache.items() if v and v not in ("GOOG", "GOOGL", "BRK-A", "BRK-B", "FOX", "FOXA", "NWS", "NWSA")}   # re-resolve share classes
-    fcache = json.loads((cdir / "filings_v2.json").read_text()) if (cdir / "filings_v2.json").exists() else {}   # acc -> aggregated
+    fcache = load_json(cdir / "filings_v2.json")   # accession -> aggregated holdings
     universe = {}
     try:
         idx = json.loads((Path(a.app_data) / "index.json").read_text())

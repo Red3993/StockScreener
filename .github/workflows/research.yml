@@ -24,13 +24,16 @@ jobs:
       - run: pip install -r jobs/requirements.txt
       - name: App universe + previous caches
         run: |
-          git fetch --depth 1 origin app-data && git --work-tree=. checkout origin/app-data -- app-data/index.json && git reset -q
+          git fetch --depth 1 origin app-data:refs/remotes/origin/app-data
+          git --work-tree=. checkout origin/app-data -- app-data/index.json && git reset -q
           mkdir -p rcache
-          if git fetch --depth 1 origin research-data 2>/dev/null; then
-            git show origin/research-data:cusip_map.json > rcache/cusip_map.json 2>/dev/null || true
-            git show origin/research-data:filings_v2.json > rcache/filings_v2.json 2>/dev/null || true
-            git show origin/research-data:research.json > /tmp/prev_research.json 2>/dev/null || true
+          if git fetch --depth 1 origin research-data:refs/remotes/origin/research-data; then
+            for f in cusip_map.json filings_v2.json; do
+              git show origin/research-data:$f > /tmp/$f 2>/dev/null && [ -s /tmp/$f ] && mv /tmp/$f rcache/$f || true
+            done
+            git show origin/research-data:research.json > /tmp/prev_research.json 2>/dev/null || rm -f /tmp/prev_research.json
           fi
+          ls -la rcache
       - name: Build research.json
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
@@ -49,4 +52,4 @@ jobs:
           cp rcache/*.json . 2>/dev/null || true
           cp /tmp/research.log research.log 2>/dev/null || true
           rm -rf rcache
-          git add -A && git commit -qm "research $(date -u +%FT%TZ)" && git push -f origin HEAD:research-data
+          git add -A && git commit -qm "research $(date -u +%FT%TZ)" && git push -f origin HEAD:refs/heads/research-data
