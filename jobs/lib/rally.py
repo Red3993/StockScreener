@@ -273,6 +273,8 @@ def score_date(F: Frames, t: int, peers: dict, insiders: dict[str, list], since:
         sig["insider"] = ins
         x = (extras or {}).get(c) if extras is not None else None
         if x is not None:
+            x = {k: (None if v is None or (isinstance(v, float) and not math.isfinite(v)) else v) for k, v in x.items()}
+        if x is not None:
             rev, net = x.get("eps_rev_90d"), x.get("eps_rev_net_30d")
             if rev is not None:
                 sig["revisions"] = float(_clip01((rev - 0.01) / 0.14) * 100)
@@ -285,6 +287,7 @@ def score_date(F: Frames, t: int, peers: dict, insiders: dict[str, list], since:
             if si is not None:
                 above = (_val(F.C, t, c) or 0) > (_val(F.sma20, t, c) or float("inf"))
                 sig["squeeze"] = float(_clip01((si - 0.10) / 0.20) * 100 * (1 if above else 0.4))
+        sig = {k: (None if v is None or (isinstance(v, float) and not math.isfinite(v)) else v) for k, v in sig.items()}
         comp, pillars, fires = _combine(sig)
         rows[c] = {"sig": sig, "comp": comp, "pillars": pillars, "fires": fires, "ins_txt": ins_txt,
                    "pl": pl.loc[c].to_dict() if c in pl.index else {}, "trend": _val(F.trend, t, c)}
@@ -332,6 +335,8 @@ def _drivers(F: Frames, t: int, c: str, v: dict, x: dict | None, members: list[s
 
 def compute(C: pd.DataFrame, V: pd.DataFrame | None, sectors: dict[str, str], insiders: dict[str, list],
             insider_since: date | None, extras: dict[str, dict], step: int = 5, refit: int = 4, log=print) -> dict:
+    fin = lambda v: None if v is None or (isinstance(v, float) and not math.isfinite(v)) else v  # noqa: E731
+    extras = {c: {k: fin(v) for k, v in (x or {}).items()} for c, x in (extras or {}).items()}
     F = Frames(C, V)
     n = len(F.C)
     out: dict = {"live": {}, "hist": {}, "bt_dates": [], "backtest": None}
