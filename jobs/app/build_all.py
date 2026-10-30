@@ -39,6 +39,7 @@ from jobs.lib.form4 import cluster_buys, parse_form4  # noqa: E402
 from jobs.lib.metrics import Fundamentals, metric_set_for  # noqa: E402
 from jobs.lib.momentum import momentum_block, universe_stats  # noqa: E402
 from jobs.lib.politics_match import CommitteeMatcher  # noqa: E402
+from jobs.lib import rally as RALLY  # noqa: E402
 from jobs.lib.scoring import CATEGORIES, score_rows  # noqa: E402
 from jobs.lib.xbrl import CompanyFacts  # noqa: E402
 
@@ -455,6 +456,38 @@ def main() -> int:
                 if isinstance(v, (int, float)):
                     mhist[t].setdefault(k, [None] * len(hist_dates))[j] = rnd(float(v))
 
+    # ------------------------------------------------------------ Trend + Rally Setup scores and their backtest (not in Overall)
+    log(f"rally: scoring + backtest (rss {rss_mb()} MB)")
+    rly = {"live": {}, "hist": {}, "bt_dates": [], "backtest": None}
+    try:
+        y2t = {ytick[t]: t for t in all_t if ytick[t] in uclose.columns}
+        ins_ev, extras = {}, {}
+        for yt_, t in y2t.items():
+            ev = []
+            for x in (icache.get(str(mapped[t]["cik"])) or {}).get("trades", []):
+                if x.get("code") != "P" or not x.get("date"):
+                    continue
+                try:
+                    dd = date.fromisoformat(x["date"][:10])
+                    fd = date.fromisoformat(str(x.get("filed") or x["date"])[:10])
+                except ValueError:
+                    continue
+                ev.append({"date": dd, "filed": fd, "owner": x.get("owner"), "ceo": bool(x.get("ceo") or x.get("cfo"))})
+            if ev:
+                ins_ev[yt_] = ev
+            am, prof = (ycache.get(t) or {}).get("am") or {}, (ycache.get(t) or {}).get("prof") or {}
+            extras[yt_] = {"eps_rev_90d": am.get("eps_rev_90d"), "eps_rev_net_30d": am.get("eps_revisions_net_30d"),
+                           "short_pct_float": prof.get("shortPercentOfFloat"),
+                           "share_change_1y": rowmap[t]["metrics"].get("share_change_1y")}
+        cols = list(y2t)
+        rly = RALLY.compute(uclose[cols], uvol.reindex(columns=cols) if len(uvol) else None,
+                            {yt_: mapped[t]["sector"] for yt_, t in y2t.items()}, ins_ev, TODAY - timedelta(days=INSIDER_DAYS), extras, log=log)
+        rly["live"] = {y2t[k]: v for k, v in rly["live"].items()}
+        rly["hist"] = {y2t[k]: v for k, v in rly["hist"].items()}
+    except Exception as e:  # noqa: BLE001
+        health("rally", f"{type(e).__name__}: {e}")
+        traceback.print_exc()
+
     # ------------------------------------------------------------ output
     dates = [d.date().isoformat() for d in uclose.index]
     idx_rows, shards = [], {}
@@ -493,12 +526,16 @@ def main() -> int:
                 "cg": {"b90": sum(1 for x in cg if x["relevant"] and "Purchase" in (x["type"] or "") and (x["date"] or "") >= cut90),
                        "n12": sum(1 for x in cg if x["relevant"] and (x["date"] or "") >= cut365)},
                 "e": {"earn": nxt, "exd": cal.get("ex_dividend"), "pay": cal.get("dividend_pay"), "eps": cal.get("eps_estimate")},
+                "ry": {"r": (rly["live"].get(t) or {}).get("rally"), "t": (rly["live"].get(t) or {}).get("trend"),
+                       "g": bool((rly["live"].get(t) or {}).get("gated")),
+                       "k": [x["k"] for x in (rly["live"].get(t) or {}).get("drivers", [])][:4]},
                 "nw7": sum(1 for n in d["news"] if (n.get("date") or "") >= (TODAY - timedelta(days=7)).isoformat()),
             })
             full = {"ticker": t, "yahoo": yt, "name": u["name"], "sector": u["sector"], "sic": u.get("sic"), "sic_desc": u.get("sic_desc"),
                     "cik": u["cik"], "metric_set": row["set"], "ivv_weight": u["ivv_weight"], "chg_1d": dv.get("c1"),
                     "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"), "closes": closes,
-                    "score_history": shist.get(t), "metric_history": mhist.get(t), **{k: v for k, v in d.items() if k != "derived"}}
+                    "score_history": shist.get(t), "metric_history": mhist.get(t),
+                    "rally": rly["live"].get(t), "rally_hist": rly["hist"].get(t), **{k: v for k, v in d.items() if k != "derived"}}
             shards.setdefault(shard_of(t), {})[t] = full
         except Exception as e:  # noqa: BLE001
             health("output", f"{t}: {type(e).__name__}: {e}")
@@ -509,7 +546,7 @@ def main() -> int:
     vv = [v for v in validation if v["rev_diff"] is not None]
     index = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "asof": TODAY.isoformat(),
              "universe_count": len(uni), "fundamentals_rows": len(rows), "count": len(idx_rows), "top_n": len(top), "shards": SHARDS,
-             "dates": dates, "hist_dates": hd_iso, "labels": CFG["labels"], "directions": CFG["directions"],
+             "dates": dates, "hist_dates": hd_iso, "bt_dates": rly.get("bt_dates"), "backtest": rly.get("backtest"), "labels": CFG["labels"], "directions": CFG["directions"],
              "macro": B.macro_calendar(), "health": B.HEALTH[:400], "runtime_s": round(time.time() - B.T0), "sec_calls": sec.calls,
              "politics_stats": pol.get("stats", {}), "politics_generated": pol.get("generated"),
              "validation": {"rev_within_2pct": sum(abs(v["rev_diff"]) <= 0.02 for v in vv), "rev_within_5pct": sum(abs(v["rev_diff"]) <= 0.05 for v in vv),

@@ -74,7 +74,9 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 .ruler i{border-radius:2px;background:var(--sunk)}
 .overall{font-family:var(--f-display);font-weight:700;font-size:44px;line-height:1;letter-spacing:-.03em}
 .overall small{font-size:16px;color:var(--muted);font-weight:500;letter-spacing:0}
-.scores7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.scores7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr)) 3px repeat(2,minmax(0,1fr));gap:3px}
+.scores7 .sep{border-left:1px dashed var(--line);align-self:stretch;margin:2px 0}
+.sc7.tm{outline:1.5px solid color-mix(in srgb,var(--fg) 22%,transparent);outline-offset:-1.5px}
 .sc7{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;height:34px;color:var(--chip-ink);line-height:1.05}
 .sc7 small{font-size:9.5px;font-weight:600;letter-spacing:.02em;opacity:.92}
 .sc7 b{font:600 13.5px var(--f-mono)}
@@ -96,8 +98,8 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 .why .badge{white-space:normal;text-align:left}
 .head{display:none}
 @media (min-width:760px){
-  .row{grid-template-columns:minmax(0,1.3fr) 120px 52px minmax(0,320px);grid-template-areas:"id px ov s7"}
-  .head{display:grid;grid-template-columns:minmax(0,1.3fr) 120px 52px minmax(0,320px);gap:10px;padding:8px 14px;background:var(--sunk);align-items:center}
+  .row{grid-template-columns:minmax(0,1.3fr) 120px 52px minmax(0,400px);grid-template-areas:"id px ov s7"}
+  .head{display:grid;grid-template-columns:minmax(0,1.3fr) 120px 52px minmax(0,400px);gap:10px;padding:8px 14px;background:var(--sunk);align-items:center}
   .head span:nth-child(2){text-align:right}
   .row .scores7 small{display:none}
   .sc7{height:26px}
@@ -279,7 +281,15 @@ const chip = (n, title = "") => n == null ? `<span class="chip na" title="${esc(
 const ruler = n => `<div class="ruler" aria-hidden="true">${Array.from({length: 10}, (_, i) => `<i style="${n != null && i < Math.round(n) ? `background:${sc(n)}` : ""}"></i>`).join("")}</div>`;
 const scores7 = r => `<div class="scores7">${CATS.map((c, i) => { const v = r.cs?.[i]; return v == null
   ? `<span class="sc7 na" title="${esc(c)}: ${esc(r.na?.[c] || "N/A")}"><small>${CAT_SHORT[c]}</small><b>–</b></span>`
-  : `<span class="sc7" style="background:${sc(v)}" title="${esc(c)}"><small>${CAT_SHORT[c]}</small><b>${v}</b></span>`; }).join("")}</div>`;
+  : `<span class="sc7" style="background:${sc(v)}" title="${esc(c)}"><small>${CAT_SHORT[c]}</small><b>${v}</b></span>`; }).join("")}<i class="sep"></i>${timing(r)}</div>`;
+// Trend and Rally Setup: timing scores shown beside the categories, never averaged into Overall
+const TIMING = [["t", "Trnd", "Trend (not in Overall)"], ["r", "Rally", "Rally Setup (not in Overall)"]];
+const timing = r => TIMING.map(([k, l, title]) => { const v = r.ry?.[k];
+  const tt = title + (k === "r" && r.ry?.g ? ": capped at 6, no catalyst yet" : "") + (k === "r" && r.ry?.k?.length ? " · " + r.ry.k.map(x => RALLY_LBL[x] || x).join(", ") : "");
+  return v == null ? `<span class="sc7 na tm" title="${esc(title)}: not enough history"><small>${l}</small><b>–</b></span>`
+    : `<span class="sc7 tm" style="background:${sc(v)}" title="${esc(tt)}"><small>${l}</small><b>${v}</b></span>`; }).join("");
+const RALLY_LBL = {revisions: "estimate revisions", drift: "gap up holding", insider: "insider buying", buyback: "buybacks", accumulation: "accumulation",
+  squeeze: "short squeeze setup", peer_lag: "lagging peers", near_low: "near 52-week low", rsi_div: "RSI divergence", vol_squeeze: "volatility squeeze"};
 const fmtMoney = (v, d = 2) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
   return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
@@ -508,6 +518,8 @@ const daysTo = ds => ds ? Math.round((new Date(ds + "T12:00:00") - new Date(DATA
 F("overall", {group: "Scores", label: "Overall score", unit: "score", get: r => r.ov});
 CATS.forEach(c => F("cat:" + c, {group: "Scores", label: c + " score", unit: "score", get: r => r.cs?.[ci(c)] ?? null}));
 F("minCat", {group: "Scores", label: "Every category score at least…", unit: "score", get: r => { const v = (r.cs || []).filter(x => x != null); return v.length ? Math.min(...v) : null; }, minOnly: true});
+F("trend", {group: "Scores", label: "Trend score (not in Overall)", unit: "score", get: r => r.ry?.t ?? null, hint: "1–10. 10 = strongest uptrend and relative strength in the app"});
+F("rally", {group: "Scores", label: "Rally Setup score (not in Overall)", unit: "score", get: r => r.ry?.r ?? null, hint: "1–10. 10 = strongest setup for a rally; capped at 6 without a catalyst"});
 F("own", {group: "Scores", label: "Cheapness vs own 3-year history (0–100)", unit: "", get: r => r.own, hint: "Average own-history percentile of the valuation ratios; 100 = cheapest in 3 years"});
 F("fromLow", {group: "52-week range", label: "% above 52-week low", unit: "%", get: r => P100(r.d?.fl)});
 F("fromHigh", {group: "52-week range", label: "% below 52-week high", unit: "%", get: r => r.d?.fh == null ? null : -P100(r.d.fh), hint: "0 = at the high"});
@@ -666,13 +678,13 @@ function stockRow(r, extra = "") {
     ${scores7(r)}</button>`;
 }
 function bindRows(root) { $$(".row[data-t]", root).forEach(b => b.onclick = () => Sheet.open(b.dataset.t)); }
-const headRow = first => `<div class="head label"><span>${first}</span><span>Price · 52-wk</span><span>All</span><span class="scores7" style="gap:3px">${CATS.map(c => `<span style="text-align:center" title="${c}">${CAT_SHORT[c]}</span>`).join("")}</span></div>`;
+const headRow = first => `<div class="head label"><span>${first}</span><span>Price · 52-wk</span><span>All</span><span class="scores7" style="gap:3px">${CATS.map(c => `<span style="text-align:center" title="${c}">${CAT_SHORT[c]}</span>`).join("")}<i class="sep"></i>${TIMING.map(([, l, t]) => `<span style="text-align:center" title="${t}">${l}</span>`).join("")}</span></div>`;
 function whyChips(r) {
   return UI.filters.filter(f => f.type === "range" && !f.key.startsWith("cat:") && f.key !== "overall" || f.type === "flag").slice(0, 3).map(f => {
     if (f.type === "flag") { const b = r.d?.ev?.[f.key]; return `<span class="badge acc">${esc(FLAGS[f.key].split(" (")[0])} ${b === 0 ? "today" : b + "d ago"}</span>`; }
     const fd = FIELDS[f.key]; return `<span class="badge">${esc(fd.label.replace(/…$/, ""))}: ${fmtU(fd.get(r), fd.unit)}</span>`; }).join("");
 }
-const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["price", "Share price"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
+const SORTS = [["overall", "Overall score"], ...CATS.map(c => ["cat:" + c, c + " score"]), ["rally", "Rally Setup score"], ["trend", "Trend score"], ["mom", "Momentum score"], ["fromLow", "Closest to 52-week low"], ["fromHigh", "Furthest below 52-week high"], ["chg1d", "Change today"], ["r21", "Change, 1 month"], ["rsi", "RSI"], ["upside", "Analyst upside"], ["mcapB", "Market cap"], ["price", "Share price"], ["own", "Cheapest vs own history"], ["ticker", "Ticker A–Z"]];
 const DEFAULT_DIR = {fromLow: "asc", rsi: "asc", ticker: "asc", price: "asc"};
 // A stock needs scores in at least MIN_CATS of the 7 categories to rank by overall score; thinner ones sort after it.
 const MIN_CATS = 5, nCats = r => (r.cs || []).filter(x => x != null).length, partial = r => nCats(r) < MIN_CATS;
@@ -1039,6 +1051,7 @@ function stockContext(s, full = true) {
     const fil = (s.filings || []).slice(0, 10).map(f => `- ${f.date} ${f.form}${f.items.length ? ": " + f.items.join(", ") : ""}`).join("\n");
     if (fil) L.push("Recent SEC filings:\n" + fil);
   }
+  const ry = s.rally; if (ry) L.push(`Timing scores (not in Overall): Trend ${ry.trend ?? "n/a"}/10, Rally Setup ${ry.rally}/10${ry.gated ? " (capped at 6: no catalyst)" : ""}; pillars catalyst ${ry.pillars?.catalyst}, flow ${ry.pillars?.flow}, setup ${ry.pillars?.setup} (0–100)${ry.drivers?.length ? "; drivers: " + ry.drivers.map(x => x.txt).join("; ") : ""}.`);
   return L.join("\n");
 }
 const RULES = `You are a careful equity research assistant inside a personal stock research app used by one individual investor. Use ONLY the data provided below plus general background knowledge of the company's business model. Do not invent numbers, events or news that are not in the data; if something important is missing, say so. News comes only from the headlines provided; you cannot browse. Scores are 1-10 sector-relative deciles (10 = best in sector). Be balanced and concrete, cite the numbers that matter, and do not tell the reader to buy or sell. Write in plain English for a finance-literate reader.`;
@@ -1172,7 +1185,7 @@ const Sheet = {
     const s = BY[this.t], el = $("#dbody"); const T = UI.dtab;
     if (T === "overview") el.innerHTML = overviewHtml(s);
     if (T === "scores") el.innerHTML = `<div class="card">${scoresHtml(s)}</div>`;
-    if (T === "chart") el.innerHTML = chartCard(s) + `<div class="grid2" style="margin-top:14px">${momentumCard(s)}${signalsCard(s)}</div>`;
+    if (T === "chart") { el.innerHTML = chartCard(s) + `<div class="grid2" style="margin-top:14px">${rallyCard(s)}<div id="btCard">${backtestCard(s)}</div>${momentumCard(s)}${signalsCard(s)}</div>`; bindBacktest(s); }
     if (T === "congress") el.innerHTML = congressCard(s);
     if (T === "analysts") el.innerHTML = analystCard(s);
     if (T === "insiders") el.innerHTML = insiderCard(s);
@@ -1674,6 +1687,77 @@ ${cands.map(block).join("\n\n")}`;
 
 // ================================================================ momentum, congress, trends
 const REGIME_C = {"Falling knife": "var(--down)", "Basing / turning": "var(--warn)", "Healthy uptrend": "var(--up)", "Overextended": "var(--s3)", "Neutral": "var(--faint)"};
+// ================================================================ Trend & Rally Setup + backtest
+const fmtMY = s => s ? new Date(s.slice(0, 10) + "T12:00:00").toLocaleDateString(undefined, {month: "short", year: "numeric"}) : "—";
+const PILLAR_L = {catalyst: "Catalyst", flow: "Flow", setup: "Setup"};
+let DIX = null;
+const dateIx = () => { if (!DIX || DIX.n !== DATA.dates.length) { DIX = {n: DATA.dates.length, m: new Map(DATA.dates.map((d, i) => [d, i]))}; } return DIX.m; };
+function rallyHistStats(s, minScore = 9, h = 20) {
+  const H = s.rally_hist?.[0], c = s.closes || [], ix = dateIx(), out = [];
+  (DATA.bt_dates || []).forEach((d, j) => { const v = H?.[j]; const i = ix.get(d);
+    if (v == null || v < minScore || i == null || i + h >= c.length || !c[i] || !c[i + h]) return; out.push(c[i + h] / c[i] - 1); });
+  return {n: out.length, avg: out.length ? out.reduce((a, b) => a + b, 0) / out.length : null, up: out.filter(x => x > 0).length};
+}
+function rallyCard(s) {
+  const ry = s.rally;
+  if (!ry) return `<div class="card"><h3>Trend & Rally Setup</h3><p class="muted">Not enough price history (needs a year of daily prices).</p></div>`;
+  const P = ry.pillars || {}, bar = (l, v) => `<div class="compbar"><span class="muted">${l}</span><div class="pctbar"><i style="width:${v ?? 0}%;background:${sc((v ?? 0) / 10 + .5)}"></i></div><span class="num small">${v == null ? "—" : Math.round(v)}</span></div>`;
+  const pg = ry.peer_group || {}, hs = rallyHistStats(s), hv = (s.rally_hist?.[0] || []);
+  return `<div class="card"><h3>Trend & Rally Setup <span class="label">not in Overall</span></h3>
+    <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div><div class="label">Trend</div><div style="display:flex;align-items:center;gap:8px;margin-top:4px">${chip(ry.trend, "Trend")}<span class="faint small">strength of the current uptrend vs every stock</span></div></div>
+      <div><div class="label">Rally Setup</div><div style="display:flex;align-items:center;gap:8px;margin-top:4px">${chip(ry.rally, "Rally Setup")}<span class="faint small">${ry.gated ? "capped at 6: no catalyst yet" : ry.catalyst_fires ? "catalyst present" : "setup for a turn higher"}</span></div></div>
+    </div>
+    <div style="margin-top:12px">${bar("Catalyst · 45%", P.catalyst)}${bar("Flow · 25%", P.flow)}${bar("Setup · 30%", P.setup)}</div>
+    <div class="label" style="margin-top:14px">What's driving it</div>
+    ${(ry.drivers || []).length ? `<ul class="small" style="margin:6px 0 0;padding-left:18px">${ry.drivers.map(x => `<li><span class="badge ${x.pillar === "catalyst" ? "acc" : ""}">${PILLAR_L[x.pillar]}</span> ${esc(x.txt)}</li>`).join("")}</ul>` : `<p class="muted small" style="margin:6px 0 0">No signal is firing strongly right now.</p>`}
+    <dl class="kv" style="margin-top:12px">
+      <dt>Peer group</dt><dd>${pg.members?.length ? esc(pg.members.slice(0, 6).join(", ")) + ` <span class="faint">(${pg.size} stocks that trade alike)</span>` : `<span class="faint">sector fallback</span>`}</dd>
+      <dt>40-day gap vs peers</dt><dd>${pg.gap_40d != null ? `<span class="${cls(pg.gap_40d)}">${pct(pg.gap_40d)}</span> (${pg.z > 0 ? "+" : ""}${pg.z}σ, correlation ${pg.corr})` : "—"}</dd>
+      <dt>Rally Setup, last ${hv.length} weeks</dt><dd>${spark(hv, 120, 22) || "—"}</dd>
+      <dt>When it scored 9–10</dt><dd>${hs.n ? `${hs.n} weekly checks; next 20 trading days averaged <span class="${cls(hs.avg)}">${pct(hs.avg)}</span>, up ${hs.up} of ${hs.n}` : "never in the backtest window"}</dd>
+    </dl>
+    <details class="small faint" style="margin-top:10px"><summary>How these are calculated</summary>
+      <p><b>Trend</b> uses the Momentum formula (price vs 50/200-day averages and their slope, 12-month-minus-last-month and 3-month returns, buying pressure), ranked against every stock: 10 = top 10%.</p>
+      <p><b>Rally Setup</b> scores each signal 0–100. <b>Catalyst</b>: EPS estimate revisions, a heavy-volume gap up that is holding, insider buying (cluster of 3+ insiders strongest), buybacks. <b>Flow</b>: quiet accumulation, short-squeeze setup. <b>Setup</b>: the strongest of lagging its peer group, near the 52-week low or a bullish RSI divergence (they overlap, so only the strongest counts), plus a volatility squeeze. Peer groups come from clustering a year of daily returns. The weighted total is ranked against every stock; without a catalyst the score is capped at 6.</p></details>
+  </div>`;
+}
+function backtestCard(s) {
+  const bt = DATA.backtest, S = UI.btS || "rally", H = UI.btH || "20";
+  const seg = (k, opts, cur) => `<div class="seg">${opts.map(([v, l]) => `<button data-${k}="${v}" aria-pressed="${v === cur}">${l}</button>`).join("")}</div>`;
+  const head = `<h3>Backtest <span class="label">all stocks · does a high score lead to gains?</span></h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${seg("bts", [["rally", "Rally Setup"], ["trend", "Trend"]], S)}${seg("bth", [["20", "Next 20 days"], ["60", "Next 60 days"]], H)}</div>`;
+  if (!bt?.scores?.[S]?.[H]) return `<div class="card">${head}<p class="muted">The backtest runs with the nightly build and will appear after the next one.</p></div>`;
+  const B = bt.scores[S][H], bk = B.buckets, cur = S === "rally" ? s.rally?.rally : s.rally?.trend, T = B.top || {};
+  const t = T.t, avg = T.avg;
+  const verdict = t == null ? ["Not enough history yet", "warn"] : t >= 2 ? ["Statistically meaningful edge", "good"] : t >= 1 ? ["Suggestive, not proven", "warn"]
+    : t <= -1 ? ["High scores have lagged", "bad"] : ["No reliable edge yet", "bad"];
+  const vals = bk.map(b => b.avg ?? 0), mx = Math.max(0.005, ...vals.map(Math.abs));
+  const W = 320, Hh = 150, x0 = 36, bw = (W - x0 - 4) / 10, zy = 70, sy = v => zy - v / mx * 58;
+  const bars = bk.map((b, i) => { const v = b.avg ?? 0, y = sy(v), x = x0 + i * bw + 2, h = Math.abs(y - zy);
+    return `<rect x="${x.toFixed(1)}" y="${Math.min(y, zy).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${v >= 0 ? "var(--up)" : "var(--down)"}" opacity="${b.b === cur ? 1 : .55}" ${b.b === cur ? 'stroke="var(--fg)" stroke-width="1.5"' : ""}><title>Score ${b.b}: ${pct(b.avg, 2)} avg vs average stock, beat the median stock ${b.hit != null ? Math.round(b.hit * 100) + "%" : "—"} (${(b.n || 0).toLocaleString()} observations)</title></rect>
+      <text x="${(x + (bw - 4) / 2).toFixed(1)}" y="${Hh - 8}" text-anchor="middle" font-size="10" fill="${b.b === cur ? "var(--fg)" : "var(--muted)"}" font-weight="${b.b === cur ? 700 : 400}">${b.b}</text>`; }).join("");
+  const axis = [mx, 0, -mx].map(v => `<text x="${x0 - 4}" y="${(sy(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--faint)">${(v * 100 > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("");
+  const curve = (B.curve || []).map(p => p[1]);
+  return `<div class="card">${head}
+    <div class="regime"><i style="background:var(--${verdict[1] === "good" ? "up" : verdict[1] === "bad" ? "down" : "warn"})"></i>${verdict[0]}${t != null ? ` <span class="faint small">(t = ${t})</span>` : ""}</div>
+    <p class="small" style="margin:6px 0 10px">${avg == null ? "" : `Stocks scoring <b>9–10</b> did <b class="${cls(avg)}">${pct(avg, 2)}</b> vs the average stock over the next ${H} trading days, on average, and beat it in <b>${Math.round((T.beat_pct || 0) * 100)}%</b> of ${T.periods} separate periods. Spread vs scores 1–3: ${pct(B.spread?.avg, 2)}.`}</p>
+    <svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Average return vs the average stock by score">
+      <line x1="${x0}" x2="${W - 2}" y1="${zy}" y2="${zy}" stroke="var(--line)"/>${axis}${bars}
+      <text x="${x0}" y="${Hh - 0}" font-size="9" fill="var(--faint)">score →</text></svg>
+    <div class="faint small" style="margin-top:2px">Average ${H}-day return vs the average stock, by score.${cur ? ` Outlined: ${esc(s.ticker)}'s score today (${cur}).` : ""}</div>
+    ${curve.length > 2 ? `<dl class="kv" style="margin-top:10px"><dt>Score 9–10 basket, cumulative vs average</dt><dd>${spark(curve, 120, 22, "var(--up)")} <span class="num ${cls(curve[curve.length - 1])}">${pct(curve[curve.length - 1])}</span></dd></dl>` : ""}
+    <details class="small" style="margin-top:8px"><summary class="faint">Score-by-score table</summary>
+      <table style="margin-top:6px"><thead><tr><th>Score</th><th class="r">Avg vs average</th><th class="r">Median</th><th class="r">Beat median stock</th><th class="r">Obs.</th></tr></thead><tbody>
+      ${bk.map(b => `<tr${b.b === cur ? ' style="font-weight:700"' : ""}><td>${b.b}</td><td class="r num ${cls(b.avg)}">${pct(b.avg, 2)}</td><td class="r num">${pct(b.med, 2)}</td><td class="r num">${b.hit != null ? Math.round(b.hit * 100) + "%" : "—"}</td><td class="r num">${(b.n || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></details>
+    <p class="faint small" style="margin:10px 0 0">Every week from ${esc(fmtMY(bt.dates?.[0]))} to ${esc(fmtMY(bt.dates?.[1]))}, every stock was scored using only data available that day, then its next ${H}-day return was compared with the average stock's. t ≥ 2 means the result is unlikely to be luck. Left out because no free history exists: estimate revisions, buybacks, short interest. Insider buying counts only from ${esc(fmtMY(bt.insider_since))}. Uses today's index members, which flatters results a little. Past results don't guarantee future ones.</p>
+  </div>`;
+}
+function bindBacktest(s) {
+  $$("#btCard [data-bts], #btCard [data-bth]").forEach(b => b.onclick = () => {
+    if (b.dataset.bts) UI.btS = b.dataset.bts; if (b.dataset.bth) UI.btH = b.dataset.bth;
+    $("#btCard").innerHTML = backtestCard(s); bindBacktest(s); });
+}
 function momentumCard(s, compact = false) {
   const m = s.momentum; if (!m || m.score == null) return `<div class="card"><h3>Momentum</h3><p class="muted">Not enough price history.</p></div>`;
   const i = m.inputs || {}, c = m.components || {};

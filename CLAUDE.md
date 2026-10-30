@@ -33,7 +33,7 @@ Full spec: `docs/BUILD_PROMPT.md`. Owner: Tom (single user, personal, never shar
 | 5. Politician trades + tracked people | not started | |
 | 6. Ownership / share count + MA crosses | not started | |
 | 7. Calendar | not started | |
-| 8. Sector divergence | not started | |
+| 8. Sector divergence | prototype | peer-lag signal inside Rally Setup (2026-10-30) |
 
 ### Prototype track (2026-10-23) — Tom's call: "see it and refine first, top 100, decide on the rest later"
 Built a working prototype ahead of Supabase/Vercel (no signups needed):
@@ -130,7 +130,18 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Price filter: "Max $" box on the Stocks bar, presets "Under $10" / "Under $20, overall ≥ 6", sort by share price.
 - 2026-10-27 speed: the fundamentals + score-history pass (~65 min at 3,000 stocks) now runs on 4 forked processes
   (`--workers`, per-process zip handle, closure via module-level `_ONE`); health entries returned to the parent.
-- Known gaps: 13F, divergence, Telegram not in prototype.
+- 2026-10-30 **Trend + Rally Setup scores (1–10) and backtest** (Tom: "due for a rally" signal; NOT averaged into Overall).
+  `jobs/lib/rally.py` (docstring explains): Trend = Momentum formula vectorized, ranked to deciles. Rally Setup = Catalyst 45%
+  (EPS revisions, holding gap-up/PEAD proxy, insider buys w/ cluster strongest, buybacks) + Flow 25% (accumulation, short-squeeze
+  setup) + Setup 30% (max of peer lag / near 52w low / RSI bullish divergence, + volatility squeeze); capped at 6 without a catalyst.
+  Peer groups = each stock's 15 most-correlated stocks over 1y (hard Ward clusters tried first: AAPL landed in a junk cluster).
+  Backtest: weekly as-of dates, point-in-time, next 20/60-day return vs the equal-weighted average stock, t-stat on
+  non-overlapping periods; revisions/buybacks/short interest excluded (no history), insiders only from cache start.
+  Output: index row `ry` {r, t, g, k}, detail `rally` + `rally_hist`, index `backtest` + `bt_dates`. UI: two outlined chips
+  after the 7 categories on every row (Trnd, Rally), sorts/filters, "Chart & momentum" tab gets Rally card + Backtest card.
+  Dry run on closes only (no volume) 2026-10-30: Rally 9–10 +0.06%/20d vs average, t 0.13 → no edge yet; Trend decile 1 beat
+  everything (+2%/20d, +5%/60d: junk/reversal rally). Re-check with the real build (volume adds gap-up + accumulation).
+- Known gaps: 13F, Telegram not in prototype.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
 
