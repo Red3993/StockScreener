@@ -40,6 +40,7 @@ from jobs.lib.metrics import Fundamentals, metric_set_for  # noqa: E402
 from jobs.lib.momentum import momentum_block, universe_stats  # noqa: E402
 from jobs.lib.politics_match import CommitteeMatcher  # noqa: E402
 from jobs.lib import rally as RALLY  # noqa: E402
+from jobs.lib import track as TRACK  # noqa: E402
 from jobs.lib.scoring import CATEGORIES, score_rows  # noqa: E402
 from jobs.lib.xbrl import CompanyFacts  # noqa: E402
 
@@ -217,6 +218,14 @@ def main() -> int:
         uclose, uvol = uclose.iloc[:-1], uvol.iloc[:-1] if len(uvol) else uvol
     log(f"prices: {uclose.shape[1]} tickers x {len(uclose)} days, last {uclose.index[-1].date()}")
     U = universe_stats(uclose)
+    # benchmarks (S&P 500, Nasdaq 100, Russell 2000 ETFs) for Claude's Picks scoreboard and track records
+    bench = pd.DataFrame()
+    try:
+        bc, _bs, _bv = B.download_prices(["SPY", "QQQ", "IWM"], "3y")
+        bench = bc.reindex(uclose.index).ffill()
+        log(f"benchmarks: {list(bench.columns)}")
+    except Exception as e:  # noqa: BLE001
+        health("prices", f"benchmarks: {e}")
 
     # yahoo refresh (threaded, cached)
     todo = [t for t in mapped if needs_refresh(ycache.get(t), t, t in top_set)]
@@ -488,6 +497,24 @@ def main() -> int:
         health("rally", f"{type(e).__name__}: {e}")
         traceback.print_exc()
 
+    # ------------------------------------------------------------ track records (congress + insider buys -> forward excess returns)
+    track = None
+    try:
+        cong_by, ins_by = {}, {}
+        for t in all_t:
+            raw = pol_by.get(t.replace(".", "-").upper(), [])
+            if raw:
+                cong_by[t] = matcher.annotate(raw, pol.get("members", {}), mapped[t]["sector"], mapped[t].get("sic"), t)
+            itr = (icache.get(str(mapped[t]["cik"])) or {}).get("trades", [])
+            if itr:
+                ins_by[t] = itr
+        track = TRACK.compute(uclose, bench["SPY"] if "SPY" in bench.columns else None, ytick, cong_by, ins_by,
+                              {t: mapped[t]["name"] for t in all_t}, TODAY)
+        log(f"track records: {track['coverage']}")
+    except Exception as e:  # noqa: BLE001
+        health("track", f"{type(e).__name__}: {e}")
+        traceback.print_exc()
+
     # ------------------------------------------------------------ output
     dates = [d.date().isoformat() for d in uclose.index]
     idx_rows, shards = [], {}
@@ -546,7 +573,8 @@ def main() -> int:
     vv = [v for v in validation if v["rev_diff"] is not None]
     index = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "asof": TODAY.isoformat(),
              "universe_count": len(uni), "fundamentals_rows": len(rows), "count": len(idx_rows), "top_n": len(top), "shards": SHARDS,
-             "dates": dates, "hist_dates": hd_iso, "bt_dates": rly.get("bt_dates"), "backtest": rly.get("backtest"), "labels": CFG["labels"], "directions": CFG["directions"],
+             "dates": dates, "hist_dates": hd_iso, "bt_dates": rly.get("bt_dates"), "backtest": rly.get("backtest"), "track": track,
+             "bench": {k: [None if pd.isna(v) else round(float(v), 2) for v in bench[k]] for k in bench.columns} if len(bench) else {}, "labels": CFG["labels"], "directions": CFG["directions"],
              "macro": B.macro_calendar(), "health": B.HEALTH[:400], "runtime_s": round(time.time() - B.T0), "sec_calls": sec.calls,
              "politics_stats": pol.get("stats", {}), "politics_generated": pol.get("generated"),
              "validation": {"rev_within_2pct": sum(abs(v["rev_diff"]) <= 0.02 for v in vv), "rev_within_5pct": sum(abs(v["rev_diff"]) <= 0.05 for v in vv),

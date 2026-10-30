@@ -1,0 +1,40 @@
+# 13F filers shown on the Research tab.
+# cik: a hint; the research job checks it against `match` (words that must appear in the SEC entity name) and,
+#      if it doesn't match or is missing, searches EDGAR full-text search for 13F-HR filings by that name.
+# group: fund (counts toward "smart money" consensus) | corporate (a company's own stock portfolio)
+funds:
+  - {name: Berkshire Hathaway, manager: Warren Buffett / Greg Abel, cik: 1067983, match: [berkshire, hathaway], style: Value, group: fund}
+  - {name: Pershing Square, manager: Bill Ackman, cik: 1336528, match: [pershing, square], style: Concentrated activist, group: fund}
+  - {name: Scion Asset Management, manager: Michael Burry, cik: 1649339, match: [scion], style: Contrarian value, group: fund}
+  - {name: Duquesne Family Office, manager: Stanley Druckenmiller, cik: 1536411, match: [duquesne], style: Macro, group: fund}
+  - {name: Appaloosa, manager: David Tepper, cik: 1656456, match: [appaloosa], style: Opportunistic, group: fund}
+  - {name: Baupost Group, manager: Seth Klarman, cik: 1061768, match: [baupost], style: Deep value, group: fund}
+  - {name: Third Point, manager: Dan Loeb, cik: 1040273, match: [third, point], style: Activist / event-driven, group: fund}
+  - {name: Greenlight Capital, manager: David Einhorn, cik: 1079114, match: [greenlight], style: Value long/short, group: fund}
+  - {name: Tiger Global, manager: Chase Coleman, cik: 1167483, match: [tiger, global], style: Growth / tech, group: fund}
+  - {name: Coatue Management, manager: Philippe Laffont, cik: 1135730, match: [coatue], style: Tech growth, group: fund}
+  - {name: Lone Pine Capital, manager: Stephen Mandel, cik: 1061165, match: [lone, pine], style: Growth long/short, group: fund}
+  - {name: Viking Global, manager: Andreas Halvorsen, cik: 1103804, match: [viking, global], style: Long/short, group: fund}
+  - {name: Soros Fund Management, manager: Soros family office, cik: 1029160, match: [soros, fund], style: Macro / multi-strategy, group: fund}
+  - {name: Icahn Enterprises, manager: Carl Icahn, cik: 921669, match: [icahn], style: Activist, group: fund}
+  - {name: Akre Capital, manager: Akre / Saler / Neff, cik: 1112520, match: [akre], style: Quality compounders, group: fund}
+  - {name: Himalaya Capital, manager: Li Lu, cik: 1709323, match: [himalaya], style: Concentrated value, group: fund}
+  - {name: ValueAct Capital, manager: Mason Morfit, cik: 1418814, match: [valueact], style: Activist, group: fund}
+  - {name: Trian Fund Management, manager: Nelson Peltz, cik: 1345471, match: [trian], style: Activist, group: fund}
+  - {name: Starboard Value, manager: Jeff Smith, cik: 1517137, match: [starboard, value], style: Activist, group: fund}
+  - {name: Elliott Investment Management, manager: Paul Singer, cik: 1791786, match: [elliott], style: Activist / multi-strategy, group: fund}
+  - {name: Altimeter Capital, manager: Brad Gerstner, cik: 1541617, match: [altimeter], style: Tech growth, group: fund}
+  - {name: Durable Capital Partners, manager: Henry Ellenbogen, cik: 1798849, match: [durable, capital], style: Growth, group: fund}
+  - {name: Dalal Street (Pabrai), manager: Mohnish Pabrai, cik: 1549575, match: [dalal], style: Concentrated value, group: fund}
+  - {name: Markel Group, manager: Tom Gayner, cik: 1096343, match: [markel], style: Quality value, group: fund}
+  - {name: ARK Investment Management, manager: Cathie Wood, cik: 1697748, match: [ark, invest], style: Disruptive growth, group: fund}
+  - {name: Bridgewater Associates, manager: Ray Dalio (founder), cik: 1350694, match: [bridgewater], style: Macro / systematic, group: fund}
+  - {name: Renaissance Technologies, manager: Jim Simons (founder), cik: 1037389, match: [renaissance, technologies], style: Quant, group: fund}
+  - {name: Gates Foundation Trust, manager: Gates Foundation, cik: 1166559, match: [gates, foundation], style: Long-term endowment, group: fund}
+  # companies that file 13Fs for their own investment portfolios
+  - {name: Alphabet, manager: Google's parent, cik: 1652044, match: [alphabet], style: Strategic stakes, group: corporate}
+  - {name: NVIDIA, manager: NVIDIA, cik: 1045810, match: [nvidia], style: Strategic stakes (AI ecosystem), group: corporate}
+  - {name: Amazon, manager: Amazon.com, cik: 1018724, match: [amazon], style: Strategic stakes, group: corporate}
+  - {name: Microsoft, manager: Microsoft, cik: 789019, match: [microsoft], style: Strategic stakes, group: corporate}
+  - {name: Meta Platforms, manager: Meta, cik: 1326801, match: [meta, platforms], style: Strategic stakes, group: corporate}
+  - {name: Salesforce, manager: Salesforce Ventures, cik: 1108524, match: [salesforce], style: Strategic stakes, group: corporate}

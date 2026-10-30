@@ -1,0 +1,50 @@
+name: Research data (13F)
+# Fund and corporate 13F holdings for the Research tab -> research.json on the `research-data` branch.
+# 13Fs are due 45 days after each quarter, so a weekly run is plenty; caches (CUSIP map, parsed filings) live on the branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["jobs/research/**", "config/funds.yaml", ".github/workflows/research.yml"]
+  schedule:
+    - cron: "23 12 * * 6"   # Saturdays 12:23 UTC
+permissions:
+  contents: write
+concurrency:
+  group: research
+  cancel-in-progress: false
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r jobs/requirements.txt
+      - name: App universe + previous caches
+        run: |
+          git fetch --depth 1 origin app-data && git --work-tree=. checkout origin/app-data -- app-data/index.json && git reset -q
+          mkdir -p rcache
+          if git fetch --depth 1 origin research-data 2>/dev/null; then
+            git show origin/research-data:cusip_map.json > rcache/cusip_map.json 2>/dev/null || true
+            git show origin/research-data:filings.json > rcache/filings.json 2>/dev/null || true
+          fi
+      - name: Build research.json
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          set -o pipefail
+          python jobs/research/build_research.py --app-data app-data --cache rcache --out /tmp/research.json 2>&1 | tee /tmp/research.log
+      - name: Publish
+        if: always()
+        run: |
+          git config user.name "research-bot"; git config user.email "research-bot@users.noreply.github.com"
+          git checkout -q --orphan research-tmp
+          git rm -rq --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name rcache -exec rm -rf {} +
+          [ -f /tmp/research.json ] && cp /tmp/research.json . || true
+          cp rcache/*.json . 2>/dev/null || true
+          cp /tmp/research.log research.log 2>/dev/null || true
+          rm -rf rcache
+          git add -A && git commit -qm "research $(date -u +%FT%TZ)" && git push -f origin HEAD:research-data
