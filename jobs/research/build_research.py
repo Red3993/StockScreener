@@ -209,7 +209,7 @@ def map_cusips(cusips: dict[str, str], universe: dict[str, set], cache: dict) ->
             eqs = [d for d in data if d.get("marketSector") == "Equity"] or data
             us = [d for d in eqs if d.get("exchCode") in US_EXCH] or eqs
             tk = us[0].get("ticker") if us else None
-            out[c] = tk.replace("/", "-").replace(" ", "-") if tk else None
+            out[c] = tk.rstrip("*").replace("/", "-").replace(" ", "-") if tk else None   # OpenFIGI marks some tickers with *
             if out[c]:
                 cache[c] = out[c]
         time.sleep(2.6)    # 25 requests / minute without an API key
@@ -315,7 +315,7 @@ def main() -> int:
             log(f"cache {p.name} unreadable ({e}); starting fresh")
             return {}
     cache = load_json(cdir / "cusip_map.json")
-    cache = {k: v for k, v in cache.items() if v and v not in ("GOOG", "GOOGL", "BRK-A", "BRK-B", "FOX", "FOXA", "NWS", "NWSA")}   # re-resolve share classes
+    cache = {k: v.rstrip("*") for k, v in cache.items() if v}
     fcache = load_json(cdir / "filings_v2.json")   # accession -> aggregated holdings
     universe = {}
     try:
@@ -411,13 +411,14 @@ def main() -> int:
 
     # consensus across funds (latest quarter each)
     own, buy, sell = defaultdict(list), defaultdict(list), defaultdict(list)
+    same_co = {"GOOG": "GOOGL", "BRK-A": "BRK-B", "FOXA": "FOX", "NWSA": "NWS"}   # count share classes of one company once
     names = {}
     for f in out_f:
         if f.get("error") or f.get("group") != "fund" or f.get("stale"):
             continue
         seen_o, seen_b, seen_s = set(), set(), set()
         for x in f["top"]:
-            k = x["t"] or x["cusip"]
+            k = same_co.get(x["t"], x["t"]) or x["cusip"]
             names[k] = x["name"]
             if k not in seen_o:
                 seen_o.add(k)
@@ -429,7 +430,7 @@ def main() -> int:
                 seen_s.add(k)
                 sell[k].append({"fund": f["name"], "trim": x["chg_pct"]})
         for x in f["sold"]:
-            k = x["t"] or x["cusip"]
+            k = same_co.get(x["t"], x["t"]) or x["cusip"]
             names[k] = x["name"]
             if k not in seen_s:
                 seen_s.add(k)
