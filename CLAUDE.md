@@ -148,7 +148,22 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   "Ask about the markets" chat (sample; tools search_headlines, get_upcoming, get_stock, list_sector). The nightly publish
   task writes `app/brief` with web search (by: "nightly", web: true); the page's Write/Rewrite button writes it from headlines
   only (by: "page"). Tab label is now "Chart & Momentum".
-- Known gaps: 13F, Telegram not in prototype.
+- 2026-10-30 **Claude's Picks scoreboard** (tab has "This week | Scoreboard"). Every pick set is appended to db doc
+  `app/pick_log` {sets: [{id, generated, dataAsof, week, scope, refresh, picks: [{t, rank, theme, conviction, size, px0}],
+  bench0: {SPY, IWM, QQQ}, mkt0}]} (backfilled from the last 26 weekly `picks_*` docs). Returns from px0 to today vs SPY over
+  the same days (fallback: median S&P 500 stock). By theme / conviction / rank / size, per-set table, sortable tracker.
+  Build now writes `bench` {SPY, QQQ, IWM} closes aligned to `dates`; prices_quick adds SPY/QQQ/IWM; the page extends bench.
+- 2026-10-30 **Research tab** (6th nav tab): Funds / Companies / Smart money / Track records.
+  `jobs/research/build_research.py` + `research.yml` (Saturdays + dispatch) → `research.json` on `research-data`
+  (+ caches cusip_map.json, filings.json). Filers in `config/funds.yaml` (28 funds + Alphabet, NVIDIA, Amazon, Microsoft,
+  Meta, Salesforce); CIK hints verified against the SEC name, else EDGAR full-text search. Up to 13 quarters of 13F-HR,
+  top 60 positions, CUSIP→ticker via app names then OpenFIGI (free, 25 req/min), copycat = buy each 13F at first close after
+  filing, hold to the next filing, vs SPY. Consensus: most owned / bought / sold across funds.
+  Track records: `jobs/lib/track.py` in the build → index `track` (congress 3y + insiders 1y purchases; excess return vs SPY
+  1/3/6 months after the first close after disclosure; trades capped +100%/−90%; ranked on avg63 × n/(n+4)).
+  Tom (2026-10-30): Telegram on hold; insider history stays 1 year. "TopStack" ranking = interpreted as TipRanks-style
+  track records (asked Tom to confirm).
+- Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
 

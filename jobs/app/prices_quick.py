@@ -37,6 +37,8 @@ def main() -> int:
             ymap[t] = v.get("yahoo") or t
     for r in idx["rows"]:
         ymap.setdefault(r["t"], r["t"].replace(".", "-"))
+    for b in ("SPY", "QQQ", "IWM"):    # benchmarks for the picks scoreboard
+        ymap[b] = b
     ys = sorted(set(ymap.values()))
     frames = []
     for i in range(0, len(ys), 200):

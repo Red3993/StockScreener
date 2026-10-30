@@ -44,8 +44,8 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;text
 .brand b{color:var(--accent)}
 .asof{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
 main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--gut);padding-right:var(--gut-r)}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.tabs button{background:none;border:0;padding:10px 4px 9px;font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs button{background:none;border:0;padding:10px 2px 9px;font-size:11.5px;white-space:nowrap;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabs button svg{width:22px;height:22px}
 .tabs button[aria-current="page"]{color:var(--accent)}
 .disclaimer{font-size:12px;color:var(--faint);margin-top:28px;text-align:center}
@@ -273,6 +273,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
   <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
   <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Claude’s Picks</button>
+  <button data-tab="research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 12.5l2-2.5 2 1.5 2.5-3"/></svg>Research</button>
   <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
   <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
 </nav>
@@ -645,6 +646,7 @@ async function applyQuickPrices() {
     if (d.hi && d.lo) { d.fl = last / d.lo - 1; d.fh = last / d.hi - 1; d.pos = d.hi > d.lo ? (last - d.lo) / (d.hi - d.lo) : null; }
   }
   QP.k0 = k0; QP.n = nd.length;
+  for (const [k, arr] of Object.entries(DATA.bench || {})) { const a = QP.px?.[k] || []; for (let i = 0; i < nd.length; i++) arr.push(a[k0 + i] ?? null); }
   DATA.dates = DATA.dates.concat(nd); DATA.lastDate = nd[nd.length - 1]; DATA.quickPrices = true;
 }
 function patchCloses(t, v) {   // extend a stock's daily closes with the quick prices so charts and RSI include today
@@ -804,7 +806,7 @@ $$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!DATA) return;
   $$(".tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === UI.tab ? "page" : "false"));
-  ({stocks: viewStocks, watch: viewWatch, ideas: viewIdeas, cal: viewCal, about: viewAbout})[UI.tab]();
+  ({stocks: viewStocks, watch: viewWatch, ideas: viewIdeas, research: viewResearch, cal: viewCal, about: viewAbout})[UI.tab]();
 }
 function rerender() { if (!DATA) return; if ($("#fpanel").hidden) render(); if (!$("#sheet").hidden && Sheet.t) Sheet.refreshLists(); }
 
@@ -1714,12 +1716,16 @@ async function viewIdeas() {
   const cands = candidates();
   $("#view").innerHTML = `
     <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Claude’s picks</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
+    <div class="seg" id="pseg" style="margin-bottom:12px"><button data-pv="week" aria-pressed="${UI.picksView !== "board"}">This week</button><button data-pv="board" aria-pressed="${UI.picksView === "board"}">Scoreboard</button></div>
+    ${UI.picksView === "board" ? `<div id="boardBox"><div class="card"><p class="muted">Loading the scoreboard…</p></div></div><p class="disclaimer">For personal research. Not financial advice.</p>` : `
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
     <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
     <div class="seg" id="iscope" style="margin-bottom:10px">${[["all", "All stocks"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWM", "Russell 2000"]].map(([v, l]) => `<button data-is="${v}" aria-pressed="${(UI.ideasScope || "all") === v}">${l}</button>`).join("")}</div>
     <div class="list">${headRow("Opportunity score")}${cands.map(({s, o, size}) => stockRow(s, `<div class="why"><span class="badge acc">Opportunity ${Math.round(o.score)}</span><span class="badge">${esc(size || sizeOf(s))}</span>${o.why.slice(0, 4).map(w => `<span class="badge">${esc(w)}</span>`).join("")}</div>`)).join("")}</div>
-    <p class="disclaimer">For personal research. Not financial advice.</p>`;
+    <p class="disclaimer">For personal research. Not financial advice.</p>`}`;
+  $$("[data-pv]").forEach(b => b.onclick = () => { UI.picksView = b.dataset.pv; viewIdeas(); });
+  if (UI.picksView === "board") { Board.show(); return; }
   bindRows($("#view"));
   $$("[data-is]").forEach(b => b.onclick = () => { UI.ideasScope = b.dataset.is; viewIdeas(); });
   if (Ideas.loadedWeek !== week) {
@@ -1823,12 +1829,185 @@ ${cands.map(block).join("\n\n")}`;
     const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all",
                   px: {...pxSnapshot(), ...pickPx}, prev: old?.result ? {dataAsof: old.dataAsof, generated: old.generated, tickers: (old.result.picks || []).map(p => p.ticker)} : null};
     await Store.setDoc(key, body); Ideas.state = body;
+    await PickLog.add(body, week);
     if (UI.tab === "ideas") renderPicks(week, key, cands);
   } catch (e) {
     out.innerHTML = e?.code === "cancelled" ? `<p class="faint small">Stopped.</p>` : `<p class="down small">${esc(e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : AI.errText(e))}</p>`;
   } finally { Ideas.busy = false; const g = $("#pickGo"); if (g) g.disabled = false; const st = $("#pickStop"); if (st) st.hidden = true; }
 }
 
+
+// ================================================================ Claude's Picks scoreboard
+// Every pick set is logged in db doc app/pick_log with entry prices, so refreshes never erase history.
+const benchAt = (k, ds) => { const a = DATA.bench?.[k]; if (!a) return null; let i = DATA.dates.indexOf(ds); if (i < 0) i = DATA.dates.findIndex(d => d > ds) - 1; if (i < 0) return null; for (; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+const benchNow = k => { const a = DATA.bench?.[k]; if (!a) return null; for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+const PickLog = {
+  doc: null, loaded: false,
+  entry(body, week) {
+    const res = body.result || {};
+    return {id: body.generated, generated: body.generated, dataAsof: body.dataAsof, week, scope: body.scope || "all", refresh: !!body.prev,
+      picks: (res.picks || []).map((p, i) => ({t: p.ticker, rank: i + 1, theme: p.theme || null, conviction: p.conviction || null, size: RB[p.ticker] ? sizeOf(RB[p.ticker]) : null,
+        px0: body.px?.[p.ticker] ?? null})).filter(p => p.px0 != null),
+      bench0: {SPY: benchAt("SPY", body.dataAsof), IWM: benchAt("IWM", body.dataAsof), QQQ: benchAt("QQQ", body.dataAsof)},
+      mkt0: body.px ? Object.fromEntries(Object.entries(body.px).filter(([t]) => RB[t]?.ix?.includes("IVV"))) : null};
+  },
+  async load() {
+    if (this.loaded) return this.doc; this.doc = (await Store.getDoc("pick_log")) || {sets: []}; this.loaded = true;
+    // backfill from the weekly pick docs (last 26 weeks) the first time, and pick up any set not logged yet
+    const have = new Set(this.doc.sets.map(x => x.id)); let added = 0;
+    const weeks = []; for (let i = 0; i < 26; i++) weeks.push(isoWeek(new Date(Date.parse(DATA.lastDate) - i * 7 * 864e5).toISOString().slice(0, 10)));
+    const docs = await Promise.all([...new Set(weeks)].map(w => Store.getDoc("picks_" + w.replace("-", "_")).then(d => [w, d]).catch(() => [w, null])));
+    for (const [w, d] of docs) if (d?.result && d.generated && !have.has(d.generated)) { this.doc.sets.push(this.entry(d, w)); added++; }
+    if (added) { this.doc.sets.sort((a, b) => a.generated.localeCompare(b.generated)); await Store.setDoc("pick_log", this.doc); }
+    return this.doc;
+  },
+  async add(body, week) { await this.load(); if (this.doc.sets.some(x => x.id === body.generated)) return; this.doc.sets.push(this.entry(body, week)); await Store.setDoc("pick_log", this.doc); },
+};
+function setStats(x) {
+  const spyNow = benchNow("SPY"), iwmNow = benchNow("IWM");
+  let spy = x.bench0?.SPY && spyNow ? spyNow / x.bench0.SPY - 1 : null, iwm = x.bench0?.IWM && iwmNow ? iwmNow / x.bench0.IWM - 1 : null, benchName = "S&P 500 (SPY)";
+  if (spy == null && x.mkt0) { spy = medianMove(x.mkt0, r => r.ix?.includes("IVV")); benchName = "median S&P 500 stock"; }
+  const rows = x.picks.map(p => { const now = RB[p.t]?.d?.px; const ret = now && p.px0 ? now / p.px0 - 1 : null; return {...p, now, ret, ex: ret != null && spy != null ? ret - spy : null}; });
+  const rs = rows.map(r => r.ret).filter(v => v != null); const n = rs.length;
+  const avg = n ? rs.reduce((a, b) => a + b, 0) / n : null, srt = [...rs].sort((a, b) => a - b);
+  const i0 = DATA.dates.indexOf(x.dataAsof); const days = i0 >= 0 ? DATA.dates.length - 1 - i0 : null;
+  return {...x, rows, n, avg, med: n ? srt[Math.floor(n / 2)] : null, up: rs.filter(v => v > 0).length, beat: spy != null ? rs.filter(v => v > spy).length : null,
+    spy, iwm, alpha: avg != null && spy != null ? avg - spy : null, days, benchName};
+}
+const Board = {
+  sort: "ex", dir: -1, filter: "all",
+  async show() {
+    const box = $("#boardBox"); if (!box) return;
+    const log = await PickLog.load(); if (!$("#boardBox")) return;
+    const sets = log.sets.map(setStats).filter(x => x.n);
+    if (!sets.length) { box.innerHTML = `<div class="card"><h3>Scoreboard</h3><p class="muted">No pick sets with saved prices yet. Once Claude makes picks, every set is tracked here from the price on the day it was picked.</p></div>`; return; }
+    const all = sets.flatMap(x => x.rows.filter(r => r.ret != null).map(r => ({...r, set: x})));
+    const mean = a => a.length ? a.reduce((p, q) => p + q, 0) / a.length : null;
+    const withEx = all.filter(r => r.ex != null), alphaSets = sets.filter(x => x.alpha != null);
+    const group = key => { const g = {}; for (const r of withEx) (g[r[key] || "—"] ||= []).push(r.ex); return Object.entries(g).map(([k, v]) => ({k, n: v.length, ex: mean(v), hit: v.filter(z => z > 0).length / v.length})).sort((a, b) => b.ex - a.ex); };
+    const rankG = (() => { const g = {"Top 5": [], "6–10": [], "11–25": []}; for (const r of withEx) g[r.rank <= 5 ? "Top 5" : r.rank <= 10 ? "6–10" : "11–25"].push(r.ex); return Object.entries(g).filter(([, v]) => v.length).map(([k, v]) => ({k, n: v.length, ex: mean(v), hit: v.filter(z => z > 0).length / v.length})); })();
+    const kpi = (l, v, sub, c = "") => `<div><div class="label">${l}</div><div class="num ${c}" style="font:700 22px var(--f-display)">${v}</div><div class="faint small">${sub}</div></div>`;
+    const avgAlpha = mean(alphaSets.map(x => x.alpha)), setsBeat = alphaSets.filter(x => x.alpha > 0).length;
+    const hit = all.length ? all.filter(r => r.ret > 0).length / all.length : null, beatP = withEx.length ? withEx.filter(r => r.ex > 0).length / withEx.length : null;
+    // bar chart: each set's average return vs the S&P 500 since it was picked
+    const bars = alphaSets.slice(-26), mx = Math.max(0.02, ...bars.map(x => Math.abs(x.alpha)));
+    const W = 320, Hh = 130, bw = (W - 36) / Math.max(bars.length, 1), zy = 62, sy = v => zy - v / mx * 52;
+    const svg = bars.length ? `<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Each pick set's return vs the S&P 500">
+      <line x1="34" x2="${W}" y1="${zy}" y2="${zy}" stroke="var(--line)"/>${[mx, -mx].map(v => `<text x="30" y="${sy(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(0)}%</text>`).join("")}
+      ${bars.map((x, i) => { const y = sy(x.alpha), X = 36 + i * bw + 1; return `<rect x="${X.toFixed(1)}" y="${Math.min(y, zy).toFixed(1)}" width="${Math.max(2, bw - 3).toFixed(1)}" height="${Math.max(1, Math.abs(y - zy)).toFixed(1)}" rx="2" fill="${x.alpha >= 0 ? "var(--up)" : "var(--down)"}"><title>${fmtDate(x.dataAsof)}${x.refresh ? " (refresh)" : ""}: picks ${pct(x.avg)} vs ${x.benchName} ${pct(x.spy)} → ${pct(x.alpha)}</title></rect>`; }).join("")}
+      <text x="36" y="${Hh - 4}" font-size="9" fill="var(--faint)">${esc(fmtShort(bars[0].dataAsof))}</text><text x="${W}" y="${Hh - 4}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtShort(bars[bars.length - 1].dataAsof))}</text></svg>` : "";
+    const gtab = (title, rows) => `<div><div class="label" style="margin-bottom:4px">${title}</div><table><tbody>${rows.map(g => `<tr><td>${esc(g.k)}</td><td class="r num faint">${g.n}</td><td class="r num ${cls(g.ex)}">${pct(g.ex)}</td><td class="r num faint">${Math.round(g.hit * 100)}% beat</td></tr>`).join("")}</tbody></table></div>`;
+    let list = this.filter === "latest" ? all.filter(r => r.set === sets[sets.length - 1]) : all;
+    const key = {ex: r => r.ex ?? -9, ret: r => r.ret ?? -9, t: r => r.t, date: r => r.set.generated, rank: r => r.rank}[this.sort];
+    list = [...list].sort((a, b) => { const va = key(a), vb = key(b); return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * this.dir; });
+    const th = (k, l, r = true) => `<th class="${r ? "r" : ""}" data-bs="${k}" style="cursor:pointer;white-space:nowrap">${l}${this.sort === k ? (this.dir < 0 ? " ↓" : " ↑") : ""}</th>`;
+    box.innerHTML = `
+    <div class="card"><h3>Scoreboard <span class="label">${sets.length} pick set${sets.length > 1 ? "s" : ""} · ${all.length} picks</span></h3>
+      <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        ${kpi("Avg set vs S&P 500", pct(avgAlpha), `${setsBeat} of ${alphaSets.length} sets ahead`, cls(avgAlpha))}
+        ${kpi("Picks beating the S&P", beatP != null ? Math.round(beatP * 100) + "%" : "—", `${withEx.filter(r => r.ex > 0).length} of ${withEx.length} picks`)}
+        ${kpi("Picks up since picked", hit != null ? Math.round(hit * 100) + "%" : "—", `${all.filter(r => r.ret > 0).length} of ${all.length}`)}
+        ${kpi("Best pick", (() => { const b = [...all].sort((a, c) => c.ret - a.ret)[0]; return b ? esc(b.t) + " " + pct(b.ret) : "—"; })(), "since picked")}
+      </div>
+      ${svg ? `<div class="label" style="margin-top:14px">Each set's average return vs the S&amp;P 500, since picked</div>${svg}` : ""}
+      <p class="faint small" style="margin:6px 0 0">Returns run from the closing price on the day of the data Claude used to today's price, equal-weighted per set, before costs. Benchmark: ${DATA.bench?.SPY ? "the S&amp;P 500 ETF (SPY) over the same days" : "the median S&amp;P 500 stock (SPY prices arrive with tonight's build)"}. Sets differ in age, so young sets mostly reflect noise.</p></div>
+    <div class="grid2" style="margin-top:14px">
+      <div class="card"><h3>What's working <span class="label">avg return vs S&amp;P per pick</span></h3><div style="display:grid;gap:12px">${gtab("By theme", group("theme"))}${gtab("By conviction", group("conviction"))}${gtab("By rank", rankG)}${gtab("By size", group("size"))}</div></div>
+      <div class="card"><h3>Pick sets</h3><div style="overflow-x:auto"><table><thead><tr><th>Data as of</th><th class="r">Days</th><th class="r">Picks</th><th class="r">Avg</th><th class="r">S&amp;P</th><th class="r">vs S&amp;P</th></tr></thead><tbody>
+        ${[...sets].reverse().map(x => `<tr><td>${esc(fmtDate(x.dataAsof))}${x.refresh ? ` <span class="badge">refresh</span>` : ""}</td><td class="r num">${x.days ?? "—"}</td><td class="r num">${x.n}</td><td class="r num ${cls(x.avg)}">${pct(x.avg)}</td><td class="r num">${pct(x.spy)}</td><td class="r num ${cls(x.alpha)}">${pct(x.alpha)}</td></tr>`).join("")}</tbody></table></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Tracker <span class="label">every pick, from its pick price</span></h3>
+      <div class="seg" id="bf" style="margin-bottom:10px"><button data-bf="all" aria-pressed="${this.filter === "all"}">All picks</button><button data-bf="latest" aria-pressed="${this.filter === "latest"}">Latest set</button></div>
+      <div style="overflow-x:auto"><table><thead><tr>${th("t", "Ticker", false)}${th("date", "Picked", false)}${th("rank", "#")}<th>Theme</th><th class="r">Entry</th><th class="r">Now</th>${th("ret", "Return")}${th("ex", "vs S&amp;P")}</tr></thead><tbody>
+      ${list.map(r => `<tr data-t="${esc(r.t)}" style="cursor:pointer"><td><b>${esc(r.t)}</b></td><td class="num">${esc(fmtShort(r.set.dataAsof))}</td><td class="r num faint">${r.rank}</td><td class="small">${esc(r.theme || "")}${r.conviction ? ` <span class="faint">· ${esc(r.conviction)}</span>` : ""}</td><td class="r num">${fmtMoney(r.px0)}</td><td class="r num">${fmtMoney(r.now)}</td><td class="r num ${cls(r.ret)}">${pct(r.ret)}</td><td class="r num ${cls(r.ex)}">${pct(r.ex)}</td></tr>`).join("")}</tbody></table></div></div>`;
+    $$("[data-bs]", box).forEach(h => h.onclick = () => { const k = h.dataset.bs; if (this.sort === k) this.dir *= -1; else { this.sort = k; this.dir = k === "t" ? 1 : -1; } this.show(); });
+    $$("[data-bf]", box).forEach(b => b.onclick = () => { this.filter = b.dataset.bf; this.show(); });
+    $$("tr[data-t]", box).forEach(tr => tr.onclick = () => Sheet.open(tr.dataset.t));
+  },
+};
+
+// ================================================================ Research tab (13F funds, company portfolios, smart money, track records)
+let RES = null, RES_P = null;
+function loadResearch() { if (!RES_P) RES_P = fetch("research.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { RES = j || {filers: [], consensus: {}}; if (UI.tab === "research" && $("#sheet").hidden) viewResearch(); }); return RES_P; }
+const tk = (t, name) => t && RB[t] ? `<button class="link" data-open="${esc(t)}" style="font-weight:700">${esc(t)}</button>` : `<b>${esc(t || "—")}</b>`;
+const fmtB = v => v == null ? "—" : v >= 1e12 ? "$" + (v / 1e12).toFixed(2) + "T" : v >= 1e9 ? "$" + (v / 1e9).toFixed(1) + "B" : "$" + (v / 1e6).toFixed(0) + "M";
+const CHG = {new: ["New", "acc"], add: ["Added", "good"], trim: ["Trimmed", "bad"], same: ["Held", ""]};
+function lineSvg(curve) {
+  if (!curve?.length) return "";
+  const pts = [[curve[0][0], 0, 0], ...curve], W = 320, H = 120, ys = pts.flatMap(p => [p[1], p[2]]); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.05) hi = lo + 0.05;
+  const X = i => 30 + i / (pts.length - 1) * (W - 34), Y = v => 8 + (1 - (v - lo) / (hi - lo)) * (H - 26);
+  const path = k => pts.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[k]).toFixed(1)).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Copycat portfolio vs S&P 500"><line x1="30" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
+    ${[hi, lo].map(v => `<text x="26" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + Math.round(v * 100)}%</text>`).join("")}
+    <path d="${path(2)}" fill="none" stroke="var(--faint)" stroke-width="1.5" stroke-dasharray="4 3"/><path d="${path(1)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="30" y="${H - 4}" font-size="9" fill="var(--faint)">${esc(fmtMY(pts[0][0]))}</text><text x="${W}" y="${H - 4}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtMY(pts[pts.length - 1][0]))}</text></svg>
+    <div class="faint small"><span style="color:var(--accent)">━</span> copycat portfolio · <span>┅</span> S&amp;P 500</div>`;
+}
+function filerCard(f) {
+  if (f.error) return `<div class="card"><h3>${esc(f.name)} <span class="label">${esc(f.manager || "")}</span></h3><p class="muted small">${esc(f.error)}.</p></div>`;
+  const c = f.copycat, open = UI.resOpen === f.name, ex = c ? c.ann - c.spy_ann : null;
+  return `<div class="card">
+    <button class="link" data-fopen="${esc(f.name)}" style="display:block;width:100%;text-align:left;color:inherit">
+      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><h3 style="margin:0">${esc(f.name)}</h3><span class="muted small">${esc(f.manager || "")} · ${esc(f.style || "")}</span><span style="margin-left:auto" class="faint small">${open ? "▲" : "▼"}</span></div>
+      <div class="pill-row" style="margin-top:8px"><span class="badge">${fmtB(f.value)} · ${f.n} stocks</span><span class="badge">Top 10 = ${Math.round(f.top10_pct * 100)}%</span>
+        ${c ? `<span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
+      <div class="small" style="margin-top:8px">${f.top.slice(0, 6).map(x => `<span style="white-space:nowrap;margin-right:10px"><b>${esc(x.t || x.name.slice(0, 14))}</b> <span class="faint">${(x.pct * 100).toFixed(1)}%</span>${x.chg && x.chg !== "same" ? ` <span class="${CHG[x.chg][1] === "bad" ? "down" : "up"}">${x.chg === "new" ? "new" : x.chg === "add" ? "↑" : "↓"}</span>` : ""}</span>`).join("")}</div>
+    </button>
+    ${open ? `<div style="margin-top:12px">
+      ${c ? `<div class="label">Copycat track record since ${esc(fmtMY(c.start))}</div>${lineSvg(c.curve)}
+        <dl class="kv" style="margin-top:8px"><dt>Total</dt><dd><span class="${cls(c.cum)}">${pct(c.cum)}</span> vs S&amp;P ${pct(c.spy_cum)}</dd><dt>Per year</dt><dd><span class="${cls(ex)}">${pct(c.ann)}</span> vs ${pct(c.spy_ann)}</dd>
+        <dt>Quarters ahead of S&amp;P</dt><dd>${c.beat} of ${c.periods}</dd><dt>Worst drawdown</dt><dd>${pct(c.maxdd)}</dd><dt>Holdings priced</dt><dd>${Math.round(c.coverage * 100)}% of the portfolio</dd></dl>` : ""}
+      <div class="label" style="margin-top:12px">Holdings, quarter ended ${esc(fmtDate(f.period))} (filed ${esc(fmtDate(f.filed))})</div>
+      <div style="overflow-x:auto;max-height:440px;overflow-y:auto"><table><thead><tr><th>Stock</th><th class="r">Weight</th><th class="r">Value</th><th>Change</th></tr></thead><tbody>
+        ${f.top.map(x => `<tr><td>${tk(x.t)} <span class="faint small">${esc(x.name)}</span></td><td class="r num">${(x.pct * 100).toFixed(2)}%</td><td class="r num">${fmtB(x.value)}</td><td>${x.chg ? `<span class="badge ${CHG[x.chg][1]}">${CHG[x.chg][0]}${x.chg_pct && x.chg !== "same" ? " " + pct(x.chg_pct, 0) : ""}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>
+      ${f.sold?.length ? `<div class="label" style="margin-top:12px">Sold out this quarter</div><div class="small">${f.sold.map(x => `<span style="margin-right:10px;white-space:nowrap">${tk(x.t)} <span class="faint">was ${(x.prev_pct * 100).toFixed(1)}%</span></span>`).join("")}</div>` : ""}
+      ${f.options?.length ? `<div class="label" style="margin-top:12px">Options positions (notional)</div><div class="small">${f.options.map(x => `<span style="margin-right:10px;white-space:nowrap">${tk(x.t)} ${esc(x.pc)} <span class="faint">${fmtB(x.value)}</span></span>`).join("")}</div>` : ""}
+      ${f.history?.length > 2 ? `<div class="label" style="margin-top:12px">Reported 13F value by quarter</div>${spark(f.history.map(h => h.value).reverse(), 160, 26)}` : ""}
+    </div>` : ""}</div>`;
+}
+function consensusTable(title, rows, kind) {
+  return `<div class="card"><h3>${title}</h3>${rows?.length ? `<table><tbody>${rows.map(r => `<tr><td>${tk(r.t || null)} <span class="faint small">${esc(r.name)}</span></td><td class="r num">${r.funds.length}</td><td class="small muted">${esc(r.funds.slice(0, 4).map(f => f.fund).join(", "))}${r.funds.length > 4 ? "…" : ""}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">Nothing yet.</p>`}</div>`;
+}
+function trackTables() {
+  const T = DATA.track;
+  if (!T) return `<div class="card"><h3>Track records</h3><p class="muted">Track records are computed in the nightly build and will appear after tonight's run.</p></div>`;
+  const row = (r, who) => `<tr><td>${who}</td><td class="r num">${r.n63}</td><td class="r num ${cls(r.avg21)}">${pct(r.avg21)}</td><td class="r num ${cls(r.avg63)}"><b>${pct(r.avg63)}</b></td><td class="r num ${cls(r.avg126)}">${pct(r.avg126)}</td><td class="r num">${Math.round(r.hit63 * 100)}%</td><td class="small">${(r.best || []).slice(0, 2).map(b => `${tk(b.t)} <span class="faint">${pct(b.x63, 0)}</span>`).join(", ")}</td></tr>`;
+  const head = `<thead><tr><th>Who</th><th class="r">Buys</th><th class="r">1 mo</th><th class="r">3 mo</th><th class="r">6 mo</th><th class="r">Hit</th><th>Best</th></tr></thead>`;
+  const cv = T.coverage || {};
+  return `<div class="card"><h3>Latest buys by top-ranked traders <span class="label">last 60 days</span></h3>
+      ${(T.recent_by_top || []).length ? `<table><tbody>${T.recent_by_top.slice(0, 20).map(r => `<tr><td>${tk(r.t)}</td><td class="small">${esc(r.who)} <span class="badge">${esc(r.kind)}</span>${r.opt ? ` <span class="badge warn">Options</span>` : ""}</td><td class="r small num">${r.amount ? esc(amtRange({amount_low: r.amount[0], amount_high: r.amount[1]})) : fmtB(r.value)}</td><td class="r num small">filed ${esc(fmtShort(r.filed))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">None in the last 60 days.</p>`}</div>
+    <div class="card" style="margin-top:14px"><h3>Congress <span class="label">return vs S&amp;P after each disclosed purchase</span></h3>
+      <div style="overflow-x:auto"><table>${head}<tbody>${(T.congress || []).slice(0, 30).map(r => row(r, `${esc(r.name)} <span class="faint small">${esc((r.party || "?")[0])}-${esc(r.state || "")} · ${esc(r.chamber || "")}</span>`)).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">${(cv.congress_ranked || 0).toLocaleString()} members with 3+ priced purchases, from ${(cv.congress_buys || 0).toLocaleString()} disclosed buys over 3 years.</p></div>
+    <div class="card" style="margin-top:14px"><h3>Insiders <span class="label">officers & directors buying their own stock</span></h3>
+      <div style="overflow-x:auto"><table>${head}<tbody>${(T.insiders || []).slice(0, 30).map(r => row(r, `${esc(r.name)} <span class="faint small">${tk(r.t)} · ${esc(r.role || "")}</span>`)).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">${(cv.insiders_ranked || 0).toLocaleString()} insiders with 2+ priced buys in the last year. With one year of history, few have long records yet.</p></div>
+    <p class="faint small" style="margin-top:10px">How it's measured: each purchase is "bought" at the first close after it was disclosed, which is when you could have followed it, then compared with the ${esc(T.benchmark)} over the next 1, 3 and 6 months. Single trades are capped at +100%/−90%, and people are ranked on a shrunk 3-month average so a couple of lucky trades don't top the list. Hit = share of buys that beat the market over 3 months. Small samples: treat these as leads, not proof.</p>`;
+}
+function viewResearch() {
+  const V = UI.resView || "funds";
+  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Track records"]];
+  let body = "";
+  if (V === "track") body = trackTables();
+  else if (!RES) { body = `<div class="card"><p class="muted">Loading 13F data…</p></div>`; loadResearch(); }
+  else if (!RES.filers?.length) body = `<div class="card"><h3>13F holdings</h3><p class="muted">The 13F data hasn't been built yet. It refreshes every Saturday.</p></div>`;
+  else if (V === "smart") { const C = RES.consensus || {}; body = `<div class="grid2">${consensusTable("Most owned by tracked funds", C.most_owned)}${consensusTable("Most bought last quarter (new or added)", C.most_bought)}${consensusTable("Most sold last quarter (exited or cut 25%+)", C.most_sold)}</div>
+      <p class="faint small" style="margin-top:10px">Across the ${RES.filers.filter(f => f.group === "fund" && !f.error).length} funds tracked, from each one's latest 13F. Counts use each fund's top ${RES.notes?.top_n || 60} positions.</p>`; }
+  else {
+    const grp = V === "corp" ? "corporate" : "fund", sortK = UI.resSort || "copycat";
+    const list = RES.filers.filter(f => f.group === grp).sort((a, b) => a.error ? 1 : b.error ? -1 : sortK === "aum" ? (b.value || 0) - (a.value || 0) : sortK === "name" ? a.name.localeCompare(b.name)
+      : ((b.copycat ? b.copycat.ann - b.copycat.spy_ann : -9) - (a.copycat ? a.copycat.ann - a.copycat.spy_ann : -9)));
+    body = `${V === "funds" ? `<div class="bar" style="margin-bottom:10px"><select class="sel" id="rsort" aria-label="Sort funds"><option value="copycat" ${sortK === "copycat" ? "selected" : ""}>Sort: copycat vs S&amp;P</option><option value="aum" ${sortK === "aum" ? "selected" : ""}>Sort: 13F size</option><option value="name" ${sortK === "name" ? "selected" : ""}>Sort: name</option></select></div>` : `<p class="muted small" style="margin-top:0">Stocks these companies hold in their own investment portfolios, often strategic stakes in partners and suppliers.</p>`}
+      <div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>
+      <p class="faint small" style="margin-top:10px">From SEC 13F filings: long US-listed stocks and options only, no shorts or cash, reported up to 45 days after each quarter. "Copycat" buys each reported portfolio (top ${RES.notes?.top_n || 60} positions, value-weighted) at the first close after its filing date and holds until the next filing, which is what a follower could actually do. Updated ${esc(fmtDate(RES.generated))}.</p>`;
+  }
+  $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Research</h1><span class="muted">Who owns what, and whose picks have worked</span></div>
+    <div class="seg" style="margin-bottom:14px">${segs.map(([k, l]) => `<button data-rv="${k}" aria-pressed="${V === k}">${l}</button>`).join("")}</div>${body}<p class="disclaimer">For personal research. Not financial advice.</p>`;
+  $$("[data-rv]").forEach(b => b.onclick = () => { UI.resView = b.dataset.rv; viewResearch(); });
+  $$("[data-fopen]").forEach(b => b.onclick = () => { UI.resOpen = UI.resOpen === b.dataset.fopen ? null : b.dataset.fopen; viewResearch(); });
+  $$("#view [data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); Sheet.open(b.dataset.open); });
+  const rs = $("#rsort"); if (rs) rs.onchange = () => { UI.resSort = rs.value; viewResearch(); };
+}
 // ================================================================ momentum, congress, trends
 const REGIME_C = {"Falling knife": "var(--down)", "Basing / turning": "var(--warn)", "Healthy uptrend": "var(--up)", "Overextended": "var(--s3)", "Neutral": "var(--faint)"};
 // ================================================================ Trend & Rally Setup + backtest
