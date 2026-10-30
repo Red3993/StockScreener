@@ -1950,7 +1950,7 @@ function filerCard(f) {
     <button class="link" data-fopen="${esc(f.name)}" style="display:block;width:100%;text-align:left;color:inherit">
       <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><h3 style="margin:0">${esc(f.name)}</h3><span class="muted small">${esc(f.manager || "")} · ${esc(f.style || "")}</span><span style="margin-left:auto" class="faint small">${open ? "▲" : "▼"}</span></div>
       <div class="pill-row" style="margin-top:8px"><span class="badge">${fmtB(f.value)} · ${f.n} stocks</span><span class="badge">Top 10 = ${Math.round(f.top10_pct * 100)}%</span>
-        ${c ? `<span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
+        ${f.stale ? `<span class="badge warn">No 13F since ${esc(fmtMY(f.filed))}</span>` : ""}${c ? `<span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
       <div class="small" style="margin-top:8px">${f.top.slice(0, 6).map(x => `<span style="white-space:nowrap;margin-right:10px"><b>${esc(x.t || x.name.slice(0, 14))}</b> <span class="faint">${(x.pct * 100).toFixed(1)}%</span>${x.chg && x.chg !== "same" ? ` <span class="${CHG[x.chg][1] === "bad" ? "down" : "up"}">${x.chg === "new" ? "new" : x.chg === "add" ? "↑" : "↓"}</span>` : ""}</span>`).join("")}</div>
     </button>
     ${open ? `<div style="margin-top:12px">
@@ -1995,7 +1995,7 @@ function viewResearch() {
       <p class="faint small" style="margin-top:10px">Across the ${RES.filers.filter(f => f.group === "fund" && !f.error).length} funds tracked, from each one's latest 13F. Counts use each fund's top ${RES.notes?.top_n || 60} positions.</p>`; }
   else {
     const grp = V === "corp" ? "corporate" : "fund", sortK = UI.resSort || "copycat";
-    const list = RES.filers.filter(f => f.group === grp).sort((a, b) => a.error ? 1 : b.error ? -1 : sortK === "aum" ? (b.value || 0) - (a.value || 0) : sortK === "name" ? a.name.localeCompare(b.name)
+    const list = RES.filers.filter(f => f.group === grp).sort((a, b) => a.error ? 1 : b.error ? -1 : a.stale !== b.stale ? (a.stale ? 1 : -1) : sortK === "aum" ? (b.value || 0) - (a.value || 0) : sortK === "name" ? a.name.localeCompare(b.name)
       : ((b.copycat ? b.copycat.ann - b.copycat.spy_ann : -9) - (a.copycat ? a.copycat.ann - a.copycat.spy_ann : -9)));
     body = `${V === "funds" ? `<div class="bar" style="margin-bottom:10px"><select class="sel" id="rsort" aria-label="Sort funds"><option value="copycat" ${sortK === "copycat" ? "selected" : ""}>Sort: copycat vs S&amp;P</option><option value="aum" ${sortK === "aum" ? "selected" : ""}>Sort: 13F size</option><option value="name" ${sortK === "name" ? "selected" : ""}>Sort: name</option></select></div>` : `<p class="muted small" style="margin-top:0">Stocks these companies hold in their own investment portfolios, often strategic stakes in partners and suppliers.</p>`}
       <div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>

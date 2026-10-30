@@ -35,6 +35,4 @@ funds:
   - {name: Alphabet, manager: Google's parent, cik: 1652044, match: [alphabet], style: Strategic stakes, group: corporate}
   - {name: NVIDIA, manager: NVIDIA, cik: 1045810, match: [nvidia], style: Strategic stakes (AI ecosystem), group: corporate}
   - {name: Amazon, manager: Amazon.com, cik: 1018724, match: [amazon], style: Strategic stakes, group: corporate}
-  - {name: Microsoft, manager: Microsoft, cik: 789019, match: [microsoft], style: Strategic stakes, group: corporate}
-  - {name: Meta Platforms, manager: Meta, cik: 1326801, match: [meta, platforms], style: Strategic stakes, group: corporate}
-  - {name: Salesforce, manager: Salesforce Ventures, cik: 1108524, match: [salesforce], style: Strategic stakes, group: corporate}
+# Microsoft, Meta and Salesforce were tried: they don't file 13Fs (or stopped in 2023).

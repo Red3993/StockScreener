@@ -135,8 +135,10 @@ def info_table(sec, cik: int, acc: str) -> list[dict]:
 
 
 def aggregate(rows: list[dict], period: str) -> dict:
-    # values are in dollars for filings since 2023; earlier ones were in thousands
-    mult = 1000.0 if period < "2022-12-31" else 1.0
+    # values are in dollars for filings since 2023 and in thousands before, but some filers kept reporting thousands:
+    # if the implied share prices are mostly below $1, the table is in thousands
+    implied = sorted(r["value"] / r["shares"] for r in rows if r["shares"] > 0 and r["kind"] == "SH" and not r["pc"] and r["value"] > 0)
+    mult = 1000.0 if (period < "2022-12-31" or (implied and implied[len(implied) // 2] < 1.0)) else 1.0
     eq, opt = defaultdict(lambda: {"value": 0.0, "shares": 0.0}), defaultdict(float)
     names = {}
     for r in rows:
@@ -159,24 +161,36 @@ def aggregate(rows: list[dict], period: str) -> dict:
 
 
 # ------------------------------------------------------------------ CUSIP -> ticker
-def map_cusips(cusips: dict[str, str], universe: dict[str, str], cache: dict) -> dict[str, str | None]:
-    """cusips: cusip -> issuer name. universe: normalized company name -> ticker."""
+US_EXCH = {"US", "UN", "UW", "UQ", "UA", "UR", "UP", "UV", "UF"}
+
+
+def map_cusips(cusips: dict[str, str], universe: dict[str, set], cache: dict) -> dict[str, str | None]:
+    """cusips: cusip -> issuer name. universe: normalized company name -> set of app tickers.
+    Names shared by several share classes (Alphabet, Berkshire, Fox...) go to OpenFIGI so the class is right.
+    Only successful lookups are cached, so misses are retried on the next run."""
     out = {}
     todo = []
+    first2 = defaultdict(set)
+    for k, ts in universe.items():
+        w = k.split()
+        if len(w) >= 2:
+            first2[" ".join(w[:2])] |= ts
     for c, nm in cusips.items():
-        if c in cache:
+        if cache.get(c):
             out[c] = cache[c]
             continue
-        t = universe.get(norm_name(nm))
-        if t:
-            out[c] = cache[c] = t
+        n = norm_name(nm)
+        ts = universe.get(n) or (first2.get(" ".join(n.split()[:2])) if len(n.split()) >= 2 else None)
+        if ts and len(ts) == 1:
+            out[c] = cache[c] = next(iter(ts))
         else:
             todo.append(c)
     log(f"cusips: {len(cusips)} total, {len(cusips) - len(todo)} known, {len(todo)} to look up on OpenFIGI")
     s = requests.Session()
     for i in range(0, len(todo), 10):
         part = todo[i:i + 10]
-        body = [{"idType": "ID_CUSIP", "idValue": c, "exchCode": "US"} for c in part]
+        # foreign issuers have CINS codes (first character a letter); no exchange filter, US listings preferred below
+        body = [{"idType": "ID_CINS" if c[:1].isalpha() else "ID_CUSIP", "idValue": c} for c in part]
         for attempt in range(4):
             try:
                 r = s.post("https://api.openfigi.com/v3/mapping", json=body, timeout=30)
@@ -192,9 +206,12 @@ def map_cusips(cusips: dict[str, str], universe: dict[str, str], cache: dict) ->
             res = []
         for c, x in zip(part, res if isinstance(res, list) else []):
             data = (x or {}).get("data") or []
-            eqs = [d for d in data if (d.get("marketSector") == "Equity")] or data
-            tk = (eqs[0].get("ticker") if eqs else None)
-            out[c] = cache[c] = tk.replace("/", "-").replace(" ", "-") if tk else None
+            eqs = [d for d in data if d.get("marketSector") == "Equity"] or data
+            us = [d for d in eqs if d.get("exchCode") in US_EXCH] or eqs
+            tk = us[0].get("ticker") if us else None
+            out[c] = tk.replace("/", "-").replace(" ", "-") if tk else None
+            if out[c]:
+                cache[c] = out[c]
         time.sleep(2.6)    # 25 requests / minute without an API key
     return out
 
@@ -292,12 +309,13 @@ def main() -> int:
     cdir = Path(a.cache)
     cdir.mkdir(parents=True, exist_ok=True)
     cache = json.loads((cdir / "cusip_map.json").read_text()) if (cdir / "cusip_map.json").exists() else {}
-    fcache = json.loads((cdir / "filings.json").read_text()) if (cdir / "filings.json").exists() else {}   # acc -> aggregated
+    cache = {k: v for k, v in cache.items() if v and v not in ("GOOG", "GOOGL", "BRK-A", "BRK-B", "FOX", "FOXA", "NWS", "NWSA")}   # re-resolve share classes
+    fcache = json.loads((cdir / "filings_v2.json").read_text()) if (cdir / "filings_v2.json").exists() else {}   # acc -> aggregated
     universe = {}
     try:
         idx = json.loads((Path(a.app_data) / "index.json").read_text())
         for r in idx["rows"]:
-            universe.setdefault(norm_name(r["n"]), r["t"])
+            universe.setdefault(norm_name(r["n"]), set()).add(r["t"])
         app_tickers = {r["t"] for r in idx["rows"]}
     except Exception as e:  # noqa: BLE001
         log(f"no app index: {e}")
@@ -378,8 +396,9 @@ def main() -> int:
                                                     sorted(q["agg"]["eq"].items(), key=lambda kv: -kv[1]["value"])[:TOP_N]]} for q in reversed(qs)],
                      P, today)
         top10 = sum(x["pct"] for x in top[:10])
+        stale = (pd.Timestamp(today) - pd.Timestamp(cur["filed"])).days > 200
         out_f.append({**base, "period": cur["period"], "filed": cur["filed"], "value": round(cur["agg"]["total"]), "n": cur["agg"]["n"],
-                      "top10_pct": round(top10, 4), "top": top, "sold": sold[:25],
+                      "top10_pct": round(top10, 4), "stale": stale, "top": top, "sold": sold[:25],
                       "options": [{"cusip": k.split("|")[0], "pc": k.split("|")[1], "name": cur["agg"]["names"].get(k.split("|")[0], ""),
                                    "t": cmap.get(k.split("|")[0]), "value": round(v)} for k, v in opts],
                       "history": hist, "copycat": cc})
@@ -388,22 +407,27 @@ def main() -> int:
     own, buy, sell = defaultdict(list), defaultdict(list), defaultdict(list)
     names = {}
     for f in out_f:
-        if f.get("error") or f.get("group") != "fund":
+        if f.get("error") or f.get("group") != "fund" or f.get("stale"):
             continue
+        seen_o, seen_b, seen_s = set(), set(), set()
         for x in f["top"]:
             k = x["t"] or x["cusip"]
             names[k] = x["name"]
-            own[k].append({"fund": f["name"], "pct": x["pct"]})
-            if x.get("chg") in ("new", "add"):
+            if k not in seen_o:
+                seen_o.add(k)
+                own[k].append({"fund": f["name"], "pct": x["pct"]})
+            if x.get("chg") in ("new", "add") and k not in seen_b:
+                seen_b.add(k)
                 buy[k].append({"fund": f["name"], "chg": x["chg"], "pct": x["pct"]})
+            if x.get("chg") == "trim" and (x.get("chg_pct") or 0) <= -0.25 and k not in seen_s:
+                seen_s.add(k)
+                sell[k].append({"fund": f["name"], "trim": x["chg_pct"]})
         for x in f["sold"]:
             k = x["t"] or x["cusip"]
             names[k] = x["name"]
-            sell[k].append({"fund": f["name"], "prev_pct": x["prev_pct"]})
-        for x in f["top"]:
-            if x.get("chg") == "trim" and (x.get("chg_pct") or 0) <= -0.25:
-                k = x["t"] or x["cusip"]
-                sell[k].append({"fund": f["name"], "trim": x["chg_pct"]})
+            if k not in seen_s:
+                seen_s.add(k)
+                sell[k].append({"fund": f["name"], "prev_pct": x["prev_pct"]})
 
     def rank(d, n=25):
         rows = [{"k": k, "t": k if k in cmap.values() else None, "name": names.get(k, ""), "in_app": k in app_tickers, "funds": v}
@@ -415,7 +439,7 @@ def main() -> int:
            "notes": {"top_n": TOP_N, "quarters": QUARTERS}, "log": LOG[-200:]}
     Path(a.out).write_text(json.dumps(res, separators=(",", ":"), default=lambda o: None if isinstance(o, float) and math.isnan(o) else str(o)))
     (cdir / "cusip_map.json").write_text(json.dumps(cache, separators=(",", ":")))
-    (cdir / "filings.json").write_text(json.dumps(fcache, separators=(",", ":")))
+    (cdir / "filings_v2.json").write_text(json.dumps(fcache, separators=(",", ":")))
     ok = sum(1 for f in out_f if not f.get("error"))
     log(f"research.json: {ok}/{len(out_f)} filers, {Path(a.out).stat().st_size / 1e6:.2f} MB")
     return 0 if ok else 1

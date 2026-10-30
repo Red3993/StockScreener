@@ -28,7 +28,7 @@ jobs:
           mkdir -p rcache
           if git fetch --depth 1 origin research-data 2>/dev/null; then
             git show origin/research-data:cusip_map.json > rcache/cusip_map.json 2>/dev/null || true
-            git show origin/research-data:filings.json > rcache/filings.json 2>/dev/null || true
+            git show origin/research-data:filings_v2.json > rcache/filings_v2.json 2>/dev/null || true
           fi
       - name: Build research.json
         env:
