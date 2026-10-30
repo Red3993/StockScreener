@@ -155,8 +155,10 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Build now writes `bench` {SPY, QQQ, IWM} closes aligned to `dates`; prices_quick adds SPY/QQQ/IWM; the page extends bench.
 - 2026-10-30 **Research tab** (6th nav tab): Funds / Companies / Smart money / Track records.
   `jobs/research/build_research.py` + `research.yml` (Saturdays + dispatch) → `research.json` on `research-data`
-  (+ caches cusip_map.json, filings.json). Filers in `config/funds.yaml` (28 funds + Alphabet, NVIDIA, Amazon, Microsoft,
-  Meta, Salesforce); CIK hints verified against the SEC name, else EDGAR full-text search. Up to 13 quarters of 13F-HR,
+  (+ caches cusip_map.json, filings_v2.json). Filers in `config/funds.yaml` (28 funds + Alphabet, NVIDIA, Amazon; Microsoft,
+  Meta, Salesforce don't file 13Fs). CIK hints verified against the SEC name, else EDGAR full-text search. Some filers still
+  report values in thousands → detected from implied share prices. Filers with no 13F in 200 days are flagged `stale`
+  (Scion, Greenlight) and left out of consensus. Fetch force-pushed data branches with `+branch:refs/remotes/origin/branch`. Up to 13 quarters of 13F-HR,
   top 60 positions, CUSIP→ticker via app names then OpenFIGI (free, 25 req/min), copycat = buy each 13F at first close after
   filing, hold to the next filing, vs SPY. Consensus: most owned / bought / sold across funds.
   Track records: `jobs/lib/track.py` in the build → index `track` (congress 3y + insiders 1y purchases; excess return vs SPY
