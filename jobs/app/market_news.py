@@ -28,6 +28,7 @@ import requests
 SNAP = [("SPY", "S&P 500", "index"), ("QQQ", "Nasdaq 100", "index"), ("IWM", "Russell 2000", "index"), ("DIA", "Dow", "index"),
         ("^VIX", "VIX (fear gauge)", "vol"), ("^TNX", "10-year Treasury yield", "rate"), ("DX-Y.NYB", "US dollar index", "fx"),
         ("CL=F", "Oil (WTI)", "commodity"), ("GC=F", "Gold", "commodity"), ("BTC-USD", "Bitcoin", "crypto")]
+WIRES = {"businesswire", "globenewswire", "prnewswire", "accesswire", "newsfile"}   # company press releases, often not English
 SECTORS = [("XLK", "Technology"), ("XLC", "Communication Services"), ("XLY", "Consumer Discretionary"), ("XLP", "Consumer Staples"),
            ("XLF", "Financials"), ("XLV", "Health Care"), ("XLI", "Industrials"), ("XLE", "Energy"), ("XLB", "Materials"),
            ("XLU", "Utilities"), ("XLRE", "Real Estate")]
@@ -85,7 +86,7 @@ def news(days: int) -> list[dict]:
             title = re.sub(r"\s+", " ", (it.get("headline") or "")).strip()
             norm = re.sub(r"[^a-z0-9 ]", "", title.lower())[:90]
             ts = it.get("datetime") or 0
-            if not title or norm in seen or ts < cut:
+            if not title or norm in seen or ts < cut or (it.get("source") or "").lower() in WIRES:
                 continue
             seen.add(norm)
             out.append({"title": title, "src": it.get("source"), "url": it.get("url"),
