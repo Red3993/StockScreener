@@ -204,6 +204,19 @@ tr:last-child td{border-bottom:0}
 .chatin{display:flex;gap:8px;margin-top:10px}
 .chatin textarea{min-height:44px;flex:1}
 .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+/* market brief (Calendar tab) */
+.mkt{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin-bottom:12px}
+.mkt div{background:var(--sunk);border-radius:8px;padding:7px 9px;min-width:0}
+.mkt .n{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mkt .v{font:600 14px var(--f-mono);font-variant-numeric:tabular-nums}
+.mkt .c{font:500 12px var(--f-mono);font-variant-numeric:tabular-nums}
+.brief h4{font-family:var(--f-display);font-size:15px;margin:14px 0 6px}
+.brief ul{margin:0;padding-left:18px;display:grid;gap:6px} .brief li{font-size:14.5px}
+.brief li b{font-weight:650}
+.brief .when{font:600 12px var(--f-mono);color:var(--accent);margin-right:6px;white-space:nowrap}
+.sectors{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.hl{display:grid;gap:8px;margin-top:8px} .hl a{color:var(--fg);text-decoration:none} .hl a:hover{text-decoration:underline}
+.hl .meta{font-size:11.5px;color:var(--faint)}
 .suggest button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 10px;font-size:12.5px;color:var(--muted)}
 .thinking{color:var(--muted);font-style:italic}
 
@@ -640,6 +653,134 @@ function patchCloses(t, v) {   // extend a stock's daily closes with the quick p
   const r = RB[t]; if (r?.d?.px != null) { v.price = r.d.px; v.chg_1d = r.d.c1; }
 }
 
+// ================================================================ market brief (Calendar tab)
+let MARKET = null, MARKET_P = null;
+function loadMarket() { if (!MARKET_P) MARKET_P = fetch("market.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { MARKET = j || {snapshot: [], sectors: [], news: []}; if (UI.tab === "cal" && $("#sheet").hidden) Brief.paint(); }); return MARKET_P; }
+const fmtLvl = x => x.last == null ? "—" : x.k === "^TNX" ? x.last.toFixed(2) + "%" : x.kind === "index" || x.kind === "vol" || x.kind === "fx" ? x.last.toFixed(2) : "$" + x.last.toLocaleString(undefined, {maximumFractionDigits: x.last > 1000 ? 0 : 2});
+const fmtChg = (x, k = "d1") => x[k] == null ? "—" : x.k === "^TNX" ? (x[k] > 0 ? "+" : "") + Math.round(x[k] * 100) + " bp" : pct(x[k], 2);
+const chgCls = x => x.d1 == null ? "" : (x.k === "^VIX" || x.k === "^TNX") ? (x.d1 > 0 ? "down" : "up") : cls(x.d1);
+function upcomingFor(days, scope = "top") {
+  const end = new Date(DATA.lastDate + "T12:00:00"); end.setDate(end.getDate() + days); const e2 = end.toISOString().slice(0, 10);
+  const macro = (DATA.macro || []).filter(m => m.date > DATA.lastDate && m.date <= e2).map(m => `${m.date} ${m.label}`);
+  const watch = new Set(lists().flatMap(l => l.items.map(i => i.ticker)));
+  const earn = ROWS.filter(r => r.e?.earn && r.e.earn > DATA.lastDate && r.e.earn <= e2 && (scope === "all" || r.top || watch.has(r.t)))
+    .sort((a, b) => a.e.earn.localeCompare(b.e.earn) || (b.mc || 0) - (a.mc || 0)).slice(0, 40).map(r => `${r.e.earn} ${r.t} (${r.n}) earnings${watch.has(r.t) ? " [on watchlist]" : ""}`);
+  return {macro, earn};
+}
+function marketContext(nNews = 45) {
+  const M = MARKET || {}, L = [];
+  L.push(`Market data as of the close on ${M.asof || DATA.lastDate}.`);
+  if (M.snapshot?.length) L.push("Snapshot (level; 1-day, 5-day, 1-month change): " + M.snapshot.map(x => `${x.name} ${fmtLvl(x)} (${fmtChg(x)}, ${fmtChg(x, "d5")}, ${fmtChg(x, "m1")})`).join("; ") + ".");
+  if (M.sectors?.length) L.push("S&P sector ETFs 1-day / 5-day: " + [...M.sectors].sort((a, b) => (b.d1 ?? 0) - (a.d1 ?? 0)).map(x => `${x.name} ${pct(x.d1)} / ${pct(x.d5)}`).join("; ") + ".");
+  const breadth = ROWS.filter(r => r.d?.c1 != null), up = breadth.filter(r => r.d.c1 > 0).length;
+  if (breadth.length) L.push(`Breadth in this app's ${breadth.length.toLocaleString()} stocks: ${up.toLocaleString()} up, ${(breadth.length - up).toLocaleString()} down on the day.`);
+  const u = upcomingFor(21); L.push("Scheduled macro releases (next 3 weeks): " + (u.macro.join("; ") || "none listed") + ".");
+  L.push("Upcoming earnings, largest stocks and watchlist (next 3 weeks): " + (u.earn.join("; ") || "none listed") + ".");
+  L.push("Headlines (newest first, [n] = reference number):\n" + (M.news || []).slice(0, nNews).map((h, i) => `[${i}] ${new Date(h.ts * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC · ${h.src}: ${h.title}${h.summary ? " — " + h.summary.slice(0, 220) : ""}`).join("\n"));
+  return L.join("\n");
+}
+const BRIEF_RULES = `You are a markets analyst writing for one individual investor inside a personal stock research app. Use ONLY the market data, calendar and headlines provided, plus general background knowledge of how markets work. Do not invent numbers, quotes or events; if the headlines don't explain a move, say the cause isn't clear from the news. Do not tell the reader to buy or sell. Plain English, concrete, no hype.`;
+const Brief = {
+  doc: null, loaded: false, chat: [], busy: false, ctl: null,
+  async init() { const d = await Store.getDoc("brief"); if (!this.busy) { this.doc = d || this.doc; this.paint(); } },
+  async refresh() {
+    if (this.busy || !AI.sample) return; this.busy = true; this.ctl = new AbortController(); this.paint();
+    const prompt = `${BRIEF_RULES}
+
+Write today's market brief from the data below. Return JSON only, exactly this shape:
+{"summary": "2-3 sentences: the main story of the session and the mood",
+ "moved": [{"title": "short headline", "detail": "1-2 sentences on what happened and why it mattered for stocks", "refs": [headline numbers]}],
+ "world": [{"title": "...", "detail": "1-2 sentences on the event and its market angle", "refs": [...]}],
+ "ahead": [{"date": "YYYY-MM-DD", "title": "event", "detail": "1 sentence on why it matters"}]}
+"moved": 3-5 items explaining the market's biggest moves (indices, sectors, yields, oil, dollar). "world": 3-5 non-company world events (policy, geopolitics, central banks, economy). "ahead": 4-7 items from the scheduled calendar and the headlines over the next 2 weeks, earliest first; include notable earnings only if they could move the market or are on the watchlist.
+
+DATA
+${marketContext()}`;
+    try {
+      const r = await AI.sample.json(prompt, {signal: this.ctl.signal, cache: false, modelTier: "complex"});
+      const news = MARKET?.news || [], src = new Map();
+      const fix = arr => (Array.isArray(arr) ? arr : []).map(x => { (x.refs || []).forEach(n => { const h = news[n]; if (h?.url) src.set(h.url, {title: h.title, url: h.url, src: h.src}); }); return {date: x.date, title: x.title, detail: x.detail}; });
+      const body = {asof: MARKET?.asof || DATA.lastDate, generated: new Date().toISOString(), by: "page", web: false, summary: r.summary || "", moved: fix(r.moved), world: fix(r.world), ahead: fix(r.ahead), sources: [...src.values()].slice(0, 20)};
+      this.doc = body; await Store.setDoc("brief", body);
+    } catch (e) { if (e?.code !== "cancelled") toast(AI.errText(e)); }
+    finally { this.busy = false; this.paint(); }
+  },
+  html() {
+    const M = MARKET, b = this.doc;
+    if (!M) return `<div class="card"><h3>Market brief</h3><p class="muted">Loading market data…</p></div>`;
+    const snap = (M.snapshot || []).filter(x => x.last != null);
+    const sect = [...(M.sectors || [])].filter(x => x.d1 != null).sort((a, b) => b.d1 - a.d1);
+    const stale = b && M.asof && b.asof !== M.asof;
+    const list = (arr, dated) => (arr || []).length ? `<ul>${arr.map(x => `<li>${dated && x.date ? `<span class="when">${esc(fmtShort(x.date))}</span>` : ""}<b>${esc(x.title || "")}</b>${x.detail ? ". " + esc(x.detail) : ""}</li>`).join("")}</ul>` : `<p class="muted small">Nothing notable.</p>`;
+    const canWrite = AI.sample && (MARKET.news?.length || MARKET.snapshot?.length);
+    return `<div class="card brief"><h3>Market brief <span class="label">${esc(fmtDate(M.asof || DATA.lastDate))} close</span>
+      ${canWrite ? `<button class="btn small ${b && !stale ? "" : "primary"}" id="briefGo" style="margin-left:auto" ${this.busy ? "disabled" : ""}>${this.busy ? "Writing…" : b ? "Rewrite" : "Write brief"}</button>` : ""}</h3>
+      ${snap.length ? `<div class="mkt">${snap.map(x => `<div title="5-day ${esc(fmtChg(x, "d5"))} · 1-month ${esc(fmtChg(x, "m1"))}"><div class="n">${esc(x.name)}</div><div class="v">${esc(fmtLvl(x))}</div><div class="c ${chgCls(x)}">${esc(fmtChg(x))}</div></div>`).join("")}</div>` : ""}
+      ${sect.length ? `<div class="label">Sectors today</div><div class="sectors">${sect.map(x => `<span class="badge ${x.d1 > 0 ? "good" : x.d1 < 0 ? "bad" : ""}" title="5-day ${pct(x.d5)}">${esc(x.name)} ${pct(x.d1)}</span>`).join("")}</div>` : ""}
+      ${this.busy ? `<p class="thinking" style="margin-top:14px">Reading ${(M.news || []).length} headlines and the calendar… about a minute.</p>`
+        : b ? `<p style="margin:14px 0 0;font-size:15px">${esc(b.summary || "")}</p>
+          <h4>What moved markets</h4>${list(b.moved)}
+          <h4>World events</h4>${list(b.world)}
+          <h4>Coming up</h4>${list(b.ahead, true)}
+          ${(b.sources || []).length ? `<details class="small" style="margin-top:10px"><summary class="faint">Sources (${b.sources.length})</summary><ul style="margin-top:6px">${b.sources.map(x => `<li><a class="link" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>${x.src ? ` <span class="faint">· ${esc(x.src)}</span>` : ""}</li>`).join("")}</ul></details>` : ""}
+          <p class="faint small" style="margin:8px 0 0">${b.by === "nightly" ? "Written by Claude after the close" + (b.web ? " from the news feed plus a web search" : "") : "Written by Claude from the news feed"} · ${esc(new Date(b.generated).toLocaleString())}${stale ? " · newer market data is available, tap Rewrite" : ""}.</p>`
+        : `<p class="muted" style="margin-top:14px">${AI.sample ? "No brief yet for this close. Tap Write brief for a summary of what moved markets, world events, and what's coming up." : AI.ready ? "Claude isn't available in this view, so the written brief can't be generated here. Headlines are below." : "Checking AI availability…"}</p>`}
+      ${(M.news || []).length ? `<details style="margin-top:12px"><summary class="faint small">Latest headlines (${M.news.length})</summary><div class="hl">${M.news.slice(0, 30).map(h => `<div><a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.title)}</a><div class="meta">${esc(h.src || "")} · ${esc(new Date(h.ts * 1000).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))}</div></div>`).join("")}</div></details>`
+        : `<p class="faint small" style="margin-top:12px">No market headlines in this snapshot.</p>`}
+    </div>`;
+  },
+  chatHtml() {
+    if (!AI.sample) return "";
+    return `<div class="card"><h3>Ask about the markets</h3>
+      <div class="chatlog" id="mchat">${this.chat.map(m => m.role === "user" ? `<div class="msg me">${esc(m.content)}</div>` : `<div class="msg bot md">${md(m.content)}</div>`).join("")}</div>
+      ${this.chat.length ? "" : `<div class="suggest">${["Why did markets move today?", "What could the next Fed meeting change?", "Which sectors are most exposed to the top world story?", "What's the biggest risk on the calendar this week?"].map(q => `<button data-mq="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
+      <form class="chatin" id="mchatF"><textarea id="mchatIn" placeholder="Ask about an event, a sector or a stock…" aria-label="Question about the markets" rows="1"></textarea><button class="btn primary" id="mchatGo" ${this.busy ? "disabled" : ""}>Send</button></form>
+      <p class="faint small" style="margin:8px 0 0">Uses your Claude usage. Answers draw on this snapshot's market data, headlines and calendar, plus any stock in the app; it can't browse the web. Not financial advice.</p></div>`;
+  },
+  paint() {
+    const box = $("#briefBox"); if (!box) return;
+    box.innerHTML = this.html() + this.chatHtml();
+    const g = $("#briefGo"); if (g) g.onclick = () => this.refresh();
+    $$("[data-mq]", box).forEach(b => b.onclick = () => { $("#mchatIn").value = b.dataset.mq; this.ask(); });
+    const f = $("#mchatF"); if (f) { f.onsubmit = e => { e.preventDefault(); this.ask(); }; $("#mchatIn").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.ask(); } }; }
+  },
+  tools() {
+    if (!AI.tools) return undefined;
+    const news = () => MARKET?.news || [];
+    return [
+      {name: "search_headlines", description: "Search this snapshot's market headlines (last few days) by keywords. Returns up to 15 matches with source, time and summary.",
+       inputSchema: {type: "object", properties: {query: {type: "string"}}, required: ["query"]},
+       execute: ({query}) => { const w = String(query || "").toLowerCase().split(/\s+/).filter(x => x.length > 2);
+         const hits = news().map(h => ({h, s: w.filter(x => (h.title + " " + h.summary).toLowerCase().includes(x)).length})).filter(x => x.s).sort((a, b) => b.s - a.s).slice(0, 15);
+         return hits.map(({h}) => `${new Date(h.ts * 1000).toISOString().slice(0, 16)} ${h.src}: ${h.title} — ${h.summary}`).join("\n") || "No matching headlines."; }},
+      {name: "get_upcoming", description: "Scheduled macro releases (FOMC, CPI, jobs, PCE, GDP) and earnings in the next N days. scope 'top' = 100 largest stocks + watchlists, 'all' = every stock in the app.",
+       inputSchema: {type: "object", properties: {days: {type: "number"}, scope: {type: "string", enum: ["top", "all"]}}, required: ["days"]},
+       execute: ({days, scope}) => { const u = upcomingFor(Math.min(90, Math.max(1, +days || 14)), scope === "all" ? "all" : "top"); return `Macro: ${u.macro.join("; ") || "none"}\nEarnings: ${u.earn.join("; ") || "none"}`; }},
+      ...(AI.toolsFor() || []),
+    ];
+  },
+  async ask() {
+    const inp = $("#mchatIn"); const q = inp?.value.trim(); if (!q || this.busy) return;
+    this.chat.push({role: "user", content: q}); inp.value = "";
+    const log = $("#mchat"); $("#briefBox .suggest")?.remove();
+    log.insertAdjacentHTML("beforeend", `<div class="msg me">${esc(q)}</div><div class="msg bot md" id="mbotNow"><span class="thinking">Thinking…</span></div>`);
+    const bot = $("#mbotNow"); bot.removeAttribute("id"); bot.scrollIntoView({block: "nearest", behavior: "smooth"});
+    this.busy = true; $("#mchatGo").disabled = true; this.ctl = new AbortController();
+    const b = this.doc;
+    const intro = `${BRIEF_RULES}\n\nYou are answering questions about current market events in a chat. Keep answers focused, usually under 220 words, "- " bullets where helpful. Cite headlines by source and date when you rely on them. If the data doesn't cover something, say so and explain what would usually matter.${AI.tools ? " Tools: search_headlines, get_upcoming, get_stock, list_sector." : ""}\n\n${b ? `TODAY'S BRIEF\n${b.summary}\nMoved: ${(b.moved || []).map(x => x.title + ". " + x.detail).join(" | ")}\nWorld: ${(b.world || []).map(x => x.title + ". " + x.detail).join(" | ")}\nAhead: ${(b.ahead || []).map(x => x.date + " " + x.title).join(" | ")}\n\n` : ""}DATA\n${marketContext(AI.tools ? 30 : 60)}`;
+    const turns = [{role: "user", content: intro}, {role: "assistant", content: "Understood. Ask away."}, ...this.chat.slice(-10)];
+    try {
+      const opts = {signal: this.ctl.signal, cache: false, onText: ({text}) => { bot.innerHTML = md(text); }};
+      const tools = this.tools(); if (tools) { opts.tools = tools; delete opts.cache; }
+      const {text} = await AI.sample(turns, opts);
+      this.chat.push({role: "assistant", content: text}); bot.innerHTML = md(text);
+    } catch (e) {
+      bot.innerHTML = (e?.text && e.code !== "refused" ? md(e.text) : "") + (e?.code === "cancelled" ? `<p class="faint small">Stopped.</p>` : `<p class="down small">${esc(AI.errText(e))}</p>`);
+      if (e?.text && e.code !== "refused") this.chat.push({role: "assistant", content: e.text}); else this.chat.pop();
+    } finally { this.busy = false; const g = $("#mchatGo"); if (g) g.disabled = false; }
+  },
+};
+
 // ================================================================ load
 async function load() {
   try { const r = await fetch("index.json", {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status); DATA = await r.json(); }
@@ -891,6 +1032,7 @@ function viewCal() {
   const upcoming = ev.filter(e => e.date >= todayS).slice(0, 80);
   const grouped = {}; upcoming.forEach(e => (grouped[e.date] ||= []).push(e));
   $("#view").innerHTML = `
+    <div class="grid2" id="briefBox" style="margin-bottom:16px"></div>
     <div class="bar">
       <select class="sel" id="cf" aria-label="Show"><option value="top" ${UI.calFilter === "top" ? "selected" : ""}>Top 100</option><option value="IVV" ${UI.calFilter === "IVV" ? "selected" : ""}>S&amp;P 500</option><option value="all" ${UI.calFilter === "all" ? "selected" : ""}>All ${DATA.count.toLocaleString()} stocks</option>${lists().map(l => `<option value="${esc(l.id)}" ${UI.calFilter === l.id ? "selected" : ""}>Watchlist: ${esc(l.name)}</option>`).join("")}</select>
       <div class="seg" style="margin-left:auto"><button id="pm" aria-label="Previous month">‹</button><button aria-pressed="true" style="min-width:120px">${base.toLocaleDateString(undefined, {month: "long", year: "numeric"})}</button><button id="nm" aria-label="Next month">›</button></div>
@@ -905,6 +1047,7 @@ function viewCal() {
   $("#pm").onclick = () => shift(-1); $("#nm").onclick = () => shift(1);
   $$(".day").forEach(b => b.onclick = () => { const el = document.getElementById("d-" + b.dataset.day); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); else toast("Nothing scheduled that day"); });
   $$(".ev[data-t]").forEach(b => { b.onclick = () => Sheet.open(b.dataset.t); b.onkeydown = e => { if (e.key === "Enter") Sheet.open(b.dataset.t); }; });
+  Brief.paint(); loadMarket(); Brief.init();
 }
 
 // ================================================================ data status
@@ -1062,6 +1205,7 @@ const AI = {
     if (this.sample) { try { const lim = await this.sample.limits(); this.tools = !!lim?.tools; } catch (e) { this.tools = false; } }
     this.ready = true;
     if (UI.tab === "ideas" && $("#sheet").hidden) render();
+    if (UI.tab === "cal" && $("#sheet").hidden) Brief.paint();
     if (!$("#sheet").hidden && Sheet.t && UI.dtab === "overview") this.mount(BY[Sheet.t]);
   },
   errText(e) { return ({not_granted: "Claude access wasn’t allowed for this page.", sampling_disabled: "Claude isn’t available for this account.", rate_limited: "You’ve hit a usage limit. Try again in a little while.", session_expired: "Sign in to Claude again, then retry.", refused: "Claude declined this request.", prompt_too_large: "Too much data for one request.", upstream_error: "The answer was interrupted. Try again."})[e?.code] || "Something went wrong. Try again."; },
@@ -1153,7 +1297,7 @@ ${stockContext(s)}`;
 };
 
 // ================================================================ detail sheet
-const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["financials", "Financials"], ["chart", "Chart & momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["notes", "Notes"]];
+const DTABS = [["overview", "Overview"], ["scores", "Scores"], ["financials", "Financials"], ["chart", "Chart & Momentum"], ["analysts", "Analysts"], ["insiders", "Insiders"], ["congress", "Congress"], ["notes", "Notes"]];
 const Sheet = {
   t: null,
   async open(t) {

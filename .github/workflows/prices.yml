@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["jobs/app/prices_quick.py", ".github/workflows/prices.yml"]
+    paths: ["jobs/app/prices_quick.py", "jobs/app/market_news.py", ".github/workflows/prices.yml"]
   schedule:
     - cron: "17 21 * * 1-5"   # 21:17 UTC = 5:17pm EDT / 4:17pm EST
 permissions:
@@ -26,6 +26,11 @@ jobs:
         run: git fetch --depth 1 origin app-data && git --work-tree=. checkout origin/app-data -- app-data && git reset -q
       - name: Download closes
         run: python jobs/app/prices_quick.py --app-data app-data --out /tmp/prices.json
+      - name: Market snapshot + news (Calendar tab brief)
+        continue-on-error: true
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python jobs/app/market_news.py --out /tmp/market.json
       - name: Publish
         run: |
           git config user.name "prices-bot"; git config user.email "prices-bot@users.noreply.github.com"
@@ -33,4 +38,5 @@ jobs:
           git rm -rq --cached . || true
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp /tmp/prices.json .
-          git add prices.json && git commit -qm "prices $(date -u +%FT%TZ)" && git push -f origin HEAD:price-data
+          [ -f /tmp/market.json ] && cp /tmp/market.json . || true
+          git add prices.json $( [ -f market.json ] && echo market.json ) && git commit -qm "prices $(date -u +%FT%TZ)" && git push -f origin HEAD:price-data

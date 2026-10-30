@@ -141,6 +141,13 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   after the 7 categories on every row (Trnd, Rally), sorts/filters, "Chart & momentum" tab gets Rally card + Backtest card.
   Dry run on closes only (no volume) 2026-10-30: Rally 9–10 +0.06%/20d vs average, t 0.13 → no edge yet; Trend decile 1 beat
   everything (+2%/20d, +5%/60d: junk/reversal rally). Re-check with the real build (volume adds gap-up + accumulation).
+- 2026-10-30 **Market brief on the Calendar tab** (Tom). `jobs/app/market_news.py` runs in prices.yml → `market.json` on
+  `price-data` (yfinance snapshot: SPY/QQQ/IWM/DIA, VIX, 10y yield in pp, dollar, oil, gold, BTC + 11 sector SPDRs; Finnhub
+  free market news general+merger, last 2 days / 4 on Mondays). Page: snapshot tiles, sector badges, Claude-written brief
+  (summary / What moved markets / World events / Coming up, sources) in db doc `app/brief`, headlines list, and an
+  "Ask about the markets" chat (sample; tools search_headlines, get_upcoming, get_stock, list_sector). The nightly publish
+  task writes `app/brief` with web search (by: "nightly", web: true); the page's Write/Rewrite button writes it from headlines
+  only (by: "page"). Tab label is now "Chart & Momentum".
 - Known gaps: 13F, Telegram not in prototype.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
