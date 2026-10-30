@@ -29,13 +29,15 @@ jobs:
           if git fetch --depth 1 origin research-data 2>/dev/null; then
             git show origin/research-data:cusip_map.json > rcache/cusip_map.json 2>/dev/null || true
             git show origin/research-data:filings_v2.json > rcache/filings_v2.json 2>/dev/null || true
+            git show origin/research-data:research.json > /tmp/prev_research.json 2>/dev/null || true
           fi
       - name: Build research.json
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: |
           set -o pipefail
-          python jobs/research/build_research.py --app-data app-data --cache rcache --out /tmp/research.json 2>&1 | tee /tmp/research.log
+          ls -la rcache app-data || true
+          python -X faulthandler jobs/research/build_research.py --app-data app-data --cache rcache --out /tmp/research.json 2>&1 | grep -v -i "pandas4warning\|inplace\|whatsnew" | tee /tmp/research.log
       - name: Publish
         if: always()
         run: |
@@ -43,7 +45,7 @@ jobs:
           git checkout -q --orphan research-tmp
           git rm -rq --cached . || true
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name rcache -exec rm -rf {} +
-          [ -f /tmp/research.json ] && cp /tmp/research.json . || true
+          if [ -s /tmp/research.json ]; then cp /tmp/research.json .; elif [ -s /tmp/prev_research.json ]; then cp /tmp/prev_research.json research.json; fi
           cp rcache/*.json . 2>/dev/null || true
           cp /tmp/research.log research.log 2>/dev/null || true
           rm -rf rcache
