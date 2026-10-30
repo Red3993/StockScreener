@@ -1956,7 +1956,7 @@ function filerCard(f) {
     ${open ? `<div style="margin-top:12px">
       ${c ? `<div class="label">Copycat track record since ${esc(fmtMY(c.start))}</div>${lineSvg(c.curve)}
         <dl class="kv" style="margin-top:8px"><dt>Total</dt><dd><span class="${cls(c.cum)}">${pct(c.cum)}</span> vs S&amp;P ${pct(c.spy_cum)}</dd><dt>Per year</dt><dd><span class="${cls(ex)}">${pct(c.ann)}</span> vs ${pct(c.spy_ann)}</dd>
-        <dt>Quarters ahead of S&amp;P</dt><dd>${c.beat} of ${c.periods}</dd><dt>Worst drawdown</dt><dd>${pct(c.maxdd)}</dd><dt>Holdings priced</dt><dd>${Math.round(c.coverage * 100)}% of the portfolio</dd></dl>` : ""}
+        <dt>Quarters ahead of S&amp;P</dt><dd>${c.beat} of ${c.periods}</dd><dt>Worst drawdown (at quarter ends)</dt><dd>${pct(c.maxdd)}</dd><dt>Holdings priced</dt><dd>${Math.round(c.coverage * 100)}% of the portfolio</dd></dl>` : ""}
       <div class="label" style="margin-top:12px">Holdings, quarter ended ${esc(fmtDate(f.period))} (filed ${esc(fmtDate(f.filed))})</div>
       <div style="overflow-x:auto;max-height:440px;overflow-y:auto"><table><thead><tr><th>Stock</th><th class="r">Weight</th><th class="r">Value</th><th>Change</th></tr></thead><tbody>
         ${f.top.map(x => `<tr><td>${tk(x.t)} <span class="faint small">${esc(x.name)}</span></td><td class="r num">${(x.pct * 100).toFixed(2)}%</td><td class="r num">${fmtB(x.value)}</td><td>${x.chg ? `<span class="badge ${CHG[x.chg][1]}">${CHG[x.chg][0]}${x.chg_pct && x.chg !== "same" ? " " + pct(x.chg_pct, 0) : ""}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>
