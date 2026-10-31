@@ -181,6 +181,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (`botIcon(id, color)` in web/index.html: cards, race legend, trading floor, manager callout), equity sparkline per card, race
   chart sized to its container with 0% line. Test artifact's sample is now a month: sample pitches applied at the Sep 30 close and
   marked daily to Oct 30 with the real engine (scratchpad sim/run.py builds a per-day app-data and runs arena.py apply/mark).
+- 2026-10-30 **Calendar market impact** (Tom): event dot colours unchanged; each day square is shaded by its chance of moving the
+  whole market (Moderate/High/Very high). Future days: `marketImpact()` = macro weights (FOMC 42, +projections 48, CPI/jobs 36,
+  PCE 18, GDP 14) + earnings by size (≥$50B only, 48·(mc/$4T)^0.9, cap 48) + breadth min(15, 0.25 × S&P 500 reporters);
+  score = 100·(1−e^(−raw/45)), levels at 22/45/70. Always uses every stock regardless of the calendar filter. Past days: SPY's
+  actual move (0.5/1/2% shading, move printed in the cell). Agenda days get an impact badge; big events get "▲ market mover".
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

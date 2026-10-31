@@ -243,6 +243,16 @@ tr:last-child td{border-bottom:0}
 .day.out{opacity:.4}
 .day.today{border-color:var(--accent)}
 .day .dots{display:flex;flex-wrap:wrap;gap:2px}
+.day{position:relative}
+.day.imp1{background:color-mix(in srgb,#eab308 14%,var(--surface))}
+.day.imp2{background:color-mix(in srgb,#f97316 24%,var(--surface))}
+.day.imp3{background:color-mix(in srgb,#ef4444 32%,var(--surface));border-color:color-mix(in srgb,#ef4444 55%,var(--line))}
+.day .mv{margin-top:auto;font:600 10px var(--f-mono);color:var(--muted)}
+.impkey{display:inline-block;width:14px;height:11px;border-radius:3px;border:1px solid var(--line);vertical-align:-1px;margin-right:5px}
+.impkey.k1{background:color-mix(in srgb,#eab308 30%,var(--surface))}.impkey.k2{background:color-mix(in srgb,#f97316 45%,var(--surface))}.impkey.k3{background:color-mix(in srgb,#ef4444 55%,var(--surface))}
+.ibadge{font:600 10.5px var(--f-mono);padding:1px 6px;border-radius:99px;margin-left:8px;vertical-align:1px}
+.ibadge.i1{background:color-mix(in srgb,#eab308 22%,transparent)}.ibadge.i2{background:color-mix(in srgb,#f97316 30%,transparent)}.ibadge.i3{background:color-mix(in srgb,#ef4444 38%,transparent)}
+.mover{font:600 10px var(--f-mono);color:#f97316;margin-left:6px;white-space:nowrap}
 .dot{width:7px;height:7px;border-radius:50%;flex:none}
 .agenda{display:grid;gap:12px}
 .agenda .date{font-weight:700;font-family:var(--f-display);font-size:15px;margin-bottom:4px}
@@ -1038,8 +1048,27 @@ function calEvents() {
   (DATA.macro || []).forEach(m => ev.push({date: m.date, kind: m.type === "fomc" ? "fomc" : "macro", label: m.label}));
   return ev.sort((a, b) => a.date.localeCompare(b.date));
 }
+// Market impact: how likely a day is to move the whole market. Future days: scheduled events (macro releases weighted
+// by how much they usually move stocks, plus earnings weighted by company size, since a few giants drive the index).
+// Past days: what the S&P 500 (SPY) actually did that day.
+const MACRO_W = [[/FOMC.*projection/i, 48], [/FOMC/i, 42], [/CPI/i, 36], [/Jobs/i, 36], [/PCE/i, 18], [/GDP/i, 14]];
+const moverPts = mc => mc >= 5e10 ? Math.min(48, 48 * Math.pow(mc / 4e12, 0.9)) : 0;   // $4T company ≈ 48 points (a CPI report ≈ 36), $500B ≈ 7, $100B ≈ 2; smaller ones count via breadth
+let IMPACT = null;
+function marketImpact() {
+  if (IMPACT && IMPACT.n === ROWS.length && IMPACT.last === DATA.lastDate) return IMPACT;
+  const day = {}, add = (d, pts, why) => { const x = day[d] ||= {raw: 0, why: []}; x.raw += pts; if (why) x.why.push([pts, why]); };
+  for (const m of DATA.macro || []) { const w = (MACRO_W.find(([re]) => re.test(m.label)) || [0, 10])[1]; add(m.date, w, m.label); }
+  const breadth = {};
+  for (const r of ROWS) { const d = r.e?.earn; if (!d) continue; const p = moverPts(r.mc); add(d, p, p >= 6 ? `${r.t} earnings` : null); if (r.ix?.includes("IVV")) breadth[d] = (breadth[d] || 0) + 1; }
+  for (const [d, n] of Object.entries(breadth)) add(d, Math.min(15, 0.25 * n), n >= 20 ? `${n} S&P 500 companies report` : null);
+  for (const x of Object.values(day)) { x.score = Math.round(100 * (1 - Math.exp(-x.raw / 45))); x.lvl = x.score >= 70 ? 3 : x.score >= 45 ? 2 : x.score >= 22 ? 1 : 0; x.why.sort((a, b) => b[0] - a[0]); }
+  const past = {}, a = DATA.bench?.SPY || [];
+  for (let i = 1; i < DATA.dates.length; i++) if (a[i] != null && a[i - 1] != null) { const mv = a[i] / a[i - 1] - 1, ab = Math.abs(mv); past[DATA.dates[i]] = {mv, lvl: ab >= 0.02 ? 3 : ab >= 0.01 ? 2 : ab >= 0.005 ? 1 : 0}; }
+  return IMPACT = {n: ROWS.length, last: DATA.lastDate, day, past};
+}
+const IMP_LBL = ["Low", "Moderate", "High", "Very high"];
 function viewCal() {
-  const ev = calEvents();
+  const ev = calEvents(), IMP = marketImpact();
   const base = UI.calMonth ? new Date(UI.calMonth + "-15T12:00:00") : new Date(DATA.lastDate + "T12:00:00");
   const y = base.getFullYear(), m = base.getMonth();
   const first = new Date(y, m, 1), start = new Date(first); start.setDate(1 - first.getDay());
@@ -1047,7 +1076,9 @@ function viewCal() {
   const todayS = DATA.lastDate; let cells = "";
   for (let i = 0; i < 42; i++) { const d = new Date(start); d.setDate(start.getDate() + i); const k = d.toISOString().slice(0, 10);
     if (i >= 35 && d.getMonth() !== m) break; const e = byDay[k] || [];
-    cells += `<button class="day ${d.getMonth() !== m ? "out" : ""} ${k === todayS ? "today" : ""}" data-day="${k}" aria-label="${fmtDay(k)}: ${e.length} events"><span class="num">${d.getDate()}</span><span class="dots">${e.slice(0, 8).map(x => `<i class="dot" style="background:${EVC[x.kind]}"></i>`).join("")}</span></button>`; }
+    const pst = k <= todayS ? IMP.past[k] : null, fut = k > todayS ? IMP.day[k] : null, lvl = pst ? pst.lvl : fut ? fut.lvl : 0;
+    const tip = pst ? `S&P 500 ${pct(pst.mv)} that day` : fut ? `Market impact: ${IMP_LBL[fut.lvl]} (${fut.score}/100)${fut.why.length ? " · " + fut.why.slice(0, 4).map(w => w[1]).join(", ") : ""}` : "";
+    cells += `<button class="day ${d.getMonth() !== m ? "out" : ""} ${k === todayS ? "today" : ""} ${lvl ? "imp" + lvl : ""}" data-day="${k}" title="${esc(tip)}" aria-label="${fmtDay(k)}: ${e.length} events${tip ? ". " + esc(tip) : ""}"><span class="num">${d.getDate()}</span><span class="dots">${e.slice(0, 8).map(x => `<i class="dot" style="background:${EVC[x.kind]}"></i>`).join("")}</span>${pst ? `<span class="mv ${cls(pst.mv)}">${pct(pst.mv)}</span>` : ""}</button>`; }
   const upcoming = ev.filter(e => e.date >= todayS).slice(0, 80);
   const grouped = {}; upcoming.forEach(e => (grouped[e.date] ||= []).push(e));
   $("#view").innerHTML = `
@@ -1057,14 +1088,17 @@ function viewCal() {
       <div class="seg" style="margin-left:auto"><button id="pm" aria-label="Previous month">‹</button><button aria-pressed="true" style="min-width:120px">${base.toLocaleDateString(undefined, {month: "long", year: "numeric"})}</button><button id="nm" aria-label="Next month">›</button></div>
     </div>
     <div class="month">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="dow">${d}</div>`).join("")}${cells}</div>
-    <div class="legend" style="margin-bottom:14px">${[["earnings","Earnings"],["ex_div","Ex-dividend"],["pay","Dividend paid"],["fomc","FOMC"],["macro","CPI · jobs · PCE · GDP"]].map(([k, l]) => `<span><i class="dot" style="display:inline-block;background:${EVC[k]};margin-right:5px"></i>${l}</span>`).join("")}</div>
+    <div class="legend" style="margin-bottom:6px">${[["earnings","Earnings"],["ex_div","Ex-dividend"],["pay","Dividend paid"],["fomc","FOMC"],["macro","CPI · jobs · PCE · GDP"]].map(([k, l]) => `<span><i class="dot" style="display:inline-block;background:${EVC[k]};margin-right:5px"></i>${l}</span>`).join("")}</div>
+    <div class="legend" style="margin-bottom:14px"><span class="muted">Day colour, chance of moving the whole market:</span>${[1, 2, 3].map(l => `<span><i class="impkey k${l}"></i>${IMP_LBL[l]}</span>`).join("")}<span class="faint">Past days: the S&amp;P 500's actual move (shaded at 0.5%, 1%, 2%)</span></div>
     <h2 style="font-size:18px;margin-bottom:8px">Coming up</h2>
-    <div class="agenda">${Object.entries(grouped).map(([d, es]) => `<div id="d-${d}"><div class="date">${fmtDay(d)}</div>${es.map(e => `<div class="ev" ${e.t ? `data-t="${esc(e.t)}" role="button" tabindex="0" style="cursor:pointer"` : ""}><i class="dot" style="background:${EVC[e.kind]}"></i>${esc(e.label)}</div>`).join("")}</div>`).join("") || `<div class="empty">No upcoming events for this selection.</div>`}</div>
-    <p class="faint" style="font-size:12px;margin-top:14px">Earnings and dividend dates come from Yahoo and can shift. FOMC dates are from the Federal Reserve calendar; macro release dates from FRED.</p>`;
+    <div class="agenda">${Object.entries(grouped).map(([d, es]) => { const x = IMP.day[d];
+      const big = e => e.kind === "fomc" || (e.kind === "macro" && /CPI|Jobs/i.test(e.label)) || (e.kind === "earnings" && moverPts(RB[e.t]?.mc) >= 6);
+      return `<div id="d-${d}"><div class="date">${fmtDay(d)}${x && x.lvl ? `<span class="ibadge i${x.lvl}" title="${x.score}/100">${IMP_LBL[x.lvl]} market impact</span>` : ""}</div>${[...es].sort((a, b) => big(b) - big(a)).map(e => `<div class="ev" ${e.t ? `data-t="${esc(e.t)}" role="button" tabindex="0" style="cursor:pointer"` : ""}><i class="dot" style="background:${EVC[e.kind]}"></i>${esc(e.label)}${big(e) ? `<span class="mover">▲ market mover</span>` : ""}</div>`).join("")}</div>`; }).join("") || `<div class="empty">No upcoming events for this selection.</div>`}</div>
+    <p class="faint" style="font-size:12px;margin-top:14px">Market impact always counts every stock in the app, whatever the list above shows: Fed decisions, CPI and jobs reports count most, PCE and GDP less, and earnings count by company size (a $3 trillion company reporting matters far more than fifty small ones). It's a rule of thumb, not a forecast. Earnings and dividend dates come from Yahoo and can shift. FOMC dates are from the Federal Reserve calendar; macro release dates from FRED.</p>`;
   $("#cf").onchange = e => { UI.calFilter = e.target.value; saveUI(); viewCal(); };
   const shift = n => { const d = new Date(y, m + n, 15); UI.calMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; viewCal(); };
   $("#pm").onclick = () => shift(-1); $("#nm").onclick = () => shift(1);
-  $$(".day").forEach(b => b.onclick = () => { const el = document.getElementById("d-" + b.dataset.day); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); else toast("Nothing scheduled that day"); });
+  $$(".day").forEach(b => b.onclick = () => { const el = document.getElementById("d-" + b.dataset.day); if (el) el.scrollIntoView({behavior: "smooth", block: "start"}); else toast(b.title || "Nothing scheduled that day"); });
   $$(".ev[data-t]").forEach(b => { b.onclick = () => Sheet.open(b.dataset.t); b.onkeydown = e => { if (e.key === "Enter") Sheet.open(b.dataset.t); }; });
   Brief.paint(); loadMarket(); Brief.init();
 }
