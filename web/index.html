@@ -210,7 +210,9 @@ tr:last-child td{border-bottom:0}
 .acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 12px 14px;text-align:left;width:100%;position:relative;overflow:hidden;display:grid;gap:4px;cursor:pointer}
 .acard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--pc)}
 .acard[aria-expanded="true"]{border-color:var(--pc)}
-.acard .ahead{display:flex;align-items:baseline;gap:8px}
+.acard .ahead{display:flex;align-items:center;gap:8px}
+.bot{flex:none;display:inline-block;vertical-align:middle}
+.acard .spark{display:block;width:100%;height:26px;margin-top:2px}
 .acard .rank{font:600 12px var(--f-mono);color:var(--faint)}
 .acard .nm2{font-family:var(--f-display);font-weight:700;font-size:16px}
 .acard .ret{margin-left:auto;font:600 16px var(--f-mono)}
@@ -319,7 +321,7 @@ const timing = r => TIMING.map(([k, l, title]) => { const v = r.ry?.[k];
     : `<span class="sc7 tm" style="background:${sc(v)}" title="${esc(tt)}"><small>${l}</small><b>${v}</b></span>`; }).join("");
 const RALLY_LBL = {revisions: "estimate revisions", drift: "gap up holding", insider: "insider buying", buyback: "buybacks", accumulation: "accumulation",
   squeeze: "short squeeze setup", peer_lag: "lagging peers", near_low: "near 52-week low", rsi_div: "RSI divergence", vol_squeeze: "volatility squeeze"};
-const fmtMoney = (v, d = 2) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtMoney = (v, d = 2) => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(Number(v)).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
   return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
 const pct = (v, d = 1, sign = true) => { if (v == null || !isFinite(v)) return "—"; let x = (v * 100).toFixed(d); if (/^-0(\.0+)?$/.test(x)) x = x.slice(1); return (sign && +x > 0 ? "+" : "") + x + "%"; };
@@ -1952,6 +1954,29 @@ function viewArena() {
   Arena.show();
 }
 const ARENA_TRIGGER = "trig_01NY153iZEsJnkXafyTGKVhL";
+// Little robot avatars, one per persona (an original design), tinted with the persona's colour.
+function botIcon(id, color, size = 30) {
+  const c = color || "#94a3b8", ink = "#0f172a";
+  const top = {
+    value: `<circle cx="16" cy="4.5" r="2.2" fill="${c}"/><line x1="16" y1="6.5" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/>`,
+    momentum: `<path d="M16 9V4.5m-2.6 2.4L16 4.2l2.6 2.7" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`,
+    contrarian: `<path d="M16 9V4.5m2.6-.1L16 7l-2.6-2.6" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`,
+    smart_money: `<rect x="11" y="2.4" width="10" height="5" rx="1" fill="${c}"/><rect x="9" y="7" width="14" height="1.8" rx=".9" fill="${c}"/>`,
+    yolo: `<path d="M17.4 2 13.8 6.2h3l-1.6 3" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`,
+    frontier: `<path d="M11.5 6.2a4.5 4.5 0 0 0 9 0z" fill="${c}"/><line x1="16" y1="6.4" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/><circle cx="16" cy="3.4" r="1.1" fill="${c}"/>`,
+    manager: `<path d="M9.5 9 11 4.4l2.7 2.2L16 3l2.3 3.6 2.7-2.2L22.5 9z" fill="${c}"/>`,
+  }[id] || `<circle cx="16" cy="4.5" r="2" fill="${c}"/><line x1="16" y1="6.5" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/>`;
+  const eyes = {
+    contrarian: `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><path d="M17.6 17.6h3.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`,
+    momentum: `<rect x="10.4" y="16" width="11.2" height="3.2" rx="1.6" fill="#fff"/>`,
+    smart_money: `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><circle cx="19.4" cy="17.5" r="2.6" fill="none" stroke="#fff" stroke-width="1.1"/><circle cx="19.4" cy="17.5" r="1.2" fill="#fff"/>`,
+    yolo: `<path d="M11 15.8l3.2 3.2m0-3.2L11 19m6.8-3.2 3.2 3.2m0-3.2L17.8 19" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`,
+  }[id] || `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><circle cx="19.4" cy="17.5" r="1.9" fill="#fff"/>`;
+  return `<svg class="bot" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">${top}
+    <rect x="4.2" y="14" width="2.6" height="6.5" rx="1.3" fill="${c}"/><rect x="25.2" y="14" width="2.6" height="6.5" rx="1.3" fill="${c}"/>
+    <rect x="6.2" y="9" width="19.6" height="18" rx="6" fill="${c}"/><rect x="8.6" y="12.2" width="14.8" height="10.6" rx="4" fill="${ink}" opacity=".88"/>
+    ${eyes}<path d="M13.4 24.8h5.2" stroke="${ink}" stroke-width="1.3" stroke-linecap="round" opacity=".55"/></svg>`;
+}
 const Arena = {
   st: null, logs: {}, sel: null, open: null, firing: false, fired: null,
   async show() {
@@ -2000,18 +2025,18 @@ const Arena = {
     const traders = P.filter(p => st.traders[p.id]), mgr = P.find(p => p.id === "manager");
     const rows = traders.map(p => ({p, s: this.stats(p.id), tr: st.traders[p.id]})).sort((a, b) => b.s.eq - a.s.eq);
     const lastR = st.rounds?.[st.rounds.length - 1], pend = st.pending || [];
-    const series = rows.map(r => ({c: r.p.color, n: r.p.name, v: (r.tr.hist || []).map(h => [h[0], h[1] / (st.start_cash || 100000) - 1])})).filter(x => x.v.length);
+    const series = rows.map(r => ({id: r.p.id, c: r.p.color, n: r.p.name, v: (r.tr.hist || []).map(h => [h[0], h[1] / (st.start_cash || 100000) - 1])})).filter(x => x.v.length);
     if (spy.length && st.spy0) series.push({c: "var(--faint)", n: "S&P 500", dash: true, v: spy.map(h => [h[0], h[1] / st.spy0 - 1])});
     const dates = [...new Set(series.flatMap(x => x.v.map(v => v[0])))].sort();
     let chart = `<p class="muted small" style="margin:0">The race chart starts once there are two days of results.</p>`;
     if (dates.length >= 2) {
-      const W = 320, H = 150, ys = series.flatMap(x => x.v.map(v => v[1])); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.02) { hi += 0.01; lo -= 0.01; }
-      const X = d => 32 + dates.indexOf(d) / (dates.length - 1) * (W - 36), Y = v => 6 + (1 - (v - lo) / (hi - lo)) * (H - 22);
-      chart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Each trader's return since the start vs the S&P 500"><line x1="32" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
-        ${[hi, lo].map(v => `<text x="28" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("")}
-        ${series.map(x => `<path d="${x.v.map((v, i) => (i ? "L" : "M") + X(v[0]).toFixed(1) + " " + Y(v[1]).toFixed(1)).join("")}" fill="none" stroke="${x.c}" stroke-width="${x.dash ? 1.5 : 2.2}" ${x.dash ? 'stroke-dasharray="4 3"' : ""}/>`).join("")}
-        <text x="32" y="${H - 3}" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[0]))}</text><text x="${W}" y="${H - 3}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[dates.length - 1]))}</text></svg>
-        <div class="small" style="display:flex;gap:10px;flex-wrap:wrap">${series.map(x => `<span><span style="color:${x.c}">${x.dash ? "┅" : "━"}</span> ${esc(x.n)}</span>`).join("")}</div>`;
+      const W = Math.max(300, Math.min(1040, ($("#arenaBox")?.clientWidth || 360) - 34)), H = W < 520 ? 170 : 250, ys = series.flatMap(x => x.v.map(v => v[1])); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.02) { hi += 0.01; lo -= 0.01; }
+      const X = d => 44 + dates.indexOf(d) / (dates.length - 1) * (W - 48), Y = v => 6 + (1 - (v - lo) / (hi - lo)) * (H - 22);
+      chart = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%;height:auto;display:block" role="img" aria-label="Each trader's return since the start vs the S&P 500"><line x1="44" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
+        ${[hi, lo].filter(v => Math.abs(v) > 0.004).map(v => `<line x1="44" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="2 4"/>`).join("")}<text x="40" y="${Y(0) + 3}" text-anchor="end" font-size="10" fill="var(--faint)">0%</text>${[hi, lo].map(v => `<text x="40" y="${Y(v) + 3}" text-anchor="end" font-size="10" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("")}
+        ${series.map(x => `<path d="${x.v.map((v, i) => (i ? "L" : "M") + X(v[0]).toFixed(1) + " " + Y(v[1]).toFixed(1)).join("")}" fill="none" stroke="${x.c}" stroke-width="${x.dash ? 1.5 : 2.2}" ${x.dash ? 'stroke-dasharray="4 3"' : ""}/>${x.dash ? "" : `<circle cx="${X(x.v[x.v.length - 1][0]).toFixed(1)}" cy="${Y(x.v[x.v.length - 1][1]).toFixed(1)}" r="2.6" fill="${x.c}"/>`}`).join("")}
+        <text x="44" y="${H - 3}" font-size="10" fill="var(--faint)">${esc(fmtShort(dates[0]))}</text><text x="${W}" y="${H - 3}" text-anchor="end" font-size="10" fill="var(--faint)">${esc(fmtShort(dates[dates.length - 1]))}</text></svg>
+        <div class="small" style="display:flex;gap:10px;flex-wrap:wrap">${series.map(x => `<span style="display:inline-flex;align-items:center;gap:4px">${x.id ? botIcon(x.id, x.c, 18) : `<span style="color:${x.c}">┅</span>`} ${esc(x.n)}</span>`).join("")}</div>`;
     }
     const L = this.logs[this.sel];
     const name = id => P.find(p => p.id === id)?.name || id;
@@ -2021,26 +2046,29 @@ const Arena = {
       <p class="small" style="margin:8px 0 0">Cash ${fmtMoney(r.tr.cash, 0)} · realized P&amp;L ${fmtMoney(r.tr.realized || 0, 0)} · worst drawdown ${pct(r.s.dd)} · ${r.tr.trades || 0} trades · ${r.s.approval != null ? Math.round(r.s.approval * 100) + "% of pitches approved" : "no pitches yet"}</p>
       ${(r.tr.closed || []).length ? `<p class="small" style="margin:4px 0 0">Recently closed: ${r.tr.closed.slice(-5).reverse().map(c => `${esc(c.t)} ${c.side} <span class="${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</span>${c.why === "stop" ? " (stop)" : ""}`).join(", ")}</p>` : ""}
       ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</div>`;
+    const spark = (h, c) => { if (h.length < 2) return ""; const v = h.map(x => x[1]), lo = Math.min(...v, st.start_cash || 1e5), hi = Math.max(...v, st.start_cash || 1e5), rg = hi - lo || 1, Wd = 200, Hd = 26;
+      const pts = v.map((y, i) => `${(i / (v.length - 1) * Wd).toFixed(1)},${(2 + (1 - (y - lo) / rg) * (Hd - 4)).toFixed(1)}`).join(" "), y0 = (2 + (1 - ((st.start_cash || 1e5) - lo) / rg) * (Hd - 4)).toFixed(1);
+      return `<svg class="spark" viewBox="0 0 ${Wd} ${Hd}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${Wd}" y1="${y0}" y2="${y0}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`; };
     let cards = "";
     rows.forEach((r, i) => {
       cards += `<button class="acard" data-aopen="${esc(r.p.id)}" aria-expanded="${this.open === r.p.id}" style="--pc:${r.p.color}">
-        <div class="ahead"><span class="rank">#${i + 1}</span><span class="nm2">${esc(r.p.name)}</span><span class="ret ${cls(r.s.ret)}">${pct(r.s.ret)}</span></div>
-        <div class="blurb">${esc(r.p.blurb || r.p.style || "")}</div>
+        <div class="ahead">${botIcon(r.p.id, r.p.color)}<span class="rank">#${i + 1}</span><span class="nm2">${esc(r.p.name)}</span><span class="ret ${cls(r.s.ret)}">${pct(r.s.ret)}</span></div>
+        <div class="blurb">${esc(r.p.blurb || r.p.style || "")}</div>${spark(r.tr.hist || [], r.p.color)}
         <div class="meta"><span>${fmtMoney(r.s.eq, 0)}</span><span>${r.s.pos.length} position${r.s.pos.length === 1 ? "" : "s"}</span>${spyRet != null ? `<span class="${cls(r.s.ret - spyRet)}">${pct(r.s.ret - spyRet)} vs S&amp;P</span>` : ""}${r.tr.probation ? `<span class="badge warn">Probation</span>` : ""}</div></button>`;
       if (this.open === r.p.id) cards += detail(r);
     });
     return `
-    ${st.sample ? `<div class="callout" style="margin-bottom:12px"><b>Preview.</b> This is a sample round I wrote in each trader's voice from the Oct 30 data, filled at that day's close, so you can see the layout. The live traders haven't run yet.</div>` : ""}
+    ${st.sample ? `<div class="callout" style="margin-bottom:12px"><b>Preview.</b> Sample trades I wrote in each trader's voice, replayed from the Sep 30 close through today with real closing prices, stops and costs, so you can see a month of the race. The theses quote later data, so this isn't a real result; the live traders haven't run yet.</div>` : ""}
     <div class="card"><h3>The desk <span class="label">${st.round ? `round ${st.round}` : "not started"}${st.start ? ` · since ${esc(fmtDate(st.start))}` : ""}${spyRet != null ? ` · S&amp;P 500 ${pct(spyRet)}` : ""}</span></h3>
       <div class="acards">${cards}</div>
       ${pend.length ? `<p class="small muted" style="margin:10px 0 0"><b>${pend.length} order${pend.length > 1 ? "s" : ""} waiting</b> to fill at the next close: ${pend.map(o => `${esc(name(o.trader))} ${esc(o.action)} ${esc(o.ticker)} ${(Math.abs(o.target) * 100).toFixed(0)}%`).join("; ")}.</p>` : ""}
       ${this.runBtn()}</div>
-    <div class="card" style="margin-top:14px"><h3>The race</h3>${chart}</div>
+    <div class="card" style="margin-top:14px"><h3>The race <span class="label">return since the start, updated every evening</span></h3>${chart}</div>
     ${st.rounds?.length ? `<div class="card" style="margin-top:14px"><h3>Trading floor
         <select class="sel" id="arenaRound" aria-label="Round" style="margin-left:auto">${[...st.rounds].reverse().map(r => `<option value="${r.round}" ${r.round === this.sel ? "selected" : ""}>Round ${r.round} · ${esc(fmtShort(r.asof))}${r.manual ? " (manual)" : ""}</option>`).join("")}</select></h3>
-      ${L ? `<div class="callout" style="margin-bottom:12px"><b>${esc(mgr?.name || "Floor Manager")}:</b> ${esc(L.manager_note || "No note this round.")}</div>
+      ${L ? `<div class="callout" style="margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">${botIcon("manager", mgr?.color || "#eab308", 28)}<div><b>${esc(mgr?.name || "Floor Manager")}:</b> ${esc(L.manager_note || "No note this round.")}</div></div>
         <div style="display:grid;gap:14px">${traders.map(p => { const ts = (L.trades || []).filter(t => t.trader === p.id); const v = L.views?.[p.id] || L.pitches?.[p.id]?.view;
-          return `<div class="pitch" style="--pc:${p.color}"><b>${esc(p.name)}</b>${v ? `<div class="small muted">“${esc(v)}”</div>` : ""}
+          return `<div class="pitch" style="--pc:${p.color}"><div style="display:flex;align-items:center;gap:8px">${botIcon(p.id, p.color, 24)}<b>${esc(p.name)}</b></div>${v ? `<div class="small muted">“${esc(v)}”</div>` : ""}
             ${ts.length ? `<ul class="small" style="margin:6px 0 0;padding-left:16px;display:grid;gap:6px">${ts.map(t => `<li><span class="badge ${DEC[t.decision]?.[1] || ""}">${DEC[t.decision]?.[0] || esc(t.decision || "")}</span> <b>${esc(t.action)} ${t.ticker && RB[t.ticker] ? tk(t.ticker) : esc(t.ticker)}</b> ${t.weight != null ? `${(Math.abs(t.weight) * 100).toFixed(0)}%` : ""}${t.decision === "resize" && t.approved_weight != null ? ` → ${(Math.abs(t.approved_weight) * 100).toFixed(0)}%` : ""}
               <div>${esc(t.thesis || "")}</div>${(t.evidence || []).length ? `<div class="faint">${t.evidence.map(esc).join(" · ")}</div>` : ""}${t.reason ? `<div><i>Manager:</i> ${esc(t.reason)}${t.engine_note ? ` <span class="faint">${esc(t.engine_note)}</span>` : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="small faint">No trades proposed.</div>`}</div>`; }).join("")}</div>`
         : `<p class="muted small">Loading round ${this.sel}…</p>`}</div>` : ""}

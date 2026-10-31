@@ -177,6 +177,10 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   2026-10-30 23:10 (Tom): Arena moved to its **own nav tab** (7 tabs; short labels under 560px). Weekly round task is
   **disabled** until Tom approves the polished version on the test artifact (TFeQVoVNfs1QEGfPNELRmp, seeded with a sample
   round in its own db; ARENA_TRIGGER = null there). Re-enable trig_01NY153iZEsJnkXafyTGKVhL when he signs off.
+  2026-10-30 23:40 polish (Tom): brighter persona colours (config/arena.yaml, manager #eab308), original robot avatars per persona
+  (`botIcon(id, color)` in web/index.html: cards, race legend, trading floor, manager callout), equity sparkline per card, race
+  chart sized to its container with 0% line. Test artifact's sample is now a month: sample pitches applied at the Sep 30 close and
+  marked daily to Oct 30 with the real engine (scratchpad sim/run.py builds a per-day app-data and runs arena.py apply/mark).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

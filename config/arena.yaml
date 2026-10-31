@@ -18,6 +18,7 @@ limits:                      # hard limits the code enforces after the manager's
 
 manager:
   name: Floor Manager
+  color: "#eab308"
   blurb: "Protects the firm, not the leaderboard. Approves, resizes or rejects every trade and can put a trader on probation."
   prompt: >
     You are the Floor Manager of a small trading desk. Six traders, each with $100,000 of paper money, pitch trades every
@@ -33,7 +34,7 @@ manager:
 traders:
   - id: value
     name: The Value Hound
-    color: "#2f7d5b"
+    color: "#22c55e"
     style: Buffett-style quality at a discount
     blurb: "Buys great businesses when they're cheap and waits. Ignores the chart."
     prompt: >
@@ -44,7 +45,7 @@ traders:
       perfection. Low turnover: change no more than three positions in a week unless something broke.
   - id: momentum
     name: The Momentum Rider
-    color: "#2563c9"
+    color: "#3b82f6"
     style: Buy strength, cut losers fast
     blurb: "Rides what's already working and cuts losers fast. Never catches a falling knife."
     prompt: >
@@ -54,7 +55,7 @@ traders:
       matters to you; the trend is the thesis. You rotate freely when leadership changes.
   - id: contrarian
     name: The Contrarian
-    color: "#b4622b"
+    color: "#f97316"
     style: Beaten-down stocks with a catalyst
     blurb: "Buys the panic, but only with a reason to turn. Shorts the crowd's stretched favourites."
     prompt: >
@@ -64,7 +65,7 @@ traders:
       high RSI, far above the 200-day, with fading insider and analyst support.
   - id: smart_money
     name: Smart Money
-    color: "#7c4dcc"
+    color: "#a855f7"
     style: Follow proven investors
     blurb: "No ideas of its own. Copies the best-performing politicians, insiders and funds."
     prompt: >
@@ -74,7 +75,7 @@ traders:
       how recent the evidence is, and you exit when the smart money leaves.
   - id: yolo
     name: The YOLO
-    color: "#d23f6b"
+    color: "#f43f5e"
     style: Concentrated, high-conviction swings
     blurb: "Big, concentrated bets on catalysts and squeezes. Keeps the Floor Manager busy."
     prompt: >
@@ -84,7 +85,7 @@ traders:
       the limit, but you still have to convince the Floor Manager, who can cut you down to size or put you on probation.
   - id: frontier
     name: The Frontier
-    color: "#0f8f9a"
+    color: "#06b6d4"
     style: Emerging tech, AI, biotech, software
     blurb: "AI, chips, software, biotech and space only. Never touches consumer or 'boring' sectors."
     prompt: >
