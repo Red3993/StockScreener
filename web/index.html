@@ -44,9 +44,11 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;text
 .brand b{color:var(--accent)}
 .asof{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
 main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--gut);padding-right:var(--gut-r)}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(6,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(7,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 .tabs button{background:none;border:0;padding:10px 2px 9px;font-size:11.5px;white-space:nowrap;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 .tabs button svg{width:22px;height:22px}
+.tabs .sm{display:none}
+@media (max-width:560px){.tabs .lg{display:none}.tabs .sm{display:inline}.tabs button{font-size:10.5px}}
 .tabs button[aria-current="page"]{color:var(--accent)}
 .disclaimer{font-size:12px;color:var(--faint);margin-top:28px;text-align:center}
 
@@ -204,6 +206,18 @@ tr:last-child td{border-bottom:0}
 .chatin{display:flex;gap:8px;margin-top:10px}
 .chatin textarea{min-height:44px;flex:1}
 .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.acards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 12px 14px;text-align:left;width:100%;position:relative;overflow:hidden;display:grid;gap:4px;cursor:pointer}
+.acard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--pc)}
+.acard[aria-expanded="true"]{border-color:var(--pc)}
+.acard .ahead{display:flex;align-items:baseline;gap:8px}
+.acard .rank{font:600 12px var(--f-mono);color:var(--faint)}
+.acard .nm2{font-family:var(--f-display);font-weight:700;font-size:16px}
+.acard .ret{margin-left:auto;font:600 16px var(--f-mono)}
+.acard .blurb{font-size:12.5px;color:var(--muted)}
+.acard .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--faint);font-family:var(--f-mono)}
+.adetail{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.pitch{border-left:3px solid var(--pc);padding-left:10px}
 /* market brief (Calendar tab) */
 .mkt{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin-bottom:12px}
 .mkt div{background:var(--sunk);border-radius:8px;padding:7px 9px;min-width:0}
@@ -270,12 +284,13 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <main id="view"><div class="empty">Loading…</div></main>
 
 <nav class="tabs" aria-label="Sections">
-  <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg>Stocks</button>
-  <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Watchlists</button>
-  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Claude’s Picks</button>
-  <button data-tab="research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 12.5l2-2.5 2 1.5 2.5-3"/></svg>Research</button>
-  <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>Calendar</button>
-  <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg>Data</button>
+  <button data-tab="stocks" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg><span class="lg">Stocks</span><span class="sm">Stocks</span></button>
+  <button data-tab="watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg><span class="lg">Watchlists</span><span class="sm">Watch</span></button>
+  <button data-tab="ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg><span class="lg">Claude’s Picks</span><span class="sm">Picks</span></button>
+  <button data-tab="arena"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16M6 20v-6m4 6V9m4 11v-8m4 8V5"/><circle cx="18" cy="5" r="1.6" fill="currentColor"/></svg><span class="lg">Arena</span><span class="sm">Arena</span></button>
+  <button data-tab="research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 12.5l2-2.5 2 1.5 2.5-3"/></svg><span class="lg">Research</span><span class="sm">Research</span></button>
+  <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg><span class="lg">Calendar</span><span class="sm">Calendar</span></button>
+  <button data-tab="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></svg><span class="lg">Data</span><span class="sm">Data</span></button>
 </nav>
 
 <div id="sheet" class="sheet" hidden></div>
@@ -307,7 +322,7 @@ const RALLY_LBL = {revisions: "estimate revisions", drift: "gap up holding", ins
 const fmtMoney = (v, d = 2) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
   return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
-const pct = (v, d = 1, sign = true) => v == null || !isFinite(v) ? "—" : (sign && v > 0 ? "+" : "") + (v * 100).toFixed(d) + "%";
+const pct = (v, d = 1, sign = true) => { if (v == null || !isFinite(v)) return "—"; let x = (v * 100).toFixed(d); if (/^-0(\.0+)?$/.test(x)) x = x.slice(1); return (sign && +x > 0 ? "+" : "") + x + "%"; };
 const cls = v => v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
 const fmtDate = s => { if (!s) return "—"; const d = new Date(s.slice(0, 10) + "T12:00:00"); return isNaN(d) ? s : d.toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}); };
 const fmtShort = s => { const d = new Date(s.slice(0, 10) + "T12:00:00"); return d.toLocaleDateString(undefined, {month: "short", day: "numeric"}); };
@@ -806,7 +821,7 @@ $$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!DATA) return;
   $$(".tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === UI.tab ? "page" : "false"));
-  ({stocks: viewStocks, watch: viewWatch, ideas: viewIdeas, research: viewResearch, cal: viewCal, about: viewAbout})[UI.tab]();
+  ({stocks: viewStocks, watch: viewWatch, ideas: viewIdeas, arena: viewArena, research: viewResearch, cal: viewCal, about: viewAbout})[UI.tab]();
 }
 function rerender() { if (!DATA) return; if ($("#fpanel").hidden) render(); if (!$("#sheet").hidden && Sheet.t) Sheet.refreshLists(); }
 
@@ -1716,8 +1731,8 @@ async function viewIdeas() {
   const cands = candidates();
   $("#view").innerHTML = `
     <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Claude’s picks</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
-    <div class="seg" id="pseg" style="margin-bottom:12px"><button data-pv="week" aria-pressed="${UI.picksView !== "board"}">This week</button><button data-pv="board" aria-pressed="${UI.picksView === "board"}">Scoreboard</button><button data-pv="arena" aria-pressed="${UI.picksView === "arena"}">Arena</button></div>
-    ${UI.picksView === "arena" ? `<div id="arenaBox"><div class="card"><p class="muted">Loading the Arena…</p></div></div><p class="disclaimer">Paper trading by AI personas, for research and fun. Not financial advice.</p>` : UI.picksView === "board" ? `<div id="boardBox"><div class="card"><p class="muted">Loading the scoreboard…</p></div></div><p class="disclaimer">For personal research. Not financial advice.</p>` : `
+    <div class="seg" id="pseg" style="margin-bottom:12px"><button data-pv="week" aria-pressed="${UI.picksView !== "board"}">This week</button><button data-pv="board" aria-pressed="${UI.picksView === "board"}">Scoreboard</button></div>
+    ${UI.picksView === "board" ? `<div id="boardBox"><div class="card"><p class="muted">Loading the scoreboard…</p></div></div><p class="disclaimer">For personal research. Not financial advice.</p>` : `
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
     <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
@@ -1726,7 +1741,6 @@ async function viewIdeas() {
     <p class="disclaimer">For personal research. Not financial advice.</p>`}`;
   $$("[data-pv]").forEach(b => b.onclick = () => { UI.picksView = b.dataset.pv; viewIdeas(); });
   if (UI.picksView === "board") { Board.show(); return; }
-  if (UI.picksView === "arena") { Arena.show(); return; }
   bindRows($("#view"));
   $$("[data-is]").forEach(b => b.onclick = () => { UI.ideasScope = b.dataset.is; viewIdeas(); });
   if (Ideas.loadedWeek !== week) {
@@ -1932,6 +1946,11 @@ const Board = {
 // State lives in db doc app/arena (written by the weekly "Arena round" scheduled task and marked nightly by the publish task);
 // each round's pitches and rulings in app/arena_r<N>. "Run a round now" fires that scheduled task through the Claude Code
 // Remote connector (mcp capability).
+function viewArena() {
+  $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Arena</h1><span class="muted">Six AI traders, one Floor Manager, paper money</span></div>
+    <div id="arenaBox"><div class="card"><p class="muted">Loading the Arena…</p></div></div><p class="disclaimer">Paper trading by AI personas, for research and fun. Not financial advice.</p>`;
+  Arena.show();
+}
 const ARENA_TRIGGER = "trig_01NY153iZEsJnkXafyTGKVhL";
 const Arena = {
   st: null, logs: {}, sel: null, open: null, firing: false, fired: null,
@@ -1960,12 +1979,13 @@ const Arena = {
   async run() {
     if (this.firing) return; this.firing = true; this.fired = null; this.show();
     try {
+      if (!ARENA_TRIGGER) throw {code: "test"};
       const mcp = window.claude?.use ? await window.claude.use("mcp") : null;
       if (!mcp) throw {code: "unavailable"};
       await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: ARENA_TRIGGER, text: "This run was started manually from the app (use --manual)."});
       this.fired = "Round started. It takes about 10 minutes; you'll get a notification. Orders fill at the next close.";
     } catch (e) {
-      this.fired = e?.code === "unavailable" ? "Starting a round isn't available in this view. The weekly round runs Saturday morning." : e?.code === "not_granted" || e?.code === "approval_required" ? "Allow the Claude Code Remote connector for this page, then try again." : "Couldn't start the round: " + (e?.message || e?.code || "unknown error");
+      this.fired = e?.code === "test" ? "Starting rounds is turned off in the test copy." : e?.code === "unavailable" ? "Starting a round isn't available in this view. The weekly round runs Saturday morning." : e?.code === "not_granted" || e?.code === "approval_required" ? "Allow the Claude Code Remote connector for this page, then try again." : "Couldn't start the round: " + (e?.message || e?.code || "unknown error");
     } finally { this.firing = false; this.show(); }
   },
   stats(id) {
@@ -1977,48 +1997,57 @@ const Arena = {
   },
   html() {
     const st = this.st, P = st.personas || [], spy = st.spy || [], spyRet = st.spy0 && spy.length ? spy[spy.length - 1][1] / st.spy0 - 1 : null;
-    const rows = P.filter(p => st.traders[p.id]).map(p => ({p, s: this.stats(p.id), tr: st.traders[p.id]})).sort((a, b) => b.s.eq - a.s.eq);
+    const traders = P.filter(p => st.traders[p.id]), mgr = P.find(p => p.id === "manager");
+    const rows = traders.map(p => ({p, s: this.stats(p.id), tr: st.traders[p.id]})).sort((a, b) => b.s.eq - a.s.eq);
     const lastR = st.rounds?.[st.rounds.length - 1], pend = st.pending || [];
-    // equity curves, % since start
     const series = rows.map(r => ({c: r.p.color, n: r.p.name, v: (r.tr.hist || []).map(h => [h[0], h[1] / (st.start_cash || 100000) - 1])})).filter(x => x.v.length);
     if (spy.length && st.spy0) series.push({c: "var(--faint)", n: "S&P 500", dash: true, v: spy.map(h => [h[0], h[1] / st.spy0 - 1])});
     const dates = [...new Set(series.flatMap(x => x.v.map(v => v[0])))].sort();
-    let chart = "";
+    let chart = `<p class="muted small" style="margin:0">The race chart starts once there are two days of results.</p>`;
     if (dates.length >= 2) {
-      const W = 320, H = 140, ys = series.flatMap(x => x.v.map(v => v[1])); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.02) { hi += 0.01; lo -= 0.01; }
+      const W = 320, H = 150, ys = series.flatMap(x => x.v.map(v => v[1])); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.02) { hi += 0.01; lo -= 0.01; }
       const X = d => 32 + dates.indexOf(d) / (dates.length - 1) * (W - 36), Y = v => 6 + (1 - (v - lo) / (hi - lo)) * (H - 22);
       chart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Each trader's return since the start vs the S&P 500"><line x1="32" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
         ${[hi, lo].map(v => `<text x="28" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("")}
-        ${series.map(x => `<path d="${x.v.map((v, i) => (i ? "L" : "M") + X(v[0]).toFixed(1) + " " + Y(v[1]).toFixed(1)).join("")}" fill="none" stroke="${x.c}" stroke-width="${x.dash ? 1.5 : 2}" ${x.dash ? 'stroke-dasharray="4 3"' : ""}/>`).join("")}
+        ${series.map(x => `<path d="${x.v.map((v, i) => (i ? "L" : "M") + X(v[0]).toFixed(1) + " " + Y(v[1]).toFixed(1)).join("")}" fill="none" stroke="${x.c}" stroke-width="${x.dash ? 1.5 : 2.2}" ${x.dash ? 'stroke-dasharray="4 3"' : ""}/>`).join("")}
         <text x="32" y="${H - 3}" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[0]))}</text><text x="${W}" y="${H - 3}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[dates.length - 1]))}</text></svg>
         <div class="small" style="display:flex;gap:10px;flex-wrap:wrap">${series.map(x => `<span><span style="color:${x.c}">${x.dash ? "┅" : "━"}</span> ${esc(x.n)}</span>`).join("")}</div>`;
     }
     const L = this.logs[this.sel];
-    const name = id => P.find(p => p.id === id)?.name || id, color = id => P.find(p => p.id === id)?.color || "var(--faint)";
+    const name = id => P.find(p => p.id === id)?.name || id;
     const DEC = {approve: ["Approved", "good"], resize: ["Resized", "warn"], reject: ["Rejected", "bad"]};
+    const detail = r => `<div class="adetail" style="--pc:${r.p.color}">
+      ${r.s.pos.length ? `<div style="overflow-x:auto"><table><thead><tr><th>Position</th><th class="r">Weight</th><th class="r">Entry</th><th class="r">Now</th><th class="r">P&amp;L</th></tr></thead><tbody>${r.s.pos.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)).map(x => `<tr><td>${tk(x.t)} <span class="badge ${x.shares < 0 ? "bad" : "good"}">${x.shares < 0 ? "Short" : "Long"}</span></td><td class="r num">${(Math.abs(x.val) / r.s.eq * 100).toFixed(1)}%</td><td class="r num">${fmtMoney(x.entry)}</td><td class="r num">${fmtMoney(x.px)}</td><td class="r num ${cls(x.pnl)}">${pct(x.pnl)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0">All cash.</p>`}
+      <p class="small" style="margin:8px 0 0">Cash ${fmtMoney(r.tr.cash, 0)} · realized P&amp;L ${fmtMoney(r.tr.realized || 0, 0)} · worst drawdown ${pct(r.s.dd)} · ${r.tr.trades || 0} trades · ${r.s.approval != null ? Math.round(r.s.approval * 100) + "% of pitches approved" : "no pitches yet"}</p>
+      ${(r.tr.closed || []).length ? `<p class="small" style="margin:4px 0 0">Recently closed: ${r.tr.closed.slice(-5).reverse().map(c => `${esc(c.t)} ${c.side} <span class="${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</span>${c.why === "stop" ? " (stop)" : ""}`).join(", ")}</p>` : ""}
+      ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</div>`;
+    let cards = "";
+    rows.forEach((r, i) => {
+      cards += `<button class="acard" data-aopen="${esc(r.p.id)}" aria-expanded="${this.open === r.p.id}" style="--pc:${r.p.color}">
+        <div class="ahead"><span class="rank">#${i + 1}</span><span class="nm2">${esc(r.p.name)}</span><span class="ret ${cls(r.s.ret)}">${pct(r.s.ret)}</span></div>
+        <div class="blurb">${esc(r.p.blurb || r.p.style || "")}</div>
+        <div class="meta"><span>${fmtMoney(r.s.eq, 0)}</span><span>${r.s.pos.length} position${r.s.pos.length === 1 ? "" : "s"}</span>${spyRet != null ? `<span class="${cls(r.s.ret - spyRet)}">${pct(r.s.ret - spyRet)} vs S&amp;P</span>` : ""}${r.tr.probation ? `<span class="badge warn">Probation</span>` : ""}</div></button>`;
+      if (this.open === r.p.id) cards += detail(r);
+    });
     return `
-    <div class="card"><h3>Arena <span class="label">${st.round ? `round ${st.round}` : "not started"}${st.start ? ` · since ${esc(fmtDate(st.start))}` : ""}</span></h3>
-      <p class="muted small" style="margin-top:0">Six AI traders with $100,000 of paper money each pitch trades every Saturday morning; the Floor Manager approves, resizes or rejects them. Orders fill at the next close; stops, costs and short borrow fees are applied by code.</p>
-      ${chart || `<p class="muted small">The equity chart starts after the first orders fill at the next close.</p>`}
-      <div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>Trader</th><th class="r">Equity</th><th class="r">Return</th><th class="r">vs S&amp;P</th><th class="r">Worst DD</th><th class="r">Approved</th><th class="r">Trades</th></tr></thead><tbody>
-        ${rows.map((r, i) => `<tr data-aopen="${esc(r.p.id)}" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.p.color};margin-right:6px"></span><b>${esc(r.p.name)}</b>${r.tr.probation ? ` <span class="badge warn">Probation</span>` : ""}<div class="faint small">${esc(r.p.style || "")}</div></td>
-          <td class="r num">${fmtMoney(r.s.eq, 0)}</td><td class="r num ${cls(r.s.ret)}">${pct(r.s.ret)}</td><td class="r num ${cls(spyRet != null ? r.s.ret - spyRet : null)}">${spyRet != null ? pct(r.s.ret - spyRet) : "—"}</td>
-          <td class="r num">${pct(r.s.dd)}</td><td class="r num">${r.s.approval != null ? Math.round(r.s.approval * 100) + "%" : "—"}</td><td class="r num">${r.tr.trades || 0}</td></tr>
-          ${this.open === r.p.id ? `<tr><td colspan="7" style="background:var(--sunk)">
-            ${r.s.pos.length ? `<table><thead><tr><th>Position</th><th class="r">Weight</th><th class="r">Entry</th><th class="r">Now</th><th class="r">P&amp;L</th><th>Since</th></tr></thead><tbody>${r.s.pos.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)).map(x => `<tr><td>${tk(x.t)} <span class="badge ${x.shares < 0 ? "bad" : "good"}">${x.shares < 0 ? "Short" : "Long"}</span></td><td class="r num">${(Math.abs(x.val) / r.s.eq * 100).toFixed(1)}%</td><td class="r num">${fmtMoney(x.entry)}</td><td class="r num">${fmtMoney(x.px)}</td><td class="r num ${cls(x.pnl)}">${pct(x.pnl)}</td><td class="small">${esc(fmtShort(x.since))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">All cash.</p>`}
-            <p class="small" style="margin:6px 0 0">Cash ${fmtMoney(r.tr.cash, 0)} · realized P&amp;L ${fmtMoney(r.tr.realized || 0, 0)}${(r.tr.closed || []).length ? ` · last closed: ${r.tr.closed.slice(-4).reverse().map(c => `${esc(c.t)} ${c.side} <span class="${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</span>${c.why === "stop" ? " (stop)" : ""}`).join(", ")}` : ""}</p>
-            ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</td></tr>` : ""}`).join("")}
-        ${spyRet != null ? `<tr><td class="muted">S&amp;P 500 (SPY)</td><td></td><td class="r num ${cls(spyRet)}">${pct(spyRet)}</td><td colspan="4"></td></tr>` : ""}</tbody></table></div>
-      ${pend.length ? `<p class="small muted" style="margin:8px 0 0"><b>${pend.length} order${pend.length > 1 ? "s" : ""} waiting</b> to fill at the next close: ${pend.map(o => `${esc(name(o.trader))} ${esc(o.action)} ${esc(o.ticker)} ${(Math.abs(o.target) * 100).toFixed(0)}%`).join("; ")}.</p>` : ""}
+    ${st.sample ? `<div class="callout" style="margin-bottom:12px"><b>Preview.</b> This is a sample round I wrote in each trader's voice from the Oct 30 data, filled at that day's close, so you can see the layout. The live traders haven't run yet.</div>` : ""}
+    <div class="card"><h3>The desk <span class="label">${st.round ? `round ${st.round}` : "not started"}${st.start ? ` · since ${esc(fmtDate(st.start))}` : ""}${spyRet != null ? ` · S&amp;P 500 ${pct(spyRet)}` : ""}</span></h3>
+      <div class="acards">${cards}</div>
+      ${pend.length ? `<p class="small muted" style="margin:10px 0 0"><b>${pend.length} order${pend.length > 1 ? "s" : ""} waiting</b> to fill at the next close: ${pend.map(o => `${esc(name(o.trader))} ${esc(o.action)} ${esc(o.ticker)} ${(Math.abs(o.target) * 100).toFixed(0)}%`).join("; ")}.</p>` : ""}
       ${this.runBtn()}</div>
+    <div class="card" style="margin-top:14px"><h3>The race</h3>${chart}</div>
     ${st.rounds?.length ? `<div class="card" style="margin-top:14px"><h3>Trading floor
         <select class="sel" id="arenaRound" aria-label="Round" style="margin-left:auto">${[...st.rounds].reverse().map(r => `<option value="${r.round}" ${r.round === this.sel ? "selected" : ""}>Round ${r.round} · ${esc(fmtShort(r.asof))}${r.manual ? " (manual)" : ""}</option>`).join("")}</select></h3>
-      ${L ? `${L.manager_note ? `<p style="margin-top:0"><b>Floor Manager:</b> ${esc(L.manager_note)}</p>` : ""}
-        <div style="display:grid;gap:12px">${P.filter(p => p.id !== "manager").map(p => { const ts = (L.trades || []).filter(t => t.trader === p.id); const v = L.views?.[p.id] || L.pitches?.[p.id]?.view;
-          return `<div style="border-left:3px solid ${p.color};padding-left:10px"><b>${esc(p.name)}</b>${v ? `<div class="small muted">“${esc(v)}”</div>` : ""}
-            ${ts.length ? `<ul class="small" style="margin:6px 0 0;padding-left:16px">${ts.map(t => `<li><span class="badge ${DEC[t.decision]?.[1] || ""}">${DEC[t.decision]?.[0] || esc(t.decision || "")}</span> <b>${esc(t.action)} ${t.ticker && RB[t.ticker] ? tk(t.ticker) : esc(t.ticker)}</b> ${t.weight != null ? `${(Math.abs(t.weight) * 100).toFixed(0)}%` : ""}${t.decision === "resize" && t.approved_weight != null ? ` → ${(Math.abs(t.approved_weight) * 100).toFixed(0)}%` : ""}
-              — ${esc(t.thesis || "")}${t.reason ? `<div class="faint">Manager: ${esc(t.reason)}${t.engine_note ? " " + esc(t.engine_note) : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="small faint">No trades proposed.</div>`}</div>`; }).join("")}</div>`
-        : `<p class="muted small">Loading round ${this.sel}…</p>`}</div>` : ""}`;
+      ${L ? `<div class="callout" style="margin-bottom:12px"><b>${esc(mgr?.name || "Floor Manager")}:</b> ${esc(L.manager_note || "No note this round.")}</div>
+        <div style="display:grid;gap:14px">${traders.map(p => { const ts = (L.trades || []).filter(t => t.trader === p.id); const v = L.views?.[p.id] || L.pitches?.[p.id]?.view;
+          return `<div class="pitch" style="--pc:${p.color}"><b>${esc(p.name)}</b>${v ? `<div class="small muted">“${esc(v)}”</div>` : ""}
+            ${ts.length ? `<ul class="small" style="margin:6px 0 0;padding-left:16px;display:grid;gap:6px">${ts.map(t => `<li><span class="badge ${DEC[t.decision]?.[1] || ""}">${DEC[t.decision]?.[0] || esc(t.decision || "")}</span> <b>${esc(t.action)} ${t.ticker && RB[t.ticker] ? tk(t.ticker) : esc(t.ticker)}</b> ${t.weight != null ? `${(Math.abs(t.weight) * 100).toFixed(0)}%` : ""}${t.decision === "resize" && t.approved_weight != null ? ` → ${(Math.abs(t.approved_weight) * 100).toFixed(0)}%` : ""}
+              <div>${esc(t.thesis || "")}</div>${(t.evidence || []).length ? `<div class="faint">${t.evidence.map(esc).join(" · ")}</div>` : ""}${t.reason ? `<div><i>Manager:</i> ${esc(t.reason)}${t.engine_note ? ` <span class="faint">${esc(t.engine_note)}</span>` : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="small faint">No trades proposed.</div>`}</div>`; }).join("")}</div>`
+        : `<p class="muted small">Loading round ${this.sel}…</p>`}</div>` : ""}
+    <details class="card" style="margin-top:14px"><summary><b>How the Arena works</b></summary>
+      <p class="small">Six AI traders each start with $100,000 of paper money and can buy or short any stock in the app. Every Saturday morning each one pitches trades on its own, from a shortlist that fits its style. The ${esc(mgr?.name || "Floor Manager")} (${esc(mgr?.blurb || "")}) rules on every trade.</p>
+      <p class="small">Code then enforces the house rules regardless: at most 20% of a trader's money in one long, 10% in one short, 40% in one sector, total shorts up to 50%, and limits halve on probation. Orders fill at the next session's close, so nobody trades on a price they couldn't have had. Each trade costs 0.1%, shorts pay 3% a year to borrow, and stops close longs 15% below entry and shorts 20% above entry.</p>
+      <p class="small faint" style="margin-bottom:0">AI traders, paper money. A few weeks of results is mostly luck; give it months.</p></details>`;
   },
 };
 // ================================================================ Research tab (13F funds, company portfolios, smart money, track records)

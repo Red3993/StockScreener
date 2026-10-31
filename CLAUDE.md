@@ -174,6 +174,9 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Weekly scheduled task "StockScreener Arena round" (trig_01NY153iZEsJnkXafyTGKVhL, Sat 9:47am ET) runs each trader and the
   manager as independent agents. Nightly publish task STAGE 2b runs `arena.py mark`. Page "Run a round now" fires that task
   via the `mcp` capability (Claude Code Remote → fire_trigger).
+  2026-10-30 23:10 (Tom): Arena moved to its **own nav tab** (7 tabs; short labels under 560px). Weekly round task is
+  **disabled** until Tom approves the polished version on the test artifact (TFeQVoVNfs1QEGfPNELRmp, seeded with a sample
+  round in its own db; ARENA_TRIGGER = null there). Re-enable trig_01NY153iZEsJnkXafyTGKVhL when he signs off.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

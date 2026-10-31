@@ -83,7 +83,7 @@ class Market:
 
 # ------------------------------------------------------------------ state
 def personas() -> list:
-    return [{k: t[k] for k in ("id", "name", "color", "style")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"]}]
+    return [{k: t.get(k) for k in ("id", "name", "color", "style", "blurb")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"], "blurb": CFG["manager"].get("blurb")}]
 
 
 def init_state() -> dict:
