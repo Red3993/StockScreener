@@ -1716,8 +1716,8 @@ async function viewIdeas() {
   const cands = candidates();
   $("#view").innerHTML = `
     <div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Claude’s picks</h1><span class="muted">${esc(week)} · data as of ${esc(fmtDate(DATA.lastDate))}</span></div>
-    <div class="seg" id="pseg" style="margin-bottom:12px"><button data-pv="week" aria-pressed="${UI.picksView !== "board"}">This week</button><button data-pv="board" aria-pressed="${UI.picksView === "board"}">Scoreboard</button></div>
-    ${UI.picksView === "board" ? `<div id="boardBox"><div class="card"><p class="muted">Loading the scoreboard…</p></div></div><p class="disclaimer">For personal research. Not financial advice.</p>` : `
+    <div class="seg" id="pseg" style="margin-bottom:12px"><button data-pv="week" aria-pressed="${UI.picksView !== "board"}">This week</button><button data-pv="board" aria-pressed="${UI.picksView === "board"}">Scoreboard</button><button data-pv="arena" aria-pressed="${UI.picksView === "arena"}">Arena</button></div>
+    ${UI.picksView === "arena" ? `<div id="arenaBox"><div class="card"><p class="muted">Loading the Arena…</p></div></div><p class="disclaimer">Paper trading by AI personas, for research and fun. Not financial advice.</p>` : UI.picksView === "board" ? `<div id="boardBox"><div class="card"><p class="muted">Loading the scoreboard…</p></div></div><p class="disclaimer">For personal research. Not financial advice.</p>` : `
     <div class="card ai" id="picksCard"><p class="muted">Loading…</p></div>
     <h2 style="font-size:18px;margin:22px 0 4px">Candidates</h2>
     <p class="muted small" style="margin:0 0 10px">The app ranks every stock in the selected group on an opportunity score: 45% value (valuation score and how cheap the stock is versus its own 3-year history), 25% quality (profitability and financial health), plus setup (basing after a selloff, near the 52-week low; penalties for falling knives and overextended charts) and catalysts (insider and committee-relevant congressional buying, upgrades, rising estimates, news, upcoming earnings). The top ${cands.length} make the candidate list (one ranking across large, mid and small caps, at most 10 per sector; stocks scored in fewer than 5 of the 7 categories are left out), and Claude picks the best ${PICKS_N}.</p>
@@ -1726,6 +1726,7 @@ async function viewIdeas() {
     <p class="disclaimer">For personal research. Not financial advice.</p>`}`;
   $$("[data-pv]").forEach(b => b.onclick = () => { UI.picksView = b.dataset.pv; viewIdeas(); });
   if (UI.picksView === "board") { Board.show(); return; }
+  if (UI.picksView === "arena") { Arena.show(); return; }
   bindRows($("#view"));
   $$("[data-is]").forEach(b => b.onclick = () => { UI.ideasScope = b.dataset.is; viewIdeas(); });
   if (Ideas.loadedWeek !== week) {
@@ -1926,6 +1927,100 @@ const Board = {
   },
 };
 
+
+// ================================================================ Arena: six AI traders + a Floor Manager (paper money)
+// State lives in db doc app/arena (written by the weekly "Arena round" scheduled task and marked nightly by the publish task);
+// each round's pitches and rulings in app/arena_r<N>. "Run a round now" fires that scheduled task through the Claude Code
+// Remote connector (mcp capability).
+const ARENA_TRIGGER = "trig_01NY153iZEsJnkXafyTGKVhL";
+const Arena = {
+  st: null, logs: {}, sel: null, open: null, firing: false, fired: null,
+  async show() {
+    const box = $("#arenaBox"); if (!box) return;
+    this.st = await Store.getDoc("arena");
+    if (!$("#arenaBox")) return;
+    if (!this.st?.traders) { box.innerHTML = this.empty(); this.bind(); return; }
+    const last = this.st.rounds?.length ? this.st.rounds[this.st.rounds.length - 1].round : null;
+    this.sel ??= last;
+    if (this.sel && !this.logs[this.sel]) this.logs[this.sel] = await Store.getDoc("arena_r" + this.sel);
+    if (!$("#arenaBox")) return;
+    box.innerHTML = this.html(); this.bind();
+  },
+  empty() {
+    return `<div class="card"><h3>Arena</h3><p>Six AI traders, each with $100,000 of paper money and a different style, pitch trades every week. A Floor Manager approves, resizes or rejects every trade, and code keeps the books: fills at the next close, trading costs, short borrow fees and automatic stop-losses.</p>
+      <p class="muted">No rounds yet. The first round runs Saturday morning, or start one now.</p>${this.runBtn()}</div>`;
+  },
+  runBtn() { return `<div class="bar" style="margin:8px 0 0"><button class="btn primary small" id="arenaRun" ${this.firing ? "disabled" : ""}>${this.firing ? "Starting…" : "Run a round now"}</button>${this.fired ? `<span class="small muted">${esc(this.fired)}</span>` : ""}</div>`; },
+  bind() {
+    const b = $("#arenaRun"); if (b) b.onclick = () => this.run();
+    $$("[data-aopen]").forEach(x => x.onclick = () => { this.open = this.open === x.dataset.aopen ? null : x.dataset.aopen; this.show(); });
+    const r = $("#arenaRound"); if (r) r.onchange = () => { this.sel = +r.value; this.show(); };
+    $$("#arenaBox [data-open]").forEach(x => x.onclick = e => { e.stopPropagation(); Sheet.open(x.dataset.open); });
+  },
+  async run() {
+    if (this.firing) return; this.firing = true; this.fired = null; this.show();
+    try {
+      const mcp = window.claude?.use ? await window.claude.use("mcp") : null;
+      if (!mcp) throw {code: "unavailable"};
+      await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: ARENA_TRIGGER, text: "This run was started manually from the app (use --manual)."});
+      this.fired = "Round started. It takes about 10 minutes; you'll get a notification. Orders fill at the next close.";
+    } catch (e) {
+      this.fired = e?.code === "unavailable" ? "Starting a round isn't available in this view. The weekly round runs Saturday morning." : e?.code === "not_granted" || e?.code === "approval_required" ? "Allow the Claude Code Remote connector for this page, then try again." : "Couldn't start the round: " + (e?.message || e?.code || "unknown error");
+    } finally { this.firing = false; this.show(); }
+  },
+  stats(id) {
+    const st = this.st, tr = st.traders[id], h = tr.hist || [], start = st.start_cash || 100000;
+    const eq = h.length ? h[h.length - 1][1] : tr.cash; let peak = start, dd = 0;
+    for (const [, v] of h) { peak = Math.max(peak, v); dd = Math.min(dd, v / peak - 1); }
+    const pos = Object.entries(tr.positions || {}).map(([t, p]) => { const px = RB[t]?.d?.px ?? p.last; return {t, ...p, px, val: p.shares * px, pnl: p.shares > 0 ? px / p.entry - 1 : p.entry / px - 1}; });
+    return {eq, ret: eq / start - 1, dd, pos, approval: tr.pitched ? tr.approved / tr.pitched : null};
+  },
+  html() {
+    const st = this.st, P = st.personas || [], spy = st.spy || [], spyRet = st.spy0 && spy.length ? spy[spy.length - 1][1] / st.spy0 - 1 : null;
+    const rows = P.filter(p => st.traders[p.id]).map(p => ({p, s: this.stats(p.id), tr: st.traders[p.id]})).sort((a, b) => b.s.eq - a.s.eq);
+    const lastR = st.rounds?.[st.rounds.length - 1], pend = st.pending || [];
+    // equity curves, % since start
+    const series = rows.map(r => ({c: r.p.color, n: r.p.name, v: (r.tr.hist || []).map(h => [h[0], h[1] / (st.start_cash || 100000) - 1])})).filter(x => x.v.length);
+    if (spy.length && st.spy0) series.push({c: "var(--faint)", n: "S&P 500", dash: true, v: spy.map(h => [h[0], h[1] / st.spy0 - 1])});
+    const dates = [...new Set(series.flatMap(x => x.v.map(v => v[0])))].sort();
+    let chart = "";
+    if (dates.length >= 2) {
+      const W = 320, H = 140, ys = series.flatMap(x => x.v.map(v => v[1])); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.02) { hi += 0.01; lo -= 0.01; }
+      const X = d => 32 + dates.indexOf(d) / (dates.length - 1) * (W - 36), Y = v => 6 + (1 - (v - lo) / (hi - lo)) * (H - 22);
+      chart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Each trader's return since the start vs the S&P 500"><line x1="32" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>
+        ${[hi, lo].map(v => `<text x="28" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("")}
+        ${series.map(x => `<path d="${x.v.map((v, i) => (i ? "L" : "M") + X(v[0]).toFixed(1) + " " + Y(v[1]).toFixed(1)).join("")}" fill="none" stroke="${x.c}" stroke-width="${x.dash ? 1.5 : 2}" ${x.dash ? 'stroke-dasharray="4 3"' : ""}/>`).join("")}
+        <text x="32" y="${H - 3}" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[0]))}</text><text x="${W}" y="${H - 3}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtShort(dates[dates.length - 1]))}</text></svg>
+        <div class="small" style="display:flex;gap:10px;flex-wrap:wrap">${series.map(x => `<span><span style="color:${x.c}">${x.dash ? "┅" : "━"}</span> ${esc(x.n)}</span>`).join("")}</div>`;
+    }
+    const L = this.logs[this.sel];
+    const name = id => P.find(p => p.id === id)?.name || id, color = id => P.find(p => p.id === id)?.color || "var(--faint)";
+    const DEC = {approve: ["Approved", "good"], resize: ["Resized", "warn"], reject: ["Rejected", "bad"]};
+    return `
+    <div class="card"><h3>Arena <span class="label">${st.round ? `round ${st.round}` : "not started"}${st.start ? ` · since ${esc(fmtDate(st.start))}` : ""}</span></h3>
+      <p class="muted small" style="margin-top:0">Six AI traders with $100,000 of paper money each pitch trades every Saturday morning; the Floor Manager approves, resizes or rejects them. Orders fill at the next close; stops, costs and short borrow fees are applied by code.</p>
+      ${chart || `<p class="muted small">The equity chart starts after the first orders fill at the next close.</p>`}
+      <div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>Trader</th><th class="r">Equity</th><th class="r">Return</th><th class="r">vs S&amp;P</th><th class="r">Worst DD</th><th class="r">Approved</th><th class="r">Trades</th></tr></thead><tbody>
+        ${rows.map((r, i) => `<tr data-aopen="${esc(r.p.id)}" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.p.color};margin-right:6px"></span><b>${esc(r.p.name)}</b>${r.tr.probation ? ` <span class="badge warn">Probation</span>` : ""}<div class="faint small">${esc(r.p.style || "")}</div></td>
+          <td class="r num">${fmtMoney(r.s.eq, 0)}</td><td class="r num ${cls(r.s.ret)}">${pct(r.s.ret)}</td><td class="r num ${cls(spyRet != null ? r.s.ret - spyRet : null)}">${spyRet != null ? pct(r.s.ret - spyRet) : "—"}</td>
+          <td class="r num">${pct(r.s.dd)}</td><td class="r num">${r.s.approval != null ? Math.round(r.s.approval * 100) + "%" : "—"}</td><td class="r num">${r.tr.trades || 0}</td></tr>
+          ${this.open === r.p.id ? `<tr><td colspan="7" style="background:var(--sunk)">
+            ${r.s.pos.length ? `<table><thead><tr><th>Position</th><th class="r">Weight</th><th class="r">Entry</th><th class="r">Now</th><th class="r">P&amp;L</th><th>Since</th></tr></thead><tbody>${r.s.pos.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)).map(x => `<tr><td>${tk(x.t)} <span class="badge ${x.shares < 0 ? "bad" : "good"}">${x.shares < 0 ? "Short" : "Long"}</span></td><td class="r num">${(Math.abs(x.val) / r.s.eq * 100).toFixed(1)}%</td><td class="r num">${fmtMoney(x.entry)}</td><td class="r num">${fmtMoney(x.px)}</td><td class="r num ${cls(x.pnl)}">${pct(x.pnl)}</td><td class="small">${esc(fmtShort(x.since))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">All cash.</p>`}
+            <p class="small" style="margin:6px 0 0">Cash ${fmtMoney(r.tr.cash, 0)} · realized P&amp;L ${fmtMoney(r.tr.realized || 0, 0)}${(r.tr.closed || []).length ? ` · last closed: ${r.tr.closed.slice(-4).reverse().map(c => `${esc(c.t)} ${c.side} <span class="${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</span>${c.why === "stop" ? " (stop)" : ""}`).join(", ")}` : ""}</p>
+            ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</td></tr>` : ""}`).join("")}
+        ${spyRet != null ? `<tr><td class="muted">S&amp;P 500 (SPY)</td><td></td><td class="r num ${cls(spyRet)}">${pct(spyRet)}</td><td colspan="4"></td></tr>` : ""}</tbody></table></div>
+      ${pend.length ? `<p class="small muted" style="margin:8px 0 0"><b>${pend.length} order${pend.length > 1 ? "s" : ""} waiting</b> to fill at the next close: ${pend.map(o => `${esc(name(o.trader))} ${esc(o.action)} ${esc(o.ticker)} ${(Math.abs(o.target) * 100).toFixed(0)}%`).join("; ")}.</p>` : ""}
+      ${this.runBtn()}</div>
+    ${st.rounds?.length ? `<div class="card" style="margin-top:14px"><h3>Trading floor
+        <select class="sel" id="arenaRound" aria-label="Round" style="margin-left:auto">${[...st.rounds].reverse().map(r => `<option value="${r.round}" ${r.round === this.sel ? "selected" : ""}>Round ${r.round} · ${esc(fmtShort(r.asof))}${r.manual ? " (manual)" : ""}</option>`).join("")}</select></h3>
+      ${L ? `${L.manager_note ? `<p style="margin-top:0"><b>Floor Manager:</b> ${esc(L.manager_note)}</p>` : ""}
+        <div style="display:grid;gap:12px">${P.filter(p => p.id !== "manager").map(p => { const ts = (L.trades || []).filter(t => t.trader === p.id); const v = L.views?.[p.id] || L.pitches?.[p.id]?.view;
+          return `<div style="border-left:3px solid ${p.color};padding-left:10px"><b>${esc(p.name)}</b>${v ? `<div class="small muted">“${esc(v)}”</div>` : ""}
+            ${ts.length ? `<ul class="small" style="margin:6px 0 0;padding-left:16px">${ts.map(t => `<li><span class="badge ${DEC[t.decision]?.[1] || ""}">${DEC[t.decision]?.[0] || esc(t.decision || "")}</span> <b>${esc(t.action)} ${t.ticker && RB[t.ticker] ? tk(t.ticker) : esc(t.ticker)}</b> ${t.weight != null ? `${(Math.abs(t.weight) * 100).toFixed(0)}%` : ""}${t.decision === "resize" && t.approved_weight != null ? ` → ${(Math.abs(t.approved_weight) * 100).toFixed(0)}%` : ""}
+              — ${esc(t.thesis || "")}${t.reason ? `<div class="faint">Manager: ${esc(t.reason)}${t.engine_note ? " " + esc(t.engine_note) : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="small faint">No trades proposed.</div>`}</div>`; }).join("")}</div>`
+        : `<p class="muted small">Loading round ${this.sel}…</p>`}</div>` : ""}`;
+  },
+};
 // ================================================================ Research tab (13F funds, company portfolios, smart money, track records)
 let RES = null, RES_P = null;
 function loadResearch() { if (!RES_P) RES_P = fetch("research.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { RES = j || {filers: [], consensus: {}}; if (UI.tab === "research" && $("#sheet").hidden) viewResearch(); }); return RES_P; }

@@ -165,6 +165,15 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   1/3/6 months after the first close after disclosure; trades capped +100%/−90%; ranked on avg63 × n/(n+4)).
   Tom (2026-10-30): Telegram on hold; insider history stays 1 year. "TopStack" ranking = interpreted as TipRanks-style
   track records (asked Tom to confirm).
+- 2026-10-30 **Arena** (Claude's Picks → "This week | Scoreboard | Arena"; Tom's idea). Six AI traders (Value Hound, Momentum
+  Rider, Contrarian, Smart Money, YOLO, Frontier = emerging tech/AI/biotech/software only), $100k paper each, long + short,
+  plus a Floor Manager who approves/resizes/rejects every trade. Personas + house limits in `config/arena.yaml`.
+  `jobs/arena/arena.py` init/prepare/apply/mark: shortlists per style from index.json (+ research.json, track, brief), code-
+  enforced limits (20% long, 10% short, 150% gross, 50% short total, 40% sector, halved on probation), fills at the NEXT close,
+  10 bps cost, 3%/yr borrow, stops −15% long / +20% short. State in db doc `app/arena`, round logs `app/arena_r<N>`.
+  Weekly scheduled task "StockScreener Arena round" (trig_01NY153iZEsJnkXafyTGKVhL, Sat 9:47am ET) runs each trader and the
+  manager as independent agents. Nightly publish task STAGE 2b runs `arena.py mark`. Page "Run a round now" fires that task
+  via the `mcp` capability (Claude Code Remote → fire_trigger).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
