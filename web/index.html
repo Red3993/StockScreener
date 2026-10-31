@@ -212,6 +212,15 @@ tr:last-child td{border-bottom:0}
 .acard[aria-expanded="true"]{border-color:var(--pc)}
 .acard .ahead{display:flex;align-items:center;gap:8px}
 .bot{flex:none;display:inline-block;vertical-align:middle}
+.pk{display:inline-flex;align-items:center;gap:1px;margin-left:6px;vertical-align:-2px}
+.pk .bot.short{border-radius:50%;box-shadow:0 0 0 1.5px var(--down)}
+.cpk{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#d97757;color:#fff;font:700 9px/1 var(--f-mono)}
+.tier{font:600 10.5px var(--f-mono);padding:1px 7px;border-radius:99px;white-space:nowrap;border:1px solid var(--line)}
+.tier.good{background:color-mix(in srgb,var(--up) 18%,transparent);border-color:color-mix(in srgb,var(--up) 45%,var(--line))}
+.tier.acc{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tier.bad{background:color-mix(in srgb,var(--down) 16%,transparent);border-color:color-mix(in srgb,var(--down) 40%,var(--line))}
+.trow{cursor:pointer}.trow:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.indgrp summary{cursor:pointer;font-size:13px;font-weight:600;padding:4px 0}
 .acard .spark{display:block;width:100%;height:26px;margin-top:2px}
 .acard .rank{font:600 12px var(--f-mono);color:var(--faint)}
 .acard .nm2{font-family:var(--f-display);font-weight:700;font-size:16px}
@@ -605,6 +614,9 @@ const STATE_FLAGS = {
   congBuy90: ["Committee-relevant congressional buy, 90 days", r => (r.cg?.b90 || 0) > 0],
   upgrade90: ["Net analyst upgrades, 90 days", r => (r.a?.ug ?? 0) > (r.a?.dg ?? 0)],
   paysDiv: ["Pays a dividend", r => r.cs?.[4] != null], thinCov: ["Thin analyst coverage", r => !!r.a?.thin],
+  claudePick: ["In Claude's latest picks", r => (Picked.map[r.t] || []).some(x => x.k === "claude")],
+  botLong: ["Owned by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && !x.short)],
+  botShort: ["Shorted by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && x.short)],
 };
 const METRIC_CAT = {Valuation: ["ev_ebitda","pfcf","pe","peg","ps","pb","ptbv","pffo"], Profitability: ["roic","fcf_margin","operating_margin","gross_margin","roe","net_margin","op_margin_trend","roa","efficiency_ratio","nii_to_assets"],
   "Financial Health": ["debt_to_equity","interest_coverage","net_cash_to_mcap","altman_z","current_ratio","tangible_equity_ratio"],
@@ -628,7 +640,8 @@ function passes(r, f) {
     if (f.min !== "" && f.min != null && v < +f.min) return false; if (f.max !== "" && f.max != null && v > +f.max) return false; return true; }
   if (f.type === "flag") { const b = r.d?.ev?.[f.key]; return b != null && b < (+f.days || 7); }
   if (f.type === "state") return !!STATE_FLAGS[f.key]?.[1](r);
-  if (f.type === "sector") return !f.values?.length || f.values.includes(r.sec);
+  if (f.type === "sector") { if (!f.values?.length) return true; const on = f.values.includes(r.sec); return f.mode === "exclude" ? !on : on; }
+  if (f.type === "industry") { if (!f.values?.length) return true; const on = f.values.includes(r.ind || "(no industry)"); return f.mode === "include" ? on : !on; }
   if (f.type === "index") return !f.values?.length || f.values.some(v => r.ix?.includes(v));
   return true;
 }
@@ -638,7 +651,8 @@ function describe(f) {
     return has(f.min) && has(f.max) ? `${fd.label}: ${fmtU(+f.min, u)} – ${fmtU(+f.max, u)}` : has(f.min) ? `${fd.label} ≥ ${fmtU(+f.min, u)}` : has(f.max) ? `${fd.label} ≤ ${fmtU(+f.max, u)}` : fd.label + ": any"; }
   if (f.type === "flag") return `${FLAGS[f.key]} · last ${f.days || 7} days`;
   if (f.type === "state") return STATE_FLAGS[f.key]?.[0] || f.key;
-  if (f.type === "sector") return f.values?.length === 1 ? f.values[0] : `${f.values?.length || 0} sectors`;
+  if (f.type === "sector") return (f.mode === "exclude" ? "No " : "") + (f.values?.length === 1 ? f.values[0] : `${f.values?.length || 0} sectors`);
+  if (f.type === "industry") return (f.mode === "include" ? "Only " : "No ") + (f.values?.length <= 2 ? f.values.join(", ") : `${f.values.length} industries`);
   if (f.type === "index") return (f.values || []).map(v => INDEXES[v]).join(" or ") || "Any index";
   return "";
 }
@@ -654,6 +668,8 @@ const PRESETS = [
   ["All-rounders (every score ≥ 5)", [{type: "range", key: "minCat", min: 5, max: ""}]],
   ["Big analyst upside", [{type: "range", key: "upside", min: 20, max: ""}]],
   ["Earnings in 2 weeks", [{type: "range", key: "daysToEarnings", min: 0, max: 14}]],
+  ["Claude's picks", [{type: "state", key: "claudePick"}]],
+  ["Arena traders' longs", [{type: "state", key: "botLong"}]],
 ];
 
 // ================================================================ quick closing prices (prices.json, published right after the close,
@@ -823,6 +839,7 @@ async function load() {
   $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}${DATA.quickPrices ? ` <span class="faint" title="Closing prices are in; scores, news and filings update when tonight's full build finishes">· scores updating</span>` : ""}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
   render();
   await Store.init();
+  await Picked.load().catch(() => {});
   AI.init();
   rerender();
 }
@@ -838,11 +855,60 @@ function render() {
 function rerender() { if (!DATA) return; if ($("#fpanel").hidden) render(); if (!$("#sheet").hidden && Sheet.t) Sheet.refreshLists(); }
 
 // ================================================================ stock list
+// Who picked a stock: Claude's latest pick set and the Arena traders' current positions (both from the app's db).
+const Picked = {
+  map: {}, arena: null, log: null,
+  async load() {
+    const [a, log] = await Promise.all([Store.getDoc("arena"), Store.getDoc("pick_log")]);
+    this.arena = a; this.log = log; const m = {}, P = a?.personas || [];
+    for (const [id, tr] of Object.entries(a?.traders || {})) { const p = P.find(x => x.id === id);
+      for (const [t, pos] of Object.entries(tr.positions || {})) (m[t] ||= []).push({k: "bot", id, name: p?.name || id, color: p?.color, short: pos.shares < 0, since: pos.since, entry: pos.entry, w: pos.shares * (pos.last || pos.entry) / ((tr.hist || []).slice(-1)[0]?.[1] || a.start_cash || 1e5)}); }
+    const set = log?.sets?.[log.sets.length - 1];
+    if (set) for (const x of set.picks || []) (m[x.t] ||= []).unshift({k: "claude", rank: x.rank, theme: x.theme, conviction: x.conviction, px0: x.px0, date: set.dataAsof || (set.generated || "").slice(0, 10)});
+    this.map = m;
+  },
+  icons(t) {
+    const L = this.map[t]; if (!L?.length) return "";
+    return `<span class="pk">${L.map(x => x.k === "claude" ? `<span class="cpk" title="Claude's pick #${x.rank}${x.theme ? " · " + esc(x.theme) : ""}">${x.rank}</span>`
+      : `<span title="${esc(x.name)}: ${x.short ? "short" : "long"}">${botIcon(x.id, x.color, 15).replace('class="bot"', `class="bot${x.short ? " short" : ""}"`)}</span>`).join("")}</span>`;
+  },
+  async fill(t) {
+    const box = $("#pickedBox"); if (!box) return;
+    if (!RES) { loadResearch().then(() => { if (Sheet.t === t && UI.dtab === "overview") this.fill(t); }); }
+    const L = this.map[t] || [], r = RB[t], px = r?.d?.px;
+    const funds = (RES?.filers || []).filter(f => !f.error).map(f => ({f, h: (f.top || []).find(x => x.t === t)})).filter(x => x.h).sort((a, b) => b.h.pct - a.h.pct);
+    const T = DATA.track || {}, cong = (T.congress || []).filter(c => (c.recent || []).some(x => x.t === t)).map(c => ({c, tier: personTier(c)}));
+    if (!L.length && !funds.length && !cong.length) { box.hidden = true; return; }
+    const line = (icon, who, what, extra = "") => `<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)">${icon}<div style="flex:1;min-width:0"><b>${who}</b> <span class="small muted">${what}</span></div>${extra}</div>`;
+    box.hidden = false;
+    box.innerHTML = `<h3>Who's picked this</h3>
+      ${L.map(x => x.k === "claude" ? line(`<span class="cpk" style="width:24px;height:24px;font-size:11px">${x.rank}</span>`, "Claude's Picks", `#${x.rank}${x.theme ? " · " + esc(x.theme) : ""}${x.conviction ? " · " + esc(x.conviction) + " conviction" : ""} · picked ${esc(fmtShort(x.date))}`, x.px0 && px ? `<span class="num ${cls(px / x.px0 - 1)}">${pct(px / x.px0 - 1)}</span>` : "")
+        : line(botIcon(x.id, x.color, 24), esc(x.name), `${x.short ? "Short" : "Long"} · ${(Math.abs(x.w) * 100).toFixed(0)}% of its money · since ${esc(fmtShort(x.since))}${this.arena?.sample ? " · sample" : ""}`, x.entry && px ? `<span class="num ${cls(x.short ? x.entry / px - 1 : px / x.entry - 1)}">${pct(x.short ? x.entry / px - 1 : px / x.entry - 1)}</span>` : "")).join("")}
+      ${funds.slice(0, 8).map(({f, h}) => { const ft = fundTier(f.copycat); return line(`<span class="badge" style="min-width:24px;text-align:center">13F</span>`, esc(f.name), `${(h.pct * 100).toFixed(1)}% of portfolio${h.chg && h.chg !== "same" ? " · " + CHG[h.chg][0].toLowerCase() : ""} · ${esc(fmtShort(f.period))} 13F`, ft ? `<span class="tier ${ft[1]}">${ft[0]}</span>` : ""); }).join("")}
+      ${cong.slice(0, 6).map(({c, tier}) => { const b = c.recent.find(x => x.t === t); return line(`<span class="badge" style="min-width:24px;text-align:center">Cong</span>`, esc(c.name), `bought, disclosed ${esc(fmtDate(b.filed))}`, `<span class="tier ${tier[1]}">${tier[0]}</span>`); }).join("")}
+      <p class="faint small" style="margin:8px 0 0">Funds: latest 13F (up to 45 days after quarter end). Congress: recent purchases by members with a ranked record. Tags show whether following them has beaten the S&amp;P 500.</p>`;
+    $$("#pickedBox [data-open]").forEach(b => b.onclick = () => Sheet.open(b.dataset.open));
+  },
+};
+// Track-record tiers: is following this person or fund better than just owning the S&P 500?
+function personTier(r) {
+  const n = r.n63 || 0, a = r.avg63 ?? 0, t = r.t63 ?? 0;
+  if (a > 0 && t >= 2 && n >= 8) return ["Proven edge", "good"];
+  if (a > 0 && t >= 1.2) return [n < 6 ? "Promising · few trades" : "Promising", "acc"];
+  if (a < 0 && t <= -1.2) return ["Lags the market", "bad"];
+  return ["No clear edge", ""];
+}
+function fundTier(c) {
+  if (!c) return null; const ex = c.ann - c.spy_ann, br = c.periods ? c.beat / c.periods : 0;
+  if (c.periods >= 6 && ex >= 0.02 && br >= 0.55) return ["Beats the market", "good"];
+  if (ex <= -0.02) return ["Lags the market", "bad"];
+  return ["Market-like", ""];
+}
 function stockRow(r, extra = "") {
   const d = r.d || {};
   const pos = d.pos != null ? Math.max(0, Math.min(1, d.pos)) : null;
   return `<button class="row" data-t="${esc(r.t)}">
-    <div class="id"><div class="tk">${esc(r.t)}${partial(r) ? `<span class="ptl" title="Scored in only ${nCats(r)} of 7 categories, so it ranks after fully scored stocks">${nCats(r)}/7 scored</span>` : ""}</div><div class="nm">${esc(r.n)}</div>${extra}</div>
+    <div class="id"><div class="tk">${esc(r.t)}${Picked.icons(r.t)}${partial(r) ? `<span class="ptl" title="Scored in only ${nCats(r)} of 7 categories, so it ranks after fully scored stocks">${nCats(r)}/7 scored</span>` : ""}</div><div class="nm">${esc(r.n)}</div>${extra}</div>
     <div class="px">${fmtMoney(d.px)}<small class="${cls(d.c1)}">${pct(d.c1, 2)}</small>${pos != null ? `<div class="r52" title="52-week range: ${fmtMoney(d.lo)} – ${fmtMoney(d.hi)}"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
     <div class="ov">${chip(r.ov, "Overall")}</div>
     ${scores7(r)}</button>`;
@@ -947,9 +1013,14 @@ const Filters = {
     $$("[data-rm]", p).forEach(b => b.onclick = () => { this.draft.splice(+b.dataset.rm, 1); this.render(); });
     $$("input[data-i]", p).forEach(inp => inp.oninput = () => { const f = this.draft[+inp.dataset.i]; f[inp.dataset.k] = inp.value; $("#fok").textContent = `Show ${this.count()} stocks`; });
     $$("[data-ixv]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi]; const v = b.dataset.ixv; f.values = f.values.includes(v) ? f.values.filter(x => x !== v) : [...f.values, v]; this.render(); });
+    $$("[data-mode]", p).forEach(b => b.onclick = () => { this.draft[+b.dataset.fi].mode = b.dataset.mode; this.render(); });
+    $$("[data-ind]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi]; const v = b.dataset.ind; f.values = f.values.includes(v) ? f.values.filter(x => x !== v) : [...f.values, v]; this.openSec = b.closest("details")?.dataset.osec; this.render(); });
+    $$("[data-indall]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi], sec = b.dataset.indall; const inds = [...new Set(ROWS.filter(r => (r.sec || "Other") === sec).map(r => r.ind || "(no industry)"))];
+      const all = inds.every(k => f.values.includes(k)); f.values = all ? f.values.filter(k => !inds.includes(k)) : [...new Set([...f.values, ...inds])]; this.openSec = sec; this.render(); });
+    $$("details[data-osec]", p).forEach(d => d.ontoggle = () => { if (d.open) this.openSec = d.dataset.osec; else if (this.openSec === d.dataset.osec) this.openSec = null; });
     $$("[data-sec]", p).forEach(b => b.onclick = () => { const f = this.draft[+b.dataset.fi]; const v = b.dataset.sec; f.values = f.values.includes(v) ? f.values.filter(x => x !== v) : [...f.values, v]; this.render(); });
     $$("[data-add]", p).forEach(b => b.onclick = () => { const [type, key] = b.dataset.add.split("|");
-      const f = type === "range" ? {type, key, min: "", max: ""} : type === "flag" ? {type, key, days: 7} : type === "sector" || type === "index" ? {type, values: []} : {type, key};
+      const f = type === "range" ? {type, key, min: "", max: ""} : type === "flag" ? {type, key, days: 7} : type === "sector" || type === "index" ? {type, values: []} : type === "industry" ? {type, mode: "exclude", values: []} : {type, key};
       this.draft.push(f); this.adding = false; this.render(); const last = $$("input[data-i]", p).filter(x => +x.dataset.i === this.draft.length - 1)[0]; last && last.focus(); });
     $$("[data-scope]", p).forEach(b => b.onclick = () => { this.scope = b.dataset.scope; this.render(); });
     $("#fsearch") && ($("#fsearch").oninput = e => { this.fq = e.target.value; const pos = e.target.selectionStart; this.render(); const n2 = $("#fsearch"); n2.focus(); n2.setSelectionRange(pos, pos); });
@@ -965,7 +1036,14 @@ const Filters = {
         <div class="rng"><label class="small muted">Within the last <input type="number" min="1" max="60" data-i="${i}" data-k="days" value="${esc(f.days ?? 7)}"> trading days</label></div></div>`;
     if (f.type === "state") return `<div class="frow"><div class="frow-h"><b>${esc(STATE_FLAGS[f.key][0])}</b>${rm}</div></div>`;
     if (f.type === "index") return `<div class="frow"><div class="frow-h"><b>Index membership</b>${rm}</div><div class="picker"><div class="opts">${Object.entries(INDEXES).map(([k, l]) => `<button data-fi="${i}" data-ixv="${k}" class="${f.values.includes(k) ? "on" : ""}">${esc(l)}</button>`).join("")}</div></div><div class="faint small">Stocks in any of the picked indexes.</div></div>`;
-    if (f.type === "sector") return `<div class="frow"><div class="frow-h"><b>Sectors</b>${rm}</div><div class="picker"><div class="opts">${sectors.map(s => `<button data-fi="${i}" data-sec="${esc(s)}" class="${f.values.includes(s) ? "on" : ""}">${esc(s)}</button>`).join("")}</div></div><div class="faint small">Pick one or more. None picked = all sectors.</div></div>`;
+    const modeSeg = (opts) => `<div class="seg" style="margin:6px 0">${opts.map(([v, l]) => `<button data-fi="${i}" data-mode="${v}" aria-pressed="${(f.mode || opts[0][0]) === v}">${l}</button>`).join("")}</div>`;
+    if (f.type === "sector") return `<div class="frow"><div class="frow-h"><b>Sectors</b>${rm}</div>${modeSeg([["include", "Only these"], ["exclude", "Hide these"]])}<div class="picker"><div class="opts">${sectors.map(s => `<button data-fi="${i}" data-sec="${esc(s)}" class="${f.values.includes(s) ? "on" : ""}">${esc(s)}</button>`).join("")}</div></div><div class="faint small">Pick one or more. None picked = all sectors.</div></div>`;
+    if (f.type === "industry") { const by = {}; for (const r of ROWS) { const k = r.ind || "(no industry)"; ((by[r.sec || "Other"] ||= {})[k] = (by[r.sec || "Other"][k] || 0) + 1); }
+      return `<div class="frow"><div class="frow-h"><b>Industries</b>${rm}</div>${modeSeg([["exclude", "Hide these"], ["include", "Only these"]])}
+        <div class="faint small" style="margin-bottom:4px">${f.values.length ? `${f.values.length} picked: ${esc(f.values.slice(0, 6).join(", "))}${f.values.length > 6 ? "…" : ""}` : "Open a sector and pick industries. None picked = all industries."}</div>
+        ${Object.keys(by).sort().map(sec => { const inds = Object.entries(by[sec]).sort((a, b) => a[0].localeCompare(b[0])), nOn = inds.filter(([k]) => f.values.includes(k)).length;
+          return `<details class="indgrp" ${this.openSec === sec ? "open" : ""} data-osec="${esc(sec)}"><summary>${esc(sec)} <span class="faint">· ${inds.length} industries${nOn ? ` · ${nOn} picked` : ""}</span></summary>
+            <div class="picker"><div class="opts"><button data-fi="${i}" data-indall="${esc(sec)}" class="${nOn === inds.length ? "on" : ""}">All of ${esc(sec)}</button>${inds.map(([k, n]) => `<button data-fi="${i}" data-ind="${esc(k)}" class="${f.values.includes(k) ? "on" : ""}">${esc(k)} <span class="faint">${n}</span></button>`).join("")}</div></div></details>`; }).join("")}</div>`; }
     return "";
   },
   scope: "Scores", fq: "",
@@ -976,7 +1054,8 @@ const Filters = {
     const ev = ["insiderBuy90","ceoBuy90","cluster90","congBuy90","upgrade90","paysDiv","thinCov"].map(k => ["state|" + k, STATE_FLAGS[k][0]]);
     const tabs = {"Scores": groups["Scores"], "52-week & price": [...groups["52-week range"], ...groups["Price & size"]], "Technical": [...tech, ...groups["Technical"]],
       "Financial metrics": Object.entries(groups).filter(([g]) => g.startsWith("Financial metrics")).flatMap(([g, items]) => items.map(x => [x[0], x[1], g.split(" · ")[1]])),
-      "Analysts & insiders": [...groups["Analysts & insiders"], ...ev], "Sector & index": [["sector|", "Sector"], ["index|", "Index membership"]]};
+      "Analysts & insiders": [...groups["Analysts & insiders"], ...ev], "Sector & industry": [["sector|", "Sector (only or hide)"], ["industry|", "Industry (hide or only)"], ["index|", "Index membership"]],
+      "Picks": ["claudePick", "botLong", "botShort"].map(k => ["state|" + k, STATE_FLAGS[k][0]])};
     const used = new Set(this.draft.map(f => f.type + "|" + (f.key || "")));
     let items = tabs[this.scope] || [];
     if (this.fq) { const q = this.fq.toLowerCase(); items = Object.values(tabs).flat().filter(x => x[1].toLowerCase().includes(q)); }
@@ -1380,7 +1459,7 @@ const Sheet = {
   },
   body() {
     const s = BY[this.t], el = $("#dbody"); const T = UI.dtab;
-    if (T === "overview") el.innerHTML = overviewHtml(s);
+    if (T === "overview") { el.innerHTML = overviewHtml(s); Picked.fill(s.ticker); }
     if (T === "scores") el.innerHTML = `<div class="card">${scoresHtml(s)}</div>`;
     if (T === "chart") { el.innerHTML = chartCard(s) + `<div class="grid2" style="margin-top:14px">${rallyCard(s)}<div id="btCard">${backtestCard(s)}</div>${momentumCard(s)}${signalsCard(s)}</div>`; bindBacktest(s); }
     if (T === "congress") el.innerHTML = congressCard(s);
@@ -1449,6 +1528,7 @@ function overviewHtml(s) {
   const news = (s.news || []).slice(0, 6);
   return `<div class="grid2">
     <div class="card wide">${chartInner(s, true)}</div>
+    <div class="card wide" id="pickedBox" hidden></div>
     <div class="card wide">
       ${p.longBusinessSummary ? `<p id="bio" class="clamp" style="margin-top:0">${esc(p.longBusinessSummary)}</p><button class="link" id="moreBio" style="font-size:13px">More</button>` : `<p class="muted" style="margin-top:0">No company description in this snapshot.</p>`}
       <div class="pill-row" style="margin:10px 0 14px">${hq ? `<span class="badge">${esc(hq)}</span>` : ""}${p.fullTimeEmployees ? `<span class="badge">${Number(p.fullTimeEmployees).toLocaleString()} employees</span>` : ""}${p.website ? `<a class="badge acc" href="${esc(p.website)}" target="_blank" rel="noopener">${esc(p.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>` : ""}${s.sic_desc ? `<span class="badge">SIC: ${esc(s.sic_desc.toLowerCase())}</span>` : ""}</div>
@@ -2132,11 +2212,11 @@ function lineSvg(curve) {
 function filerCard(f) {
   if (f.error) return `<div class="card"><h3>${esc(f.name)} <span class="label">${esc(f.manager || "")}</span></h3><p class="muted small">${esc(f.error)}.</p></div>`;
   const c = f.copycat, open = UI.resOpen === f.name, ex = c ? c.ann - c.spy_ann : null;
-  return `<div class="card">
+  return `<div class="card" id="fund-${esc(f.name.replace(/[^A-Za-z0-9]/g, ""))}">
     <button class="link" data-fopen="${esc(f.name)}" style="display:block;width:100%;text-align:left;color:inherit">
       <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><h3 style="margin:0">${esc(f.name)}</h3><span class="muted small">${esc(f.manager || "")} · ${esc(f.style || "")}</span><span style="margin-left:auto" class="faint small">${open ? "▲" : "▼"}</span></div>
       <div class="pill-row" style="margin-top:8px"><span class="badge">${fmtB(f.value)} · ${f.n} stocks</span><span class="badge">Top 10 = ${Math.round(f.top10_pct * 100)}%</span>
-        ${f.stale ? `<span class="badge warn">No 13F since ${esc(fmtMY(f.filed))}</span>` : ""}${c ? `<span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
+        ${f.stale ? `<span class="badge warn">No 13F since ${esc(fmtMY(f.filed))}</span>` : ""}${c ? `<span class="tier ${fundTier(c)[1]}">${fundTier(c)[0]}</span><span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
       <div class="small" style="margin-top:8px">${f.top.slice(0, 6).map(x => `<span style="white-space:nowrap;margin-right:10px"><b>${esc(x.t || x.name.slice(0, 14))}</b> <span class="faint">${(x.pct * 100).toFixed(1)}%</span>${x.chg && x.chg !== "same" ? ` <span class="${CHG[x.chg][1] === "bad" ? "down" : "up"}">${x.chg === "new" ? "new" : x.chg === "add" ? "↑" : "↓"}</span>` : ""}</span>`).join("")}</div>
     </button>
     ${open ? `<div style="margin-top:12px">
@@ -2152,27 +2232,64 @@ function filerCard(f) {
     </div>` : ""}</div>`;
 }
 function consensusTable(title, rows, kind) {
-  return `<div class="card"><h3>${title}</h3>${rows?.length ? `<table><tbody>${rows.map(r => `<tr><td>${tk(r.t || null)} <span class="faint small">${esc(r.name)}</span></td><td class="r num">${r.funds.length}</td><td class="small muted">${esc(r.funds.slice(0, 4).map(f => f.fund).join(", "))}${r.funds.length > 4 ? "…" : ""}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">Nothing yet.</p>`}</div>`;
+  const FT = Object.fromEntries((RES?.filers || []).map(f => [f.name, fundTier(f.copycat)?.[1]]));
+  return `<div class="card"><h3>${title}</h3>${rows?.length ? `<table><thead><tr><th>Stock</th><th class="r">Funds</th><th class="r" title="How many of those funds beat the S&amp;P 500 when copied">Beaters</th><th>Who</th></tr></thead><tbody>${rows.map(r => { const good = r.funds.filter(f => FT[f.fund] === "good"); return `<tr><td>${tk(r.t || null)} <span class="faint small">${esc(r.name)}</span></td><td class="r num">${r.funds.length}</td><td class="r num ${good.length ? "up" : "faint"}">${good.length}</td><td class="small muted">${esc([...good, ...r.funds.filter(f => FT[f.fund] !== "good")].slice(0, 4).map(f => f.fund).join(", "))}${r.funds.length > 4 ? "…" : ""}</td></tr>`; }).join("")}</tbody></table>` : `<p class="muted small">Nothing yet.</p>`}</div>`;
+}
+// Cumulative excess return vs the S&P 500 (curve = [[date, cum]]), as a sparkline or a small chart.
+function exSvg(curve, W = 110, H = 26, big = false) {
+  if (!curve?.length || curve.length < 2) return `<span class="faint small">—</span>`;
+  const v = curve.map(c => c[1]); let lo = Math.min(0, ...v), hi = Math.max(0, ...v); if (hi - lo < 0.02) hi = lo + 0.02;
+  const L = big ? 34 : 1, X = i => L + i / (v.length - 1) * (W - L - 2), Y = y => 3 + (1 - (y - lo) / (hi - lo)) * (H - (big ? 20 : 6));
+  const col = v[v.length - 1] >= 0 ? "var(--up)" : "var(--down)";
+  return `<svg viewBox="0 0 ${W} ${H}" width="${big ? "100%" : W}" ${big ? "" : `height="${H}"`} role="img" aria-label="Cumulative return vs the S&P 500" style="${big ? "max-width:640px;display:block" : "vertical-align:middle"}">
+    <line x1="${L}" x2="${W}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="var(--line)" ${big ? "" : 'stroke-dasharray="2 2"'}/>
+    ${big ? [hi, lo].filter(x => Math.abs(x) > 0.005).map(x => `<text x="${L - 4}" y="${(Y(x) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--faint)">${(x > 0 ? "+" : "") + Math.round(x * 100)}%</text>`).join("") + `<text x="${L - 4}" y="${(Y(0) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--faint)">0%</text><text x="${L}" y="${H - 3}" font-size="9" fill="var(--faint)">${esc(fmtMY(curve[0][0]))}</text><text x="${W}" y="${H - 3}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtMY(curve[curve.length - 1][0]))}</text>` : ""}
+    <polyline points="${v.map((y, i) => X(i).toFixed(1) + "," + Y(y).toFixed(1)).join(" ")}" fill="none" stroke="${col}" stroke-width="${big ? 2 : 1.6}"/></svg>`;
 }
 function trackTables() {
   const T = DATA.track;
   if (!T) return `<div class="card"><h3>Track records</h3><p class="muted">Track records are computed in the nightly build and will appear after tonight's run.</p></div>`;
-  const row = (r, who) => `<tr><td>${who}</td><td class="r num">${r.n63}</td><td class="r num ${cls(r.avg21)}">${pct(r.avg21)}</td><td class="r num ${cls(r.avg63)}"><b>${pct(r.avg63)}</b></td><td class="r num ${cls(r.avg126)}">${pct(r.avg126)}</td><td class="r num">${Math.round(r.hit63 * 100)}%</td><td class="small">${(r.best || []).slice(0, 2).map(b => `${tk(b.t)} <span class="faint">${pct(b.x63, 0)}</span>`).join(", ")}</td></tr>`;
-  const head = `<thead><tr><th>Who</th><th class="r">Buys</th><th class="r">1 mo</th><th class="r">3 mo</th><th class="r">6 mo</th><th class="r">Hit</th><th>Best</th></tr></thead>`;
-  const cv = T.coverage || {};
-  return `<div class="card"><h3>Latest buys by top-ranked traders <span class="label">last 60 days</span></h3>
-      ${(T.recent_by_top || []).length ? `<table><tbody>${T.recent_by_top.slice(0, 20).map(r => `<tr><td>${tk(r.t)}</td><td class="small">${esc(r.who)} <span class="badge">${esc(r.kind)}</span>${r.opt ? ` <span class="badge warn">Options</span>` : ""}</td><td class="r small num">${r.amount ? esc(amtRange({amount_low: r.amount[0], amount_high: r.amount[1]})) : fmtB(r.value)}</td><td class="r num small">filed ${esc(fmtShort(r.filed))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">None in the last 60 days.</p>`}</div>
-    <div class="card" style="margin-top:14px"><h3>Congress <span class="label">return vs S&amp;P after each disclosed purchase</span></h3>
-      <div style="overflow-x:auto"><table>${head}<tbody>${(T.congress || []).slice(0, 30).map(r => row(r, `${esc(r.name)} <span class="faint small">${esc((r.party || "?")[0])}-${esc(r.state || "")} · ${esc(r.chamber || "")}</span>`)).join("")}</tbody></table></div>
-      <p class="faint small" style="margin:8px 0 0">${(cv.congress_ranked || 0).toLocaleString()} members with 3+ priced purchases, from ${(cv.congress_buys || 0).toLocaleString()} disclosed buys over 3 years.</p></div>
-    <div class="card" style="margin-top:14px"><h3>Insiders <span class="label">officers & directors buying their own stock</span></h3>
-      <div style="overflow-x:auto"><table>${head}<tbody>${(T.insiders || []).slice(0, 30).map(r => row(r, `${esc(r.name)} <span class="faint small">${tk(r.t)} · ${esc(r.role || "")}</span>`)).join("")}</tbody></table></div>
-      <p class="faint small" style="margin:8px 0 0">${(cv.insiders_ranked || 0).toLocaleString()} insiders with 2+ priced buys in the last year. With one year of history, few have long records yet.</p></div>
-    <p class="faint small" style="margin-top:10px">How it's measured: each purchase is "bought" at the first close after it was disclosed, which is when you could have followed it, then compared with the ${esc(T.benchmark)} over the next 1, 3 and 6 months. Single trades are capped at +100%/−90%, and people are ranked on a shrunk 3-month average so a couple of lucky trades don't top the list. Hit = share of buys that beat the market over 3 months. Small samples: treat these as leads, not proof.</p>`;
+  const V = UI.trView || "follow", cv = T.coverage || {};
+  const all = [...(T.congress || []), ...(T.congress_bottom || []).filter(b => !(T.congress || []).some(c => c.name === b.name))];
+  all.forEach(r => r._tier = personTier(r));
+  const rows = V === "follow" ? all.filter(r => ["good", "acc"].includes(r._tier[1])) : V === "lag" ? all.filter(r => r._tier[1] === "bad" || r.avg63 < 0).sort((a, b) => a.score - b.score) : all;
+  const tierOf = Object.fromEntries(all.map(r => [r.name, r._tier]));
+  const recent = (T.recent_by_top || []).filter(r => r.kind === "Congress" && ["good", "acc"].includes(tierOf[r.who]?.[1]));
+  const counts = ["good", "acc", "", "bad"].map(k => all.filter(r => r._tier[1] === k).length);
+  const detail = r => `<tr><td colspan="8" style="background:color-mix(in srgb,var(--accent) 4%,transparent)">
+      <div class="label">Following every disclosed buy (held 3 months each) vs the S&amp;P 500</div>${exSvg(r.curve, 640, 150, true)}
+      <div class="grid2" style="margin-top:8px;gap:12px"><div><div class="label">By year</div><table><thead><tr><th>Year</th><th class="r">Buys</th><th class="r">Avg vs S&amp;P, 3 mo</th></tr></thead><tbody>${Object.entries(r.years || {}).map(([y, [n, a]]) => `<tr><td>${y}</td><td class="r num">${n}</td><td class="r num ${cls(a)}">${pct(a)}</td></tr>`).join("")}</tbody></table></div>
+        <div><div class="label">Recent buys</div><div class="small">${(r.recent || []).map(b => `<div>${tk(b.t)} <span class="faint">traded ${esc(fmtDate(b.date))}, disclosed ${esc(fmtDate(b.filed))}</span></div>`).join("")}</div>
+          <div class="label" style="margin-top:8px">Best</div><div class="small">${(r.best || []).map(b => `${tk(b.t)} <span class="${cls(b.x63)}">${pct(b.x63, 0)}</span>`).join(", ")}</div>
+          <p class="faint small">Average ${pct(r.avg63)} vs S&amp;P per buy over 3 months, median ${pct(r.med63)}, beat the market ${Math.round(r.hit63 * 100)}% of the time. Confidence (t) ${r.t63 ?? "—"}: above 2 means the edge is unlikely to be luck.${r.relevant_share ? ` ${Math.round(r.relevant_share * 100)}% of buys were in sectors their committees oversee.` : ""}</p></div></div></td></tr>`;
+  const row = r => `<tr class="trow" data-tropen="${esc(r.name)}"><td>${esc(r.name)} <span class="faint small">${esc((r.party || "?")[0])}-${esc(r.state || "")} · ${esc(r.chamber || "")}</span></td><td><span class="tier ${r._tier[1]}">${r._tier[0]}</span></td><td class="r num">${r.n63}</td><td class="r num ${cls(r.avg63)}"><b>${pct(r.avg63)}</b></td><td class="r num">${Math.round(r.hit63 * 100)}%</td><td class="r num">${r.t63 ?? "—"}</td><td>${exSvg(r.curve)}</td><td class="r num ${cls(r.curve?.slice(-1)[0]?.[1])}">${r.curve ? pct(r.curve[r.curve.length - 1][1], 0) : "—"}</td></tr>${UI.trOpen === r.name ? detail(r) : ""}`;
+  return `<div class="card"><h3>Congress: who's worth following?</h3>
+      <p class="small" style="margin-top:0">${counts[0]} proven, ${counts[1]} promising, ${counts[2]} with no clear edge and ${counts[3]} lagging, among ${all.length} members with 3+ priced buys. Mirror the first two; the rest are mostly noise.</p>
+      <div class="seg" style="margin-bottom:10px">${[["follow", "Worth following"], ["all", "Everyone ranked"], ["lag", "Lagging"]].map(([k, l]) => `<button data-trv="${k}" aria-pressed="${V === k}">${l}</button>`).join("")}</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Member</th><th>Verdict</th><th class="r">Buys</th><th class="r">Avg vs S&amp;P, 3 mo</th><th class="r">Hit</th><th class="r" title="t-statistic: how sure we are the average isn't luck">t</th><th>Over time</th><th class="r">Follow total</th></tr></thead>
+        <tbody>${rows.map(row).join("") || `<tr><td colspan="8" class="muted">Nobody in this group.</td></tr>`}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">Tap a row for the full curve and year-by-year results. "Over time" follows every disclosed buy (bought at the first close after disclosure, held 3 months, equal-weighted) and shows the running gain or loss vs the S&amp;P 500. Proven edge = positive average, t ≥ 2 and 8+ buys. Promising = positive, t ≥ 1.2.</p></div>
+    <div class="card" style="margin-top:14px"><h3>Latest buys by members worth following <span class="label">last 60 days</span></h3>
+      ${recent.length ? `<table><tbody>${recent.slice(0, 20).map(r => `<tr><td>${tk(r.t)}</td><td class="small">${esc(r.who)} <span class="tier ${tierOf[r.who][1]}">${tierOf[r.who][0]}</span>${r.opt ? ` <span class="badge warn">Options</span>` : ""}</td><td class="r small num">${r.amount ? esc(amtRange({amount_low: r.amount[0], amount_high: r.amount[1]})) : ""}</td><td class="r num small">filed ${esc(fmtShort(r.filed))}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">None in the last 60 days.</p>`}</div>
+    <details class="card" style="margin-top:14px"><summary><b>Insiders</b> <span class="muted small">officers & directors buying their own company's stock</span></summary>
+      <div style="overflow-x:auto"><table><thead><tr><th>Who</th><th class="r">Buys</th><th class="r">1 mo</th><th class="r">3 mo</th><th class="r">Hit</th></tr></thead><tbody>${(T.insiders || []).slice(0, 30).map(r => `<tr><td>${esc(r.name)} <span class="faint small">${tk(r.t)} · ${esc(r.role || "")}</span></td><td class="r num">${r.n63}</td><td class="r num ${cls(r.avg21)}">${pct(r.avg21)}</td><td class="r num ${cls(r.avg63)}"><b>${pct(r.avg63)}</b></td><td class="r num">${Math.round(r.hit63 * 100)}%</td></tr>`).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">Insiders only trade their own company, so this shows when their buying has paid off, not who to follow market-wide. ${(cv.insiders_ranked || 0).toLocaleString()} insiders with 2+ priced buys in the last year.</p></details>
+    <p class="faint small" style="margin-top:10px">How it's measured: each purchase is "bought" at the first close after it was disclosed, which is when you could have followed it, then compared with the ${esc(T.benchmark)} over the next 3 months. Single trades are capped at +100%/−90%. Small samples: treat these as leads, not proof.</p>`;
+}
+function fundBoard(list) {
+  const fs = list.filter(f => f.copycat && !f.error).map(f => ({f, c: f.copycat, ex: f.copycat.ann - f.copycat.spy_ann, tier: fundTier(f.copycat),
+    rel: f.copycat.curve.map(p => [p[0], (1 + p[1]) / (1 + p[2]) - 1])})).sort((a, b) => b.ex - a.ex);
+  if (!fs.length) return "";
+  const n = k => fs.filter(x => x.tier[1] === k).length;
+  return `<div class="card" style="margin-bottom:12px"><h3>Which funds are worth copying?</h3>
+    <p class="small" style="margin-top:0">${n("good")} beat the S&amp;P 500, ${n("")} roughly match it and ${n("bad")} lag it, if you had copied each 13F when it came out.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Fund</th><th>Verdict</th><th class="r">Per year vs S&amp;P</th><th class="r">Quarters ahead</th><th>vs S&amp;P over time</th></tr></thead><tbody>
+      ${fs.map(x => `<tr class="trow" data-fjump="${esc(x.f.name)}"><td>${esc(x.f.name)}${x.f.stale ? ` <span class="badge warn">stale</span>` : ""} <span class="faint small">${esc(x.f.manager || "")}</span></td><td><span class="tier ${x.tier[1]}">${x.tier[0]}</span></td><td class="r num ${cls(x.ex)}"><b>${pct(x.ex)}</b></td><td class="r num">${x.c.beat}/${x.c.periods}</td><td>${exSvg([[x.c.start, 0], ...x.rel])}</td></tr>`).join("")}</tbody></table></div>
+    <p class="faint small" style="margin:8px 0 0">Beats the market = 2%+ a year ahead of the S&amp;P 500 and ahead in more than half of the quarters (6+ quarters of history). Tap a fund to open its holdings.</p></div>`;
 }
 function viewResearch() {
   const V = UI.resView || "funds";
-  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Track records"]];
+  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
   let body = "";
   if (V === "track") body = trackTables();
   else if (!RES) { body = `<div class="card"><p class="muted">Loading 13F data…</p></div>`; loadResearch(); }
@@ -2184,7 +2301,7 @@ function viewResearch() {
     const list = RES.filers.filter(f => f.group === grp).sort((a, b) => a.error ? 1 : b.error ? -1 : a.stale !== b.stale ? (a.stale ? 1 : -1) : sortK === "aum" ? (b.value || 0) - (a.value || 0) : sortK === "name" ? a.name.localeCompare(b.name)
       : ((b.copycat ? b.copycat.ann - b.copycat.spy_ann : -9) - (a.copycat ? a.copycat.ann - a.copycat.spy_ann : -9)));
     body = `${V === "funds" ? `<div class="bar" style="margin-bottom:10px"><select class="sel" id="rsort" aria-label="Sort funds"><option value="copycat" ${sortK === "copycat" ? "selected" : ""}>Sort: copycat vs S&amp;P</option><option value="aum" ${sortK === "aum" ? "selected" : ""}>Sort: 13F size</option><option value="name" ${sortK === "name" ? "selected" : ""}>Sort: name</option></select></div>` : `<p class="muted small" style="margin-top:0">Stocks these companies hold in their own investment portfolios, often strategic stakes in partners and suppliers.</p>`}
-      <div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>
+      ${V === "funds" ? fundBoard(list) : ""}<div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>
       <p class="faint small" style="margin-top:10px">From SEC 13F filings: long US-listed stocks and options only, no shorts or cash, reported up to 45 days after each quarter. "Copycat" buys each reported portfolio (top ${RES.notes?.top_n || 60} positions, value-weighted) at the first close after its filing date and holds until the next filing, which is what a follower could actually do. Updated ${esc(fmtDate(RES.generated))}.</p>`;
   }
   $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Research</h1><span class="muted">Who owns what, and whose picks have worked</span></div>
@@ -2193,6 +2310,9 @@ function viewResearch() {
   $$("[data-fopen]").forEach(b => b.onclick = () => { UI.resOpen = UI.resOpen === b.dataset.fopen ? null : b.dataset.fopen; viewResearch(); });
   $$("#view [data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); Sheet.open(b.dataset.open); });
   const rs = $("#rsort"); if (rs) rs.onchange = () => { UI.resSort = rs.value; viewResearch(); };
+  $$("[data-trv]").forEach(b => b.onclick = () => { UI.trView = b.dataset.trv; UI.trOpen = null; viewResearch(); });
+  $$("[data-tropen]").forEach(b => b.onclick = e => { if (e.target.closest("[data-open]")) return; UI.trOpen = UI.trOpen === b.dataset.tropen ? null : b.dataset.tropen; const y = scrollY; viewResearch(); scrollTo(0, y); });
+  $$("[data-fjump]").forEach(b => b.onclick = () => { UI.resOpen = b.dataset.fjump; viewResearch(); document.getElementById("fund-" + b.dataset.fjump.replace(/[^A-Za-z0-9]/g, ""))?.scrollIntoView({block: "start"}); });
 }
 // ================================================================ momentum, congress, trends
 const REGIME_C = {"Falling knife": "var(--down)", "Basing / turning": "var(--warn)", "Healthy uptrend": "var(--up)", "Overextended": "var(--s3)", "Neutral": "var(--faint)"};

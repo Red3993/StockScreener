@@ -186,6 +186,16 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   PCE 18, GDP 14) + earnings by size (≥$50B only, 48·(mc/$4T)^0.9, cap 48) + breadth min(15, 0.25 × S&P 500 reporters);
   score = 100·(1−e^(−raw/45)), levels at 22/45/70. Always uses every stock regardless of the calendar filter. Past days: SPY's
   actual move (0.5/1/2% shading, move printed in the cell). Agenda days get an impact badge; big events get "▲ market mover".
+- 2026-10-31 (Tom): **pick icons** — `Picked` (web/index.html) loads db `app/arena` positions + latest `app/pick_log` set; rows show
+  Claude's rank badge + tinted bot icons (short = red ring); stock Overview has a "Who's picked this" card (Claude, Arena bots,
+  13F funds holding it, Congress buyers) with verdict tags; filters/presets "In Claude's latest picks", "Owned/Shorted by an Arena trader".
+  **Industry filter** (hide or only, any industry, grouped by sector with "All of <sector>") and sector filter gained "Hide these".
+  **Track verdicts**: track.py adds `t63`, `years`, and a follow-portfolio `curve` (each buy held 63 sessions, equal-weighted, cumulative
+  excess vs SPY) for Congress only — Tom: insiders trade only their own company, so no curves/verdicts for them (table kept, collapsed).
+  personTier: Proven edge (avg>0, t≥2, n≥8) / Promising (avg>0, t≥1.2) / No clear edge / Lags (avg<0, t≤−1.2). fundTier from copycat:
+  Beats (≥+2%/yr, ≥55% quarters ahead, 6+ quarters) / Market-like / Lags (≤−2%/yr). Funds tab leaderboard; consensus shows "Beaters".
+  Arena Smart Money shortlist now counts only promising+ members and weights funds by tier. Live index.json was patched with the new
+  track block on 2026-10-31 (Monday's build regenerates it).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

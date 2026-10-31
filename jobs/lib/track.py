@@ -11,6 +11,11 @@ doesn't outrank someone with a steady record over twenty. Hit rate = share of bu
   Insiders: SEC Form 4 open-market purchases (code P) by officers and directors (1 year of history, so few have
             enough buys yet to rank).
 
+Over time: for each ranked person we also build a "follow portfolio": every disclosed buy is held for 63 trading days from
+the first close after disclosure, equal-weighted across whatever is open that day, and its daily return minus SPY's is
+compounded into a cumulative excess-return curve. `t63` is a t-statistic on the 3-month excess returns (is the average
+distinguishable from zero?), and `years` splits the record by filing year, so a single lucky year stands out.
+
 Small samples and overlapping trades mean these are leads, not proof; past results don't predict future ones.
 """
 from __future__ import annotations
@@ -50,7 +55,15 @@ def _summarize(events: list[dict], min_n: int) -> dict | None:
     if len(r63) < min_n:
         return None
     avg = float(np.mean(np.clip(r63, -0.9, 1.0)))   # one +500% biotech pop shouldn't define a track record
-    out = {"n": len(events), "n63": len(r63), "avg63": round(avg, 4), "med63": round(float(np.median(r63)), 4),
+    rc = np.clip(r63, -0.9, 1.0)
+    sd = float(np.std(rc, ddof=1)) if len(rc) > 2 else None
+    t63 = round(avg / (sd / math.sqrt(len(rc))), 2) if sd and sd > 0 else None
+    years: dict[str, list] = {}
+    for e in events:
+        if e.get("x63") is not None:
+            years.setdefault(e["filed"][:4], []).append(max(-0.9, min(1.0, e["x63"])))
+    out = {"n": len(events), "n63": len(r63), "avg63": round(avg, 4), "med63": round(float(np.median(r63)), 4), "t63": t63,
+           "years": {y: [len(v), round(float(np.mean(v)), 4)] for y, v in sorted(years.items())},
            "hit63": round(float(np.mean([x > 0 for x in r63])), 3), "score": round(avg * len(r63) / (len(r63) + K_SHRINK), 4)}
     for h in (21, 126):
         xs = [e[f"x{h}"] for e in events if e.get(f"x{h}") is not None]
@@ -60,6 +73,40 @@ def _summarize(events: list[dict], min_n: int) -> dict | None:
     out["best"] = [{"t": e["t"], "filed": e["filed"], "x63": round(e["x63"], 4)} for e in best[:3]]
     out["recent"] = [{"t": e["t"], "date": e["date"], "filed": e["filed"]} for e in sorted(events, key=lambda e: e["filed"], reverse=True)[:5]]
     return out
+
+
+def _curve(events: list[dict], priced, idx: pd.DatetimeIndex, B: np.ndarray, hold: int = 63, max_pts: int = 80) -> list | None:
+    """Cumulative excess return of a follow portfolio: each buy held `hold` sessions from the first close after disclosure."""
+    n = len(idx)
+    contrib = np.zeros(n)
+    count = np.zeros(n)
+    rb = np.full(n, np.nan)
+    rb[1:] = B[1:] / B[:-1] - 1
+    first = None
+    for e in events:
+        px = priced(e["t"])
+        k = _entry_ix(idx, e["filed"])
+        if px is None or k is None:
+            continue
+        end = min(n - 1, k + hold)
+        if end <= k:
+            continue
+        seg = px[k:end + 1]
+        r = seg[1:] / seg[:-1] - 1
+        x = np.clip(r - rb[k + 1:end + 1], -0.5, 0.5)
+        ok = np.isfinite(x)
+        contrib[k + 1:end + 1][ok] += x[ok]
+        count[k + 1:end + 1][ok] += 1
+        first = k if first is None else min(first, k)
+    if first is None or first >= n - 2:
+        return None
+    daily = np.where(count[first:] > 0, contrib[first:] / np.maximum(count[first:], 1), 0.0)
+    cum = np.cumprod(1 + daily) - 1
+    step = max(1, math.ceil(len(cum) / max_pts))
+    ix = list(range(0, len(cum), step))
+    if ix[-1] != len(cum) - 1:
+        ix.append(len(cum) - 1)
+    return [[idx[first + i].date().isoformat(), round(float(cum[i]), 4)] for i in ix]
 
 
 def compute(uclose: pd.DataFrame, bench: pd.Series | None, ytick: dict[str, str], congress: dict[str, list[dict]],
@@ -112,6 +159,7 @@ def compute(uclose: pd.DataFrame, bench: pd.Series | None, ytick: dict[str, str]
         s = _summarize(p["events"], 3)
         if s:
             s.update({k: p[k] for k in ("name", "party", "state", "chamber")})
+            s["_events"] = p["events"]
             s["relevant_share"] = round(float(np.mean([e["relevant"] for e in p["events"]])), 2)
             cong_rows.append(s)
     cong_rows.sort(key=lambda r: -r["score"])
@@ -144,6 +192,7 @@ def compute(uclose: pd.DataFrame, bench: pd.Series | None, ytick: dict[str, str]
         s = _summarize(p["events"], 2)
         if s:
             s.update({"name": p["name"], "t": p["t"], "company": p["company"], "role": p["role"], "value": round(p["value"])})
+            s["_events"] = p["events"]
             ins_rows.append(s)
     ins_rows.sort(key=lambda r: -r["score"])
 
@@ -169,6 +218,12 @@ def compute(uclose: pd.DataFrame, bench: pd.Series | None, ytick: dict[str, str]
 
     def clean(v):
         return None if isinstance(v, float) and not math.isfinite(v) else v
+
+    keep_c = cong_rows[:60] + (cong_rows[-10:] if len(cong_rows) > 20 else [])
+    for r in keep_c:     # insiders only buy their own company's stock, so no follow-portfolio curve for them
+        r["curve"] = _curve(r["_events"], priced, idx, B)
+    for r in cong_rows + ins_rows:
+        r.pop("_events", None)
     return {"asof": today.isoformat(), "benchmark": bname, "horizons": list(H), "shrink_k": K_SHRINK,
             "congress": [{k: clean(v) for k, v in r.items()} for r in cong_rows[:60]],
             "congress_bottom": [{k: clean(v) for k, v in r.items()} for r in cong_rows[-10:][::-1]] if len(cong_rows) > 20 else [],
