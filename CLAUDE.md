@@ -225,6 +225,13 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   UI: Research opens on Strategy Lab (sub-nav wraps on phones); Lab = "Signal tests" (default) | "Score rankings" (old lab.json).
   Arena: **The Quant** = `strategy: {type: signals, pick: tech, horizon: 63}` (top 8 technical-only combos), **The Insider Edge**
   (id `bargain`) = pick insider; `signal_book()` in arena.py, packets list S1..S8 with records + fresh firings; `prepare --signals`.
+- 2026-11-01 (Tom: "expand the backtest to 3 variables"): Signal Lab now tests every combination of up to 3 variables —
+  adds signal triples (3 different signals within 10 days, event = day the last fires; nested parent/child signals like
+  insider buy + cluster excluded) on top of signal+1/2 filters and pair+1 filter. `p` = "b+c" for triples (arena.py names/insider
+  pick handle it). signals.json gains `table` (every combo with 40+ events: [n, per horizon [avgc, hit, n, t, tr, te], redundant])
+  and meta.by_size. UI: leaderboard ranked client-side from `table` with "Any / 1 / 2 / 3 variables" chips, and a
+  "Test your own combination" card (pick up to 3 variables; canonical key via sigCanon). Local run (no volume): ~13.5k combos,
+  table 2.7 MB of a 3.7 MB file, 130 s.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

@@ -16,6 +16,7 @@ SIGNALS (an event on the day it first fires; repeats on the same stock within 20
   Smart money      insider open-market buy, insider cluster (3+ insiders within 14 days), CEO/CFO buy,
                    Congress purchase, committee-relevant Congress purchase (all on the public filing date)
   PAIRS            two different signals on the same stock within 10 trading days (event = the day the second fires)
+  TRIPLES          three different signals on the same stock within 10 trading days (event = the day the last one fires)
 
 FILTERS (must hold on the event day; all point-in-time)
   price vs 200-day, 50-day vs 200-day (trend), RSI < 40 / > 60, position in the 52-week range, S&P 500 above / below its
@@ -27,8 +28,11 @@ MEASUREMENT
   (a) the median stock over the same days (a fair coin flip: half of all stocks beat it) and (b) SPY. Single returns are capped at -90% / +300%.
   Significance uses one average per calendar month (signals cluster in time, so stock-level t-stats would overstate it).
   Walk-forward: the first 60% of the signal history is "training", the rest "test"; a combination only counts as robust
-  if it works in both. Tested: every signal, every signal + 1 filter, every signal + 2 filters, every pair, every pair +
-  1 filter (~10,000 combinations x 5 horizons), so some winners are luck: the luck check compares training and test ranks.
+  if it works in both. Tested: every combination of up to THREE variables (Tom, 2026-11-01): every signal, signal + 1 filter,
+  signal + 2 filters, every pair, pair + 1 filter, every triple of signals (~16,500 combinations x 5 horizons), so some winners
+  are luck: the luck check compares training and test ranks.
+  A combination's second field `p` is "" (single), one signal (pair) or "b+c" (triple; the first field is the third signal).
+  `table` holds a compact row for every combination with enough events, so the app can look up any 1-3 variable test.
 
 CAVEATS
   ~3 years of prices (signals needing a 200-day average start ~10 months in); insider data ~1 year; today's index members
@@ -119,6 +123,27 @@ def recent(E: np.ndarray, w: int) -> np.ndarray:
     c = np.cumsum(E, axis=0, dtype=np.int32)
     prev = np.vstack([np.zeros((w + 1, E.shape[1]), np.int32), c[:-w - 1]])
     return (c - prev) > 0
+
+
+def sig_parts(s: str, q: str | None) -> list[str]:
+    """All signals in a combination: [s] (single), [s, q] (pair) or [s, b, c] when q is "b+c" (triple)."""
+    return [s] + (q.split("+") if q else [])
+
+
+def combo_events(S: dict, R: dict, s: str, q: str | None) -> np.ndarray:
+    """Event mask for one signal, a pair or a triple: every signal fired within PAIR_WIN days; the event is the day the
+    last one fires (each signal in turn fires today while the others fired recently), then the 20-day cooldown."""
+    parts = sig_parts(s, q)
+    if len(parts) == 1:
+        return S[s]
+    m = np.zeros_like(S[s])
+    for i, a in enumerate(parts):
+        x = S[a]
+        for j, b in enumerate(parts):
+            if j != i:
+                x = x & R[b]
+        m |= x
+    return cooldown(m)
 
 
 def build(app_data: Path, volume: pd.DataFrame | None, prog: Path | None):
@@ -327,17 +352,18 @@ def main() -> int:
         combos.append((p, q, ()))
         for k in cond_names:
             combos.append((p, q, (k,)))
-    log(f"combos: {len(combos):,} ({len(sig_names)} signals, {len(cond_names)} filters, {len(pairs)} pairs)", prog, stage="run", done=0, total=len(combos))
+    NESTED = [{"ins_buy", "ins_cluster"}, {"ins_buy", "ins_ceo"}, {"cong_buy", "cong_rel"}]   # the second always fires with the first
+    triples = [t for t in itertools.combinations(sig_names, 3) if not any(n <= set(t) for n in NESTED)]
+    for a_, b_, c_ in triples:
+        combos.append((a_, b_ + "+" + c_, ()))
+    log(f"combos: {len(combos):,} ({len(sig_names)} signals, {len(cond_names)} filters, {len(pairs)} pairs, {len(triples)} triples)", prog, stage="run", done=0, total=len(combos))
     res = []
     pair_cache: dict = {}
     for n_, (s, q, ks) in enumerate(combos):
-        if q is None:
-            m = S[s]
-        else:
-            if (s, q) not in pair_cache:
-                pair_cache.clear()
-                pair_cache[(s, q)] = cooldown((S[s] & R[q]) | (S[q] & R[s]))
-            m = pair_cache[(s, q)]
+        if (s, q) not in pair_cache:
+            pair_cache.clear()
+            pair_cache[(s, q)] = combo_events(S, R, s, q)
+        m = pair_cache[(s, q)]
         for k in ks:
             m = m & K[k]
         r = evaluate(m, EXA, EXS, FWD, month, cut, nmonths)
@@ -359,6 +385,8 @@ def main() -> int:
            "signals": {k: {"name": SIG_INFO[k][0], "desc": SIG_INFO[k][1], "group": SIG_INFO[k][2], "events": int(S[k].sum())} for k in sig_names},
            "filters": {k: COND_INFO[k] for k in cond_names},
            "meta": {"dates": [dates[warm], dates[-1]], "cut": dates[cut], "tested": len(combos), "kept": len(res), "volume": meta["volume"],
+                    "by_size": {str(n): sum(1 for (s_, q_, k_) in combos if len(sig_parts(s_, q_)) + len(k_) == n) for n in (1, 2, 3)},
+                    "triples": len(triples),
                     "insider_since": meta["ins_since"], "stocks": len(meta["tick"]), "cooldown": COOLDOWN, "pair_window": PAIR_WIN, "min_n": MIN_N},
            "baseline": {}, "luck": {}, "leaders": {}, "singles": [], "matrix": {}, "paths": {}, "live": {}}
     for h in H:
@@ -382,13 +410,20 @@ def main() -> int:
             par = byk.get((r["s"], r["p"], tuple(x for x in r["k"] if x != f)))
             if par and par["n"] == r["n"]:
                 redundant.add(key(r))
+        sp = sig_parts(r["s"], r["p"])
+        if len(sp) == 3:
+            for drop in sp:
+                rest = [x for x in sp if x != drop]
+                par = byk.get((rest[0], rest[1], ())) or byk.get((rest[1], rest[0], ()))
+                if par and par["n"] == r["n"]:
+                    redundant.add(key(r))
     res_all, res = res, [r for r in res if key(r) not in redundant]
     for h in H:
         bh = out["baseline"][str(h)]["hit"]
         cand = [r for r in res if robust(r, h) is not None and (g(r, h, "t") or 0) >= LEAD_T and g(r, h, "n") >= LEAD_N and g(r, h, "hit") > bh]
         best = sorted(cand, key=lambda r: -robust(r, h))[:60]
         worst = sorted([r for r in res if robust(r, h) is not None and g(r, h, "n") >= LEAD_N], key=lambda r: max(g(r, h, "tr"), g(r, h, "te")))[:20]
-        tech = [r for r in cand if SIG_INFO[r["s"]][2] != "smart" and (r["p"] is None or SIG_INFO[r["p"]][2] != "smart")
+        tech = [r for r in cand if all(SIG_INFO[x][2] != "smart" for x in sig_parts(r["s"], r["p"]))
                 and not any(k in ("value7", "profit7", "health7", "growth7", "mgmt7", "overall6", "junk", "ins90", "cong90") for k in r["k"])]
         best_tech = sorted(tech, key=lambda r: -robust(r, h))[:30]
         out["leaders"][str(h)] = {"best": [list(key(r)) for r in best], "worst": [list(key(r)) for r in worst], "tech": [list(key(r)) for r in best_tech]}
@@ -414,9 +449,10 @@ def main() -> int:
         if d < T:
             MED[: T - d, j] = np.nanmedian(np.clip(c[d:] / alive_c[: T - d] - 1, -0.9, 3), axis=1)
     want = {tuple(x[:2]) + (tuple(x[2]),) for h in ("21", "63") for x in out["leaders"][h]["best"][:25] + out["leaders"][h]["tech"][:15]}
+    RW = {k: recent(S[k], PAIR_WIN) for k in S}
     for kk, r in keep.items():
         s, q, ks = kk
-        m = S[s] if q is None else cooldown((S[s] & recent(S[q], PAIR_WIN)) | (S[q] & recent(S[s], PAIR_WIN)))
+        m = combo_events(S, RW, s, q)
         for k in ks:
             m = m & K[k]
         ti, si = np.nonzero(m)
@@ -435,6 +471,13 @@ def main() -> int:
         if recent_ev:
             out["live"]["|".join([s, q or "", ",".join(ks)])] = [[meta["dates"][t], tk] for t, tk in sorted(recent_ev, reverse=True)[:40]]
     out["paths"] = cum
+    # compact lookup of every tested combination with enough events (redundant ones included, flagged):
+    # key -> [n, then per horizon in H: [avgc, hit, n, t, tr, te] or None, redundant flag]
+    rnd = lambda v, d=4: None if v is None or not math.isfinite(float(v)) else round(float(v), d)   # noqa: E731
+    out["table"] = {"|".join([r["s"], r["p"] or "", ",".join(r["k"])]): [r["n"]] + [
+        None if not r.get(str(h)) else [rnd(r[str(h)]["avgc"]), rnd(r[str(h)]["hit"], 3), r[str(h)]["n"], rnd(r[str(h)]["t"], 2),
+                                        rnd(r[str(h)]["tr"]), rnd(r[str(h)]["te"])] for h in H] + [1 if key(r) in redundant else 0]
+        for r in res_all}
     out["results"] = {"|".join([k[0], k[1] or "", ",".join(k[2])]): {kk: vv for kk, vv in r.items() if kk not in ("s", "p", "k")} for k, r in keep.items()}
     out["runtime_s"] = round(time.time() - T0)
 

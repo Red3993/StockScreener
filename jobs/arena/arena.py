@@ -171,12 +171,12 @@ def signal_book(strat: dict) -> tuple[list[dict], dict[str, list]]:
     lead = (S.get("leaders") or {}).get(h) or {}
     pool = lead.get("tech" if strat.get("pick") == "tech" else "best") or []
     if strat.get("pick") == "insider":
-        pool = [k for k in pool if k[0].startswith("ins_") or (k[1] or "").startswith("ins_") or "ins90" in k[2]]
+        pool = [k for k in pool if any(x.startswith("ins_") for x in [k[0]] + (k[1] or "").split("+")) or "ins90" in k[2]]
     combos = []
     for k in pool[: strat.get("combos", 8)]:
         key = "|".join([k[0], k[1] or "", ",".join(k[2])])
         x = ((S.get("results") or {}).get(key) or {}).get(h) or {}
-        nm = S["signals"][k[0]]["name"] + (" + " + S["signals"][k[1]]["name"] if k[1] else "") + "".join(f" [{S['filters'][f]}]" for f in k[2])
+        nm = " + ".join(S["signals"][x]["name"] for x in [k[0]] + [y for y in (k[1] or "").split("+") if y]) + "".join(f" [{S['filters'][f]}]" for f in k[2])
         combos.append({"key": key, "name": nm, "n": x.get("n"), "avg": x.get("avgc"), "hit": x.get("hit"), "t": x.get("t"), "tr": x.get("tr"), "te": x.get("te")})
     fired: dict[str, list] = {}
     for c in combos:

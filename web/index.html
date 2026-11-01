@@ -2303,7 +2303,52 @@ function labHome() {
 const sigKey = k => Array.isArray(k) ? [k[0], k[1] || "", (k[2] || []).join(",")].join("|") : k;
 function sigName(k, short = false) {
   const [s, p, ks] = sigKey(k).split("|"), S = SIG.signals, F = SIG.filters;
-  return `<b>${esc(S[s]?.name || s)}</b>${p ? ` <span class="faint">+</span> <b>${esc(S[p]?.name || p)}</b>` : ""}${ks ? ks.split(",").map(x => ` <span class="badge" style="margin:1px 0">${esc(F[x] || x)}</span>`).join("") : ""}`;
+  return [s, ...(p ? p.split("+") : [])].map(x => `<b>${esc(S[x]?.name || x)}</b>`).join(` <span class="faint">+</span> `) + (ks ? ks.split(",").map(x => ` <span class="badge" style="margin:1px 0">${esc(F[x] || x)}</span>`).join("") : "");
+}
+// number of variables in a combination key (signals + filters)
+const sigVars = key => { const [s, p, ks] = sigKey(key).split("|"); return 1 + (p ? p.split("+").length : 0) + (ks ? ks.split(",").length : 0); };
+// one combination at one holding period: the full result when the Lab kept it, else the compact table row
+function sigStat(key, h) {
+  const full = SIG.results?.[key]?.[h]; if (full) return full;
+  const row = SIG.table?.[key]; if (!row) return null;
+  const x = row[1 + SIG.horizons.indexOf(+h)]; if (!x) return null;
+  return {avgc: x[0], hit: x[1], n: x[2], t: x[3], tr: x[4], te: x[5], med: null, spy: null, redundant: !!row[row.length - 1]};
+}
+// canonical key for a user-built combination (same ordering the Lab used); null if that shape wasn't tested
+function sigCanon(vars) {
+  const SN = Object.keys(SIG.signals), FN = Object.keys(SIG.filters);
+  const sg = vars.filter(v => SIG.signals[v]).sort((a, b) => SN.indexOf(a) - SN.indexOf(b));
+  const fl = vars.filter(v => SIG.filters[v]).sort((a, b) => FN.indexOf(a) - FN.indexOf(b));
+  if (!sg.length) return {err: "Pick at least one signal: filters only narrow down when a signal fires."};
+  if (new Set(vars).size !== vars.length) return {err: "Pick three different variables."};
+  if (sg.length === 3) return {key: [sg[0], sg[1] + "+" + sg[2], ""].join("|")};
+  if (sg.length === 2 && fl.length <= 1) return {key: [sg[0], sg[1], fl.join(",")].join("|")};
+  if (sg.length === 1) return {key: [sg[0], "", fl.join(",")].join("|")};
+  return {err: "That shape wasn't tested."};
+}
+function sigBuilder(h) {
+  const S = SIG.signals, F = SIG.filters, v = UI.sigB || ["", "", ""];
+  const opt = (sel, allowNone) => `${allowNone ? `<option value="">— none —</option>` : `<option value="">Choose a signal…</option>`}
+    <optgroup label="Signals">${Object.keys(S).map(k => `<option value="${k}" ${sel === k ? "selected" : ""}>${esc(S[k].name)}</option>`).join("")}</optgroup>
+    ${allowNone ? `<optgroup label="Filters (must hold that day)">${Object.keys(F).map(k => `<option value="${k}" ${sel === k ? "selected" : ""}>${esc(F[k])}</option>`).join("")}</optgroup>` : ""}`;
+  const picked = v.filter(Boolean), c = picked.length ? sigCanon(picked) : null;
+  let body = `<p class="small muted" style="margin:0">Pick up to three variables: one to three signals, plus filters, three in total.</p>`;
+  if (c?.err) body = `<p class="small muted" style="margin:0">${esc(c.err)}</p>`;
+  else if (c?.key) {
+    const B = SIG.baseline, x0 = sigStat(c.key, h), lv = SIG.live?.[c.key] || [];
+    body = !x0 ? `<p class="small" style="margin:0">${sigName(c.key)}: <span class="muted">fewer than ${SIG.meta.min_n} times in the test window, so there's no reliable result.</span></p>`
+      : `<div class="small" style="margin-bottom:6px">${sigName(c.key)}${x0.redundant ? ` <span class="badge">same events as a simpler combination</span>` : ""}</div>
+      <div style="overflow-x:auto"><table class="small"><thead><tr><th>Holding</th>${SIG.horizons.map(hh => `<th class="r">${esc(SIG.h_labels[hh])}</th>`).join("")}</tr></thead><tbody>
+        <tr><td>Avg vs median stock</td>${SIG.horizons.map(hh => { const y = sigStat(c.key, hh); return `<td class="r num ${cls(y?.avgc)}"><b>${y ? pct(y.avgc, 1) : "—"}</b></td>`; }).join("")}</tr>
+        <tr><td>Beat the median stock</td>${SIG.horizons.map(hh => { const y = sigStat(c.key, hh); return `<td class="r num">${y ? Math.round(y.hit * 100) + "%" : "—"} <span class="faint">${y ? `(${(y.hit - B[hh].hit) >= 0 ? "+" : ""}${Math.round((y.hit - B[hh].hit) * 100)})` : ""}</span></td>`; }).join("")}</tr>
+        <tr><td>Training / test</td>${SIG.horizons.map(hh => { const y = sigStat(c.key, hh); return `<td class="r num">${y ? `<span class="${cls(y.tr)}">${pct(y.tr, 1)}</span> / <span class="${cls(y.te)}">${pct(y.te, 1)}</span>` : "—"}</td>`; }).join("")}</tr>
+        <tr><td>t (by month)</td>${SIG.horizons.map(hh => { const y = sigStat(c.key, hh); return `<td class="r num">${y?.t != null ? y.t.toFixed(1) : "—"}</td>`; }).join("")}</tr>
+        <tr><td>Times measured</td>${SIG.horizons.map(hh => { const y = sigStat(c.key, hh); return `<td class="r num">${y ? y.n.toLocaleString() : "—"}</td>`; }).join("")}</tr></tbody></table></div>
+      ${lv.length ? `<div class="small" style="margin-top:6px"><b>Fired in the last 10 trading days:</b> ${lv.map(([d, t]) => `<span style="white-space:nowrap;margin-right:8px">${tk(t)} <span class="faint">${esc(fmtShort(d))}</span></span>`).join("")}</div>` : ""}`;
+  }
+  return `<div class="card" style="margin-top:14px"><h3>Test your own combination <span class="label">up to 3 variables</span></h3>
+    <div class="bar" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">${[0, 1, 2].map(i => `<select class="sel" data-sigb="${i}" style="min-width:0;flex:1 1 200px" aria-label="Variable ${i + 1}">${opt(v[i], i > 0)}</select>`).join("")}
+      ${picked.length ? `<button class="btn small" id="sigBclear">Clear</button>` : ""}</div>${body}</div>`;
 }
 function pathSvg(pts, W = 120, H = 30, big = false) {
   if (!pts || pts.length < 3) return `<span class="faint small">—</span>`;
@@ -2319,11 +2364,21 @@ function sigView() {
   if (!SIG) { loadSig(); return `<div class="card"><p class="muted">Loading signal tests…</p></div>`; }
   if (!SIG.results || !Object.keys(SIG.results).length) return `<div class="card"><h3>Signal tests</h3><p class="muted">No results yet. The tests run every Saturday morning on GitHub; you can watch a run live <a href="${LAB_RUNS}" target="_blank" rel="noopener">here</a>.</p></div>`;
   const h = String(UI.sigH || 63), R = SIG.results, B = SIG.baseline[h], M = SIG.meta, HL = SIG.h_labels;
-  const st = k => R[sigKey(k)]?.[h];
+  const st = k => sigStat(sigKey(k), h);
   const f = v => v == null ? "—" : pct(v, 1);
   const lift = x => x ? Math.round((x.hit - B.hit) * 100) : null;
   const cat = UI.sigCat || "best";
-  const lists = {best: SIG.leaders[h]?.best || [], tech: SIG.leaders[h]?.tech || [], worst: SIG.leaders[h]?.worst || []};
+  const nv = UI.sigN || 0;   // 0 = any number of variables
+  const SMART = new Set(Object.keys(SIG.signals).filter(k => SIG.signals[k].group === "smart")), SCOREF = new Set(["value7", "profit7", "health7", "growth7", "mgmt7", "overall6", "junk", "ins90", "cong90"]);
+  const isTech = key => { const [s, p, ks] = key.split("|"); return ![s, ...(p ? p.split("+") : [])].some(x => SMART.has(x)) && !(ks ? ks.split(",") : []).some(x => SCOREF.has(x)); };
+  let lists;
+  if (SIG.table) {      // rank every tested combination of the chosen size (same bar as the Lab's leaderboards)
+    const all = Object.keys(SIG.table).filter(k => !SIG.table[k][SIG.table[k].length - 1] && (!nv || sigVars(k) === nv)).map(k => [k, sigStat(k, h)]).filter(([, x]) => x && x.tr != null && x.te != null);
+    const cand = all.filter(([, x]) => x.n >= 80 && (x.t || 0) >= 1.5 && x.hit > B.hit), rob = ([, x]) => Math.min(x.tr, x.te);
+    lists = {best: cand.sort((a, b) => rob(b) - rob(a)).map(r => r[0]), tech: cand.filter(([k]) => isTech(k)).sort((a, b) => rob(b) - rob(a)).map(r => r[0]),
+             worst: all.filter(([, x]) => x.n >= 80).sort((a, b) => Math.max(a[1].tr, a[1].te) - Math.max(b[1].tr, b[1].te)).map(r => r[0])};
+  } else lists = {best: (SIG.leaders[h]?.best || []).map(sigKey), tech: (SIG.leaders[h]?.tech || []).map(sigKey), worst: (SIG.leaders[h]?.worst || []).map(sigKey)};
+  if (!SIG.table && nv) for (const k in lists) lists[k] = lists[k].filter(x => sigVars(x) === nv);
   const rows = lists[cat].slice(0, 30);
   const live = k => SIG.live?.[sigKey(k)] || [];
   const row = k => { const key = sigKey(k), x = st(k); if (!x) return ""; const lv = live(k);
@@ -2331,11 +2386,11 @@ function sigView() {
       ${UI.sigOpen === key ? `<tr><td colspan="9" style="background:color-mix(in srgb,var(--accent) 4%,transparent)">
         <div class="label">Average return vs the median stock, by days after the signal</div>${pathSvg(SIG.paths?.[key], 640, 160, true)}
         <table style="margin-top:8px"><thead><tr><th>Holding</th>${SIG.horizons.map(hh => `<th class="r">${esc(HL[hh])}</th>`).join("")}</tr></thead><tbody>
-          <tr><td>Avg vs median stock (capped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num ${cls(y?.avgc)}">${f(y?.avgc)}</td>`; }).join("")}</tr>
-          <tr><td>Avg vs S&amp;P 500 (uncapped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num ${cls(y?.spy)}">${f(y?.spy)}</td>`; }).join("")}</tr>
-          <tr><td>Beat the median stock</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num">${y ? Math.round(y.hit * 100) + "%" : "—"}</td>`; }).join("")}</tr>
-          <tr><td>Training / test (capped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num small">${y ? `${f(y.tr)} / ${f(y.te)}` : "—"}</td>`; }).join("")}</tr>
-          <tr><td>Signals measured</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num">${y ? y.n.toLocaleString() : "—"}</td>`; }).join("")}</tr></tbody></table>
+          <tr><td>Avg vs median stock (capped)</td>${SIG.horizons.map(hh => { const y = sigStat(key, hh); return `<td class="r num ${cls(y?.avgc)}">${f(y?.avgc)}</td>`; }).join("")}</tr>
+          <tr><td>Avg vs S&amp;P 500 (uncapped)</td>${SIG.horizons.map(hh => { const y = sigStat(key, hh); return `<td class="r num ${cls(y?.spy)}">${f(y?.spy)}</td>`; }).join("")}</tr>
+          <tr><td>Beat the median stock</td>${SIG.horizons.map(hh => { const y = sigStat(key, hh); return `<td class="r num">${y ? Math.round(y.hit * 100) + "%" : "—"}</td>`; }).join("")}</tr>
+          <tr><td>Training / test (capped)</td>${SIG.horizons.map(hh => { const y = sigStat(key, hh); return `<td class="r num small">${y ? `${f(y.tr)} / ${f(y.te)}` : "—"}</td>`; }).join("")}</tr>
+          <tr><td>Signals measured</td>${SIG.horizons.map(hh => { const y = sigStat(key, hh); return `<td class="r num">${y ? y.n.toLocaleString() : "—"}</td>`; }).join("")}</tr></tbody></table>
         ${lv.length ? `<div class="label" style="margin-top:10px">Fired in the last 10 trading days</div><div class="small">${lv.map(([d, t]) => `<span style="white-space:nowrap;margin-right:10px">${tk(t)} <span class="faint">${esc(fmtShort(d))}</span></span>`).join("")}</div>` : `<p class="small muted" style="margin:8px 0 0">Not firing on any stock right now.</p>`}</td></tr>` : ""}`; };
   const head = `<thead><tr><th>Signal${cat !== "singles" ? " (+ filters)" : ""}</th><th class="r">Times</th><th class="r" title="Average return minus the median stock's over the same days; each event capped so a few huge winners can't carry it">Avg vs mkt</th><th class="r" title="Median return vs the median stock (0% for a random pick)">Median</th><th class="r" title="Share that beat the median stock, and the difference from a random pick (${Math.round(B.hit * 100)}%)">Beat mkt</th><th class="r" title="Month-clustered t-statistic: 2+ means unlikely to be luck">t</th><th class="r">Train / test</th><th>Path</th><th></th></tr></thead>`;
   const singles = [...SIG.singles].sort((a, b) => (st(b)?.avgc ?? -9) - (st(a)?.avgc ?? -9));
@@ -2343,16 +2398,18 @@ function sigView() {
   const heat = v => v == null ? "transparent" : `color-mix(in srgb,${v >= 0 ? "var(--up)" : "var(--down)"} ${Math.min(70, Math.round(Math.abs(v) / (h === "5" ? 0.01 : h === "10" ? 0.015 : h === "21" ? 0.02 : h === "63" ? 0.04 : 0.06) * 45))}%,transparent)`;
   const L = SIG.luck?.[h];
   return `<div class="card"><h3>Signal tests <span class="label">${(M.tested || 0).toLocaleString()} combinations · ${esc(fmtMY(M.dates[0]))}–${esc(fmtMY(M.dates[1]))} · updated ${esc(fmtDate(SIG.generated))}</span></h3>
-      <p class="small" style="margin-top:0">Every time a classic signal fired on any of ${M.stocks.toLocaleString()} stocks (golden cross, MACD, RSI, breakouts, big moves${M.volume ? ", volume spikes" : ""}, insider and Congress buying), alone, paired with a second signal within ${M.pair_window} days, and with up to two filters (trend, RSI, 52-week range, market regime, our scores, size), we bought at the next close and measured the return ${SIG.horizons.map(x => HL[x]).join(", ")} later against the median stock. Signals before ${esc(fmtDate(M.cut))} are the training period; after it, the test period.</p>
+      <p class="small" style="margin-top:0">Every time a classic signal fired on any of ${M.stocks.toLocaleString()} stocks (golden cross, MACD, RSI, breakouts, big moves${M.volume ? ", volume spikes" : ""}, insider and Congress buying), alone, paired with a second signal, three signals together (all within ${M.pair_window} days), and with filters (trend, RSI, 52-week range, market regime, our scores, size), up to three variables in all${M.by_size ? ` (${M.by_size[1]} with one, ${(M.by_size[2] || 0).toLocaleString()} with two, ${(M.by_size[3] || 0).toLocaleString()} with three)` : ""}, we bought at the next close and measured the return ${SIG.horizons.map(x => HL[x]).join(", ")} later against the median stock. Signals before ${esc(fmtDate(M.cut))} are the training period; after it, the test period.</p>
       <div class="rnav" style="margin-bottom:8px">${SIG.horizons.map(x => `<button data-sigh="${x}" aria-pressed="${h === String(x)}">${esc(HL[x])}</button>`).join("")}</div>
       <div class="callout small"><b>How to read it.</b> Every return is compared with the <b>median stock</b> over the same days, so a random pick beats it 50% of the time. A useful signal beats it clearly more often (60%+ is strong) and has a positive median, in both the training and the test period. Averages sit a little above zero even for random picks (a few stocks double), so judge by Median and Beat mkt. ${L ? `Across all ${L.n.toLocaleString()} combinations, training and test results barely line up (rank correlation ${L.corr.toFixed(2)}): most combinations are noise. That's why only ones that worked in both periods, with t ≥ 1.5 and 80+ signals, make the "Best" list.` : ""}</div></div>
     <div class="card" style="margin-top:14px"><h3>Classic signals on their own <span class="label">${esc(HL[h])} later</span></h3>
       <div style="overflow-x:auto"><table>${head}<tbody>${singles.map(row).join("")}</tbody></table></div>
       <p class="faint small" style="margin:8px 0 0">Tap a row for its full path and every holding period.</p></div>
     <div class="card" style="margin-top:14px"><h3>Combinations <span class="label">${esc(HL[h])} later</span></h3>
-      <div class="rnav" style="margin-bottom:10px">${[["best", "Best (worked in both periods)"], ["tech", "Technical only"], ["worst", "Worst"]].map(([k, l]) => `<button data-sigc="${k}" aria-pressed="${cat === k}">${l}</button>`).join("")}</div>
+      <div class="rnav" style="margin-bottom:6px">${[["best", "Best (worked in both periods)"], ["tech", "Technical only"], ["worst", "Worst"]].map(([k, l]) => `<button data-sigc="${k}" aria-pressed="${cat === k}">${l}</button>`).join("")}</div>
+      <div class="rnav" style="margin-bottom:10px">${[[0, "Any"], [1, "1 variable"], [2, "2 variables"], [3, "3 variables"]].map(([k, l]) => `<button data-sign="${k}" aria-pressed="${nv === k}">${l}</button>`).join("")}</div>
       <div style="overflow-x:auto"><table>${head}<tbody>${rows.map(row).join("") || `<tr><td colspan="9" class="muted">Nothing passed the bar at this holding period.</td></tr>`}</tbody></table></div>
       <p class="faint small" style="margin:8px 0 0">"Best" = ranked by the worse of the training and test results, among combinations with 80+ signals, t ≥ 1.5 and a beat rate above a random stock. A "now" badge means it fired on a stock in the last 10 trading days.</p></div>
+    ${sigBuilder(h)}
     <div class="card" style="margin-top:14px"><h3>Signal × filter <span class="label">avg vs the median stock, ${esc(HL[h])} later</span></h3>
       <div style="overflow-x:auto"><table class="small" style="font-size:11.5px"><thead><tr><th>Signal</th>${FN.map(k => `<th style="writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;padding:4px 2px;white-space:nowrap">${esc(SIG.filters[k])}</th>`).join("")}</tr></thead><tbody>
         ${SN.map(sn => `<tr><td style="white-space:nowrap">${esc(SIG.signals[sn].name)}</td>${FN.map(fk => { const v = MX[sn]?.[fk]?.[h]; const ok = v && v[1] >= 80;
@@ -2442,6 +2499,9 @@ function viewResearch() {
   $$("[data-labm]").forEach(b => b.onclick = () => { UI.labMode = b.dataset.labm; viewResearch(); });
   $$("[data-sigh]").forEach(b => b.onclick = () => { UI.sigH = +b.dataset.sigh; viewResearch(); });
   $$("[data-sigc]").forEach(b => b.onclick = () => { UI.sigCat = b.dataset.sigc; UI.sigOpen = null; viewResearch(); });
+  $$("[data-sign]").forEach(b => b.onclick = () => { UI.sigN = +b.dataset.sign; UI.sigOpen = null; const y = scrollY; viewResearch(); scrollTo(0, y); });
+  $$("[data-sigb]").forEach(el => el.onchange = () => { UI.sigB = UI.sigB || ["", "", ""]; UI.sigB[+el.dataset.sigb] = el.value; const y = scrollY; viewResearch(); scrollTo(0, y); });
+  $("#sigBclear") && ($("#sigBclear").onclick = () => { UI.sigB = ["", "", ""]; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-sig]").forEach(b => b.onclick = e => { if (e.target.closest("[data-open]")) return; UI.sigOpen = UI.sigOpen === b.dataset.sig ? null : b.dataset.sig; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-labu]").forEach(b => b.onclick = () => { UI.labU = b.dataset.labu; UI.labOpen = null; viewResearch(); });
   $$("[data-labl]").forEach(b => b.onclick = () => { UI.labList = b.dataset.labl; UI.labOpen = null; viewResearch(); });
