@@ -196,6 +196,19 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Beats (≥+2%/yr, ≥55% quarters ahead, 6+ quarters) / Market-like / Lags (≤−2%/yr). Funds tab leaderboard; consensus shows "Beaters".
   Arena Smart Money shortlist now counts only promising+ members and weights funds by tier. Live index.json was patched with the new
   track block on 2026-10-31 (Monday's build regenerates it).
+- 2026-11-01 **Strategy Lab** (Tom: backtest every combination of the key factors, then 2 bots on the best).
+  `jobs/lab/strategy_lab.py` (docstring explains) + `lab.yml` (Saturdays 14:43 UTC + on push to jobs/lab) → `lab.json` +
+  `progress.json` on `lab-data`. 14 factors (6 category scores from quarter-end score history, Trend, Rally, low vol, 1m reversal,
+  near 52w low, oversold RSI, Congress buys 90d, insider buys 90d) → all 16,383 subsets; monthly top-10% equal-weight, 0.1%/side,
+  excess vs equal-weighted universe; universes all + S&P 500; train first 60% of months, test the rest; neighbours (±1 factor);
+  train/test rank corr. First run (local, closes only, 24 months Oct 2024–Sep 2026): S&P 500 corr 0.37, all-stocks 0.14.
+  Value is the one factor that helps in both windows/universes; low vol, near-52w-low hurt. Robust picks:
+  S&P 500 Value+Management+Trend (+0.72%/mo train, +0.85% test, neighbours 93%); all stocks Value+Rally+Oversold (+0.61/+0.78, 86%).
+  UI: Research → "Strategy Lab" (luck check, factor effects, singles, leaderboard with curves). Arena: two strategy traders
+  **The Quant** (quant, sp500 value/management/trend) and **The Bargain Bin** (bargain, all value/rally/oversold); `strategy:` in
+  arena.yaml, shortlist = `strategy_rank()` (live LAB_FACTORS from index rows), packets show model ranks; `ensure_traders()` adds new
+  traders to an existing desk (fresh $100k, `joined`). Build fix: detail `rally`/`rally_hist` were overwritten by placeholder keys.
+  Stocks bar: "Industries" button, always-visible chips "Claude's picks" / "Arena traders' buys"; pending Arena orders show as faded icons.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

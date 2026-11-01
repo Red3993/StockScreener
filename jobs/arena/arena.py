@@ -83,7 +83,21 @@ class Market:
 
 # ------------------------------------------------------------------ state
 def personas() -> list:
-    return [{k: t.get(k) for k in ("id", "name", "color", "style", "blurb")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"], "color": CFG["manager"].get("color"), "blurb": CFG["manager"].get("blurb")}]
+    return [{k: t.get(k) for k in ("id", "name", "color", "style", "blurb", "strategy")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"], "color": CFG["manager"].get("color"), "blurb": CFG["manager"].get("blurb")}]
+
+
+def new_account() -> dict:
+    return {"cash": float(CFG["start_cash"]), "positions": {}, "hist": [], "peak": float(CFG["start_cash"]),
+            "probation": False, "trades": 0, "approved": 0, "pitched": 0, "realized": 0.0, "closed": []}
+
+
+def ensure_traders(st: dict, today: str | None = None) -> dict:
+    """Add traders that were added to config/arena.yaml after the desk started (they start with fresh cash)."""
+    for t in CFG["traders"]:
+        if t["id"] not in st["traders"]:
+            st["traders"][t["id"]] = {**new_account(), "joined": today}
+    st["personas"] = personas()
+    return st
 
 
 def init_state() -> dict:
@@ -133,8 +147,41 @@ def line(r: dict) -> str:
     return "\n  ".join(bits)
 
 
+LAB_FACTORS = {   # live versions of the Strategy Lab factors, from index.json rows (higher = better)
+    "value": lambda r: (r.get("cs") or [None] * 7)[0], "profitability": lambda r: (r.get("cs") or [None] * 7)[1],
+    "health": lambda r: (r.get("cs") or [None] * 7)[2], "growth": lambda r: (r.get("cs") or [None] * 7)[3],
+    "dividends": lambda r: (r.get("cs") or [None] * 7)[4] or 0, "management": lambda r: (r.get("cs") or [None] * 7)[5],
+    "trend": lambda r: (r.get("ry") or {}).get("t"), "rally": lambda r: (r.get("ry") or {}).get("r"),
+    "reversal": lambda r: None if (r.get("d") or {}).get("r21") is None else -r["d"]["r21"],
+    "near_low": lambda r: None if (r.get("d") or {}).get("fl") is None else -r["d"]["fl"],
+    "oversold": lambda r: None if (r.get("d") or {}).get("rsi") is None else -r["d"]["rsi"],
+    "congress": lambda r: (r.get("cg") or {}).get("b90") or 0, "insider": lambda r: (r.get("i") or {}).get("b90") or 0,
+}
+
+
+def strategy_rank(mk: Market, strat: dict) -> list[tuple[str, float]]:
+    """Rank the strategy's universe by the average percentile rank of its factors (as in jobs/lab/strategy_lab.py)."""
+    R = [r for r in mk.rows.values() if ((r.get("d") or {}).get("px") or 0) >= 3 and (r.get("mc") or 0) >= CFG["limits"]["min_mcap"]
+         and (strat.get("universe") != "sp500" or "IVV" in (r.get("ix") or []))]
+    ranks = {}
+    for f in strat["factors"]:
+        vals = sorted((v, r["t"]) for r in R for v in [LAB_FACTORS[f](r)] if v is not None)
+        n = len(vals)
+        ranks[f] = {t: (k + 1) / n for k, (v, t) in enumerate(vals)} if n > 1 else {}
+    out = []
+    for r in R:
+        xs = [ranks[f][r["t"]] for f in strat["factors"] if r["t"] in ranks[f]]
+        if len(xs) >= math.ceil(0.6 * len(strat["factors"])):
+            out.append((r["t"], sum(xs) / len(xs)))
+    return sorted(out, key=lambda x: -x[1])
+
+
 def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], list[str]]:
     lim = CFG["limits"]
+    strat = next((t.get("strategy") for t in CFG["traders"] if t["id"] == tid), None)
+    if strat:
+        ranked = strategy_rank(mk, strat)
+        return [t for t, _ in ranked[:30]], []
     minc = lim["yolo_min_mcap"] if tid == "yolo" else lim["min_mcap"]
     R = [r for r in mk.rows.values() if (r.get("mc") or 0) >= minc and (r.get("d") or {}).get("px")]
     g = lambda r, k, sub=None, dflt=0: ((r.get(k) or {}).get(sub) if sub else r.get(k)) or dflt   # noqa: E731
@@ -191,6 +238,7 @@ def cmd_prepare(a) -> int:
     mk = Market(a.app_data, a.prices)
     st = load(a.state)
     research = load(a.research) if a.research and Path(a.research).exists() else None
+    ensure_traders(st, mk.date)
     brief = load(a.brief) if a.brief and Path(a.brief).exists() else None
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -216,6 +264,14 @@ def cmd_prepare(a) -> int:
         board.append(f"{t['name']} ({t['id']}): equity ${eq:,.0f} ({eq / CFG['start_cash'] - 1:+.1%} since start), cash ${tr['cash']:,.0f}, "
                      f"peak ${tr['peak']:,.0f}{', ON PROBATION' if tr['probation'] else ''}. Book: {book}." + (f" Unfilled orders: {pend}." if pend else ""))
         lg, sh = shortlist(mk, t["id"], research)
+        model = ""
+        if t.get("strategy"):
+            ranked = strategy_rank(mk, t["strategy"])
+            pos_ = {k: i + 1 for i, (k, _) in enumerate(ranked)}
+            cut = max(10, int(len(ranked) * t["strategy"].get("top_frac", 0.1)))
+            model = (f"\nMODEL RANKING ({' + '.join(t['strategy']['factors'])}, {t['strategy'].get('universe')} universe, {len(ranked)} stocks ranked; "
+                     f"the backtested rule holds the top {cut}). Your current holdings' ranks: "
+                     + (", ".join(f"{k} #{pos_.get(k, 'unranked')}" for k in tr["positions"]) or "none") + "\n")
         held = [k for k in tr["positions"] if k in mk.rows and k not in lg and k not in sh]
         txt = f"""{t['prompt'].strip()}
 
@@ -224,11 +280,11 @@ Goal: maximize your return over the coming weeks within the rules. It is {mk.dat
 
 YOUR BOOK
 {board[-1]}
-
+{model}
 {mkt}
 
 LONG IDEAS that fit your style (from the app's data; you may also pick any stock below):
-""" + "\n".join("- " + line(mk.rows[k]) for k in lg) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
+""" + "\n".join(("- " + (f"model rank #{n + 1}: " if t.get("strategy") else "") + line(mk.rows[k])) for n, k in enumerate(lg)) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
             "\n\nYOUR CURRENT HOLDINGS:\n" + "\n".join("- " + line(mk.rows[k]) for k in held) if held else "") + """
 
 Use only facts from the data above. Reply with JSON only:
@@ -265,7 +321,7 @@ def cmd_apply(a) -> int:
     ids = {t["id"] for t in CFG["traders"]}
     st["round"] += 1
     rid = st["round"]
-    st["personas"] = personas()
+    ensure_traders(st, mk.date)
     if not st.get("start"):
         st["start"], st["spy0"] = mk.date, mk.spy
     for tid, b in (rulings.get("probation") or {}).items():
@@ -350,6 +406,7 @@ def cmd_apply(a) -> int:
 def cmd_mark(a) -> int:
     mk = Market(a.app_data, a.prices)
     st = load(a.state)
+    ensure_traders(st, mk.date)
     d = mk.date
     cost = CFG["cost_bps"] / 1e4
     fills = []

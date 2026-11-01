@@ -562,7 +562,8 @@ def main() -> int:
                     "cik": u["cik"], "metric_set": row["set"], "ivv_weight": u["ivv_weight"], "chg_1d": dv.get("c1"),
                     "overall": sc.get("overall"), "excluded": sc.get("excluded"), "categories": sc.get("categories"), "closes": closes,
                     "score_history": shist.get(t), "metric_history": mhist.get(t),
-                    "rally": rly["live"].get(t), "rally_hist": rly["hist"].get(t), **{k: v for k, v in d.items() if k != "derived"}}
+                    **{k: v for k, v in d.items() if k != "derived"},
+                    "rally": rly["live"].get(t), "rally_hist": rly["hist"].get(t)}   # after the spread: detail[t] carries placeholder rally keys
             shards.setdefault(shard_of(t), {})[t] = full
         except Exception as e:  # noqa: BLE001
             health("output", f"{t}: {type(e).__name__}: {e}")

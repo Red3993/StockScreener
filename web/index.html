@@ -116,6 +116,8 @@ main{max-width:1100px;margin:0 auto;padding-block:14px 110px;padding-left:var(--
 .fchip .edit{padding:0;font-weight:600;color:var(--fg);font-size:13px}
 .presets{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none}
 .presets button{flex:none;border:1px dashed var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;color:var(--muted)}
+.presets button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);color:var(--text,inherit);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.presets button .bot{vertical-align:-3px}
 .panel{position:fixed;inset:0;z-index:45;background:var(--bg);overflow-y:auto}
 .panel-top{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--line);padding-block:calc(env(safe-area-inset-top,0px) + 10px) 10px;padding-left:var(--gut);padding-right:var(--gut-r)}
 .frow{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px}
@@ -615,8 +617,8 @@ const STATE_FLAGS = {
   upgrade90: ["Net analyst upgrades, 90 days", r => (r.a?.ug ?? 0) > (r.a?.dg ?? 0)],
   paysDiv: ["Pays a dividend", r => r.cs?.[4] != null], thinCov: ["Thin analyst coverage", r => !!r.a?.thin],
   claudePick: ["In Claude's latest picks", r => (Picked.map[r.t] || []).some(x => x.k === "claude")],
-  botLong: ["Owned by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && !x.short)],
-  botShort: ["Shorted by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && x.short)],
+  botLong: ["Owned or being bought by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && !x.short)],
+  botShort: ["Shorted (or being shorted) by an Arena trader", r => (Picked.map[r.t] || []).some(x => x.k === "bot" && x.short)],
 };
 const METRIC_CAT = {Valuation: ["ev_ebitda","pfcf","pe","peg","ps","pb","ptbv","pffo"], Profitability: ["roic","fcf_margin","operating_margin","gross_margin","roe","net_margin","op_margin_trend","roa","efficiency_ratio","nii_to_assets"],
   "Financial Health": ["debt_to_equity","interest_coverage","net_cash_to_mcap","altman_z","current_ratio","tangible_equity_ratio"],
@@ -863,6 +865,8 @@ const Picked = {
     this.arena = a; this.log = log; const m = {}, P = a?.personas || [];
     for (const [id, tr] of Object.entries(a?.traders || {})) { const p = P.find(x => x.id === id);
       for (const [t, pos] of Object.entries(tr.positions || {})) (m[t] ||= []).push({k: "bot", id, name: p?.name || id, color: p?.color, short: pos.shares < 0, since: pos.since, entry: pos.entry, w: pos.shares * (pos.last || pos.entry) / ((tr.hist || []).slice(-1)[0]?.[1] || a.start_cash || 1e5)}); }
+    for (const o of a?.pending || []) { if (!["buy", "short"].includes(o.action) || (m[o.ticker] || []).some(x => x.id === o.trader)) continue; const p = P.find(x => x.id === o.trader);
+      (m[o.ticker] ||= []).push({k: "bot", id: o.trader, name: p?.name || o.trader, color: p?.color, short: o.action === "short", pending: true, w: o.target, since: o.asof}); }
     const set = log?.sets?.[log.sets.length - 1];
     if (set) for (const x of set.picks || []) (m[x.t] ||= []).unshift({k: "claude", rank: x.rank, theme: x.theme, conviction: x.conviction, px0: x.px0, date: set.dataAsof || (set.generated || "").slice(0, 10)});
     this.map = m;
@@ -870,7 +874,7 @@ const Picked = {
   icons(t) {
     const L = this.map[t]; if (!L?.length) return "";
     return `<span class="pk">${L.map(x => x.k === "claude" ? `<span class="cpk" title="Claude's pick #${x.rank}${x.theme ? " · " + esc(x.theme) : ""}">${x.rank}</span>`
-      : `<span title="${esc(x.name)}: ${x.short ? "short" : "long"}">${botIcon(x.id, x.color, 15).replace('class="bot"', `class="bot${x.short ? " short" : ""}"`)}</span>`).join("")}</span>`;
+      : `<span title="${esc(x.name)}: ${x.pending ? "order to " + (x.short ? "short" : "buy") + " fills at the next close" : x.short ? "short" : "long"}" style="${x.pending ? "opacity:.45" : ""}">${botIcon(x.id, x.color, 15).replace('class="bot"', `class="bot${x.short ? " short" : ""}"`)}</span>`).join("")}</span>`;
   },
   async fill(t) {
     const box = $("#pickedBox"); if (!box) return;
@@ -883,7 +887,7 @@ const Picked = {
     box.hidden = false;
     box.innerHTML = `<h3>Who's picked this</h3>
       ${L.map(x => x.k === "claude" ? line(`<span class="cpk" style="width:24px;height:24px;font-size:11px">${x.rank}</span>`, "Claude's Picks", `#${x.rank}${x.theme ? " · " + esc(x.theme) : ""}${x.conviction ? " · " + esc(x.conviction) + " conviction" : ""} · picked ${esc(fmtShort(x.date))}`, x.px0 && px ? `<span class="num ${cls(px / x.px0 - 1)}">${pct(px / x.px0 - 1)}</span>` : "")
-        : line(botIcon(x.id, x.color, 24), esc(x.name), `${x.short ? "Short" : "Long"} · ${(Math.abs(x.w) * 100).toFixed(0)}% of its money · since ${esc(fmtShort(x.since))}${this.arena?.sample ? " · sample" : ""}`, x.entry && px ? `<span class="num ${cls(x.short ? x.entry / px - 1 : px / x.entry - 1)}">${pct(x.short ? x.entry / px - 1 : px / x.entry - 1)}</span>` : "")).join("")}
+        : line(botIcon(x.id, x.color, 24), esc(x.name), x.pending ? `Order to ${x.short ? "short" : "buy"} ${(Math.abs(x.w) * 100).toFixed(0)}% of its money · fills at the next close` : `${x.short ? "Short" : "Long"} · ${(Math.abs(x.w) * 100).toFixed(0)}% of its money · since ${esc(fmtShort(x.since))}${this.arena?.sample ? " · sample" : ""}`, x.entry && px ? `<span class="num ${cls(x.short ? x.entry / px - 1 : px / x.entry - 1)}">${pct(x.short ? x.entry / px - 1 : px / x.entry - 1)}</span>` : "")).join("")}
       ${funds.slice(0, 8).map(({f, h}) => { const ft = fundTier(f.copycat); return line(`<span class="badge" style="min-width:24px;text-align:center">13F</span>`, esc(f.name), `${(h.pct * 100).toFixed(1)}% of portfolio${h.chg && h.chg !== "same" ? " · " + CHG[h.chg][0].toLowerCase() : ""} · ${esc(fmtShort(f.period))} 13F`, ft ? `<span class="tier ${ft[1]}">${ft[0]}</span>` : ""); }).join("")}
       ${cong.slice(0, 6).map(({c, tier}) => { const b = c.recent.find(x => x.t === t); return line(`<span class="badge" style="min-width:24px;text-align:center">Cong</span>`, esc(c.name), `bought, disclosed ${esc(fmtDate(b.filed))}`, `<span class="tier ${tier[1]}">${tier[0]}</span>`); }).join("")}
       <p class="faint small" style="margin:8px 0 0">Funds: latest 13F (up to 45 days after quarter end). Congress: recent purchases by members with a ranked record. Tags show whether following them has beaten the S&amp;P 500.</p>`;
@@ -951,11 +955,13 @@ function viewStocks() {
     <div class="bar">
       <input class="search" id="q" type="search" placeholder="Search ticker, name or theme (e.g. robotics, nuclear, AI chips)" value="${esc(UI.q)}" aria-label="Search">
       <label class="pxbox" title="Show only stocks at or below this share price"><span>Max $</span><input id="maxpx" type="number" inputmode="decimal" min="0" step="any" placeholder="any" value="${esc(String(UI.filters.find(f => f.type === "range" && f.key === "price")?.max ?? ""))}" aria-label="Maximum share price"></label>
+      <button class="btn" id="indF" title="Hide or keep whole sectors and industries">${(() => { const f = UI.filters.find(f => f.type === "industry" || f.type === "sector"); return f ? esc(describe(f)) : "Industries"; })()}</button>
       <button class="btn" id="openF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filters${nf ? ` <span class="count-dot">${nf}</span>` : ""}</button>
       <select class="sel" id="sort" aria-label="Sort by">${SORTS.map(([v, l]) => `<option value="${v}" ${v === UI.sort ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
       <button class="btn small" id="dir" aria-label="Sort direction" title="Reverse order">${UI.dir === "asc" ? "↑" : "↓"}</button>
     </div>
     <div class="seg" id="scope" style="margin-bottom:10px">${SCOPES.map(([v, l]) => `<button data-sc="${v}" aria-pressed="${UI.scope === v}">${l}</button>`).join("")}</div>
+    <div class="presets" style="margin-bottom:6px"><button data-pq="claudePick" aria-pressed="${UI.filters.some(f => f.key === "claudePick")}"><span class="cpk" style="margin-right:4px">C</span>Claude's picks</button><button data-pq="botLong" aria-pressed="${UI.filters.some(f => f.key === "botLong")}">${botIcon("momentum", "#3b82f6", 14)} Arena traders' buys</button></div>
     ${nf ? `<div class="fchips">${UI.filters.map((f, i) => `<span class="fchip"><button class="edit" data-i="${i}">${esc(describe(f))}</button><button data-x="${i}" aria-label="Remove filter">×</button></span>`).join("")}<button class="link" id="clearF" style="font-size:13px">Clear all</button></div>`
       : `<div class="presets">${PRESETS.map(([l], i) => `<button data-p="${i}">${esc(l)}</button>`).join("")}</div>`}
     <div class="list">${headRow(rows.length.toLocaleString() + " of " + ROWS.length.toLocaleString() + " stocks")}${UI.q.trim() && !SEARCH ? `<div class="faint small" style="padding:8px 12px">Loading company descriptions for theme search…</div>` : ""}${shown.map(r => { const hit = UI.q.trim() && SEARCH_HITS[r.t]; const sn = hit ? snippet(r.t, hit) : "";
@@ -968,11 +974,13 @@ function viewStocks() {
   $("#sort").onchange = e => { UI.page = 1; UI.sort = e.target.value; UI.dir = DEFAULT_DIR[UI.sort] || "desc"; saveUI(); viewStocks(); };
   $("#dir").onclick = () => { UI.dir = UI.dir === "asc" ? "desc" : "asc"; saveUI(); viewStocks(); };
   $("#openF").onclick = () => Filters.open();
+  $("#indF").onclick = () => { Filters.open(); if (!Filters.draft.some(f => f.type === "industry")) { Filters.draft.unshift({type: "industry", mode: "exclude", values: []}); Filters.adding = false; Filters.render(); } };
   $("#maxpx").onchange = e => { const v = e.target.value.trim(); const i = UI.filters.findIndex(f => f.type === "range" && f.key === "price");
     if (!v) { if (i >= 0) { const f = UI.filters[i]; if (f.min === "" || f.min == null) UI.filters.splice(i, 1); else f.max = ""; } }
     else if (i >= 0) UI.filters[i].max = +v; else UI.filters.push({type: "range", key: "price", min: "", max: +v});
     UI.page = 1; saveUI(); viewStocks(); };
   $$("[data-p]").forEach(b => b.onclick = () => { UI.filters = JSON.parse(JSON.stringify(PRESETS[+b.dataset.p][1])); const k0 = UI.filters[0]; if (k0.key === "fromLow") { UI.sort = "fromLow"; UI.dir = "asc"; } saveUI(); viewStocks(); });
+  $$("[data-pq]").forEach(b => b.onclick = () => { const k = b.dataset.pq, i = UI.filters.findIndex(f => f.key === k); if (i >= 0) UI.filters.splice(i, 1); else UI.filters.push({type: "state", key: k}); UI.page = 1; saveUI(); viewStocks(); });
   $$("[data-x]").forEach(b => b.onclick = () => { UI.filters.splice(+b.dataset.x, 1); saveUI(); viewStocks(); });
   $$(".fchip .edit").forEach(b => b.onclick = () => Filters.open());
   $("#clearF") && ($("#clearF").onclick = () => { UI.filters = []; saveUI(); viewStocks(); });
@@ -2063,7 +2071,7 @@ const Board = {
 // each round's pitches and rulings in app/arena_r<N>. "Run a round now" fires that scheduled task through the Claude Code
 // Remote connector (mcp capability).
 function viewArena() {
-  $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Arena</h1><span class="muted">Six AI traders, one Floor Manager, paper money</span></div>
+  $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Arena</h1><span class="muted">AI traders, one Floor Manager, paper money</span></div>
     <div id="arenaBox"><div class="card"><p class="muted">Loading the Arena…</p></div></div><p class="disclaimer">Paper trading by AI personas, for research and fun. Not financial advice.</p>`;
   Arena.show();
 }
@@ -2079,12 +2087,15 @@ function botIcon(id, color, size = 30) {
     yolo: `<path d="M17.4 2 13.8 6.2h3l-1.6 3" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`,
     frontier: `<path d="M11.5 6.2a4.5 4.5 0 0 0 9 0z" fill="${c}"/><line x1="16" y1="6.4" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/><circle cx="16" cy="3.4" r="1.1" fill="${c}"/>`,
     manager: `<path d="M9.5 9 11 4.4l2.7 2.2L16 3l2.3 3.6 2.7-2.2L22.5 9z" fill="${c}"/>`,
+    quant: `<path d="M10.5 8 13.5 5l2.5 2 5-4.5" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`,
+    bargain: `<path d="M13 3.2h5.2l2 2.2-2 2.2H13z" fill="${c}"/><circle cx="14.4" cy="5.4" r=".8" fill="#fff"/><line x1="16" y1="7.6" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/>`,
   }[id] || `<circle cx="16" cy="4.5" r="2" fill="${c}"/><line x1="16" y1="6.5" x2="16" y2="9" stroke="${c}" stroke-width="1.6"/>`;
   const eyes = {
     contrarian: `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><path d="M17.6 17.6h3.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`,
     momentum: `<rect x="10.4" y="16" width="11.2" height="3.2" rx="1.6" fill="#fff"/>`,
     smart_money: `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><circle cx="19.4" cy="17.5" r="2.6" fill="none" stroke="#fff" stroke-width="1.1"/><circle cx="19.4" cy="17.5" r="1.2" fill="#fff"/>`,
     yolo: `<path d="M11 15.8l3.2 3.2m0-3.2L11 19m6.8-3.2 3.2 3.2m0-3.2L17.8 19" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`,
+    quant: `<rect x="10.4" y="15.6" width="4.4" height="3.8" rx=".8" fill="none" stroke="#fff" stroke-width="1.2"/><rect x="17.2" y="15.6" width="4.4" height="3.8" rx=".8" fill="none" stroke="#fff" stroke-width="1.2"/><path d="M14.8 17.5h2.4" stroke="#fff" stroke-width="1"/><circle cx="12.6" cy="17.5" r=".9" fill="#fff"/><circle cx="19.4" cy="17.5" r=".9" fill="#fff"/>`,
   }[id] || `<circle cx="12.6" cy="17.5" r="1.9" fill="#fff"/><circle cx="19.4" cy="17.5" r="1.9" fill="#fff"/>`;
   return `<svg class="bot" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">${top}
     <rect x="4.2" y="14" width="2.6" height="6.5" rx="1.3" fill="${c}"/><rect x="25.2" y="14" width="2.6" height="6.5" rx="1.3" fill="${c}"/>
@@ -2105,7 +2116,7 @@ const Arena = {
     box.innerHTML = this.html(); this.bind();
   },
   empty() {
-    return `<div class="card"><h3>Arena</h3><p>Six AI traders, each with $100,000 of paper money and a different style, pitch trades every week. A Floor Manager approves, resizes or rejects every trade, and code keeps the books: fills at the next close, trading costs, short borrow fees and automatic stop-losses.</p>
+    return `<div class="card"><h3>Arena</h3><p>AI traders, each with $100,000 of paper money and a different style, pitch trades every week. A Floor Manager approves, resizes or rejects every trade, and code keeps the books: fills at the next close, trading costs, short borrow fees and automatic stop-losses.</p>
       <p class="muted">No rounds yet. The first round runs Saturday morning, or start one now.</p>${this.runBtn()}</div>`;
   },
   runBtn() { return `<div class="bar" style="margin:8px 0 0"><button class="btn primary small" id="arenaRun" ${this.firing ? "disabled" : ""}>${this.firing ? "Starting…" : "Run a round now"}</button>${this.fired ? `<span class="small muted">${esc(this.fired)}</span>` : ""}</div>`; },
@@ -2168,7 +2179,7 @@ const Arena = {
       cards += `<button class="acard" data-aopen="${esc(r.p.id)}" aria-expanded="${this.open === r.p.id}" style="--pc:${r.p.color}">
         <div class="ahead">${botIcon(r.p.id, r.p.color)}<span class="rank">#${i + 1}</span><span class="nm2">${esc(r.p.name)}</span><span class="ret ${cls(r.s.ret)}">${pct(r.s.ret)}</span></div>
         <div class="blurb">${esc(r.p.blurb || r.p.style || "")}</div>${spark(r.tr.hist || [], r.p.color)}
-        <div class="meta"><span>${fmtMoney(r.s.eq, 0)}</span><span>${r.s.pos.length} position${r.s.pos.length === 1 ? "" : "s"}</span>${spyRet != null ? `<span class="${cls(r.s.ret - spyRet)}">${pct(r.s.ret - spyRet)} vs S&amp;P</span>` : ""}${r.tr.probation ? `<span class="badge warn">Probation</span>` : ""}</div></button>`;
+        <div class="meta"><span>${fmtMoney(r.s.eq, 0)}</span><span>${r.s.pos.length} position${r.s.pos.length === 1 ? "" : "s"}</span>${spyRet != null ? `<span class="${cls(r.s.ret - spyRet)}">${pct(r.s.ret - spyRet)} vs S&amp;P</span>` : ""}${r.tr.probation ? `<span class="badge warn">Probation</span>` : ""}${r.p.strategy ? `<span class="badge acc" title="Trades a rule from the Strategy Lab">Lab rule</span>` : ""}${r.tr.joined ? `<span>joined ${esc(fmtShort(r.tr.joined))}</span>` : ""}</div></button>`;
       if (this.open === r.p.id) cards += detail(r);
     });
     return `
@@ -2187,7 +2198,7 @@ const Arena = {
               <div>${esc(t.thesis || "")}</div>${(t.evidence || []).length ? `<div class="faint">${t.evidence.map(esc).join(" · ")}</div>` : ""}${t.reason ? `<div><i>Manager:</i> ${esc(t.reason)}${t.engine_note ? ` <span class="faint">${esc(t.engine_note)}</span>` : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="small faint">No trades proposed.</div>`}</div>`; }).join("")}</div>`
         : `<p class="muted small">Loading round ${this.sel}…</p>`}</div>` : ""}
     <details class="card" style="margin-top:14px"><summary><b>How the Arena works</b></summary>
-      <p class="small">Six AI traders each start with $100,000 of paper money and can buy or short any stock in the app. Every Saturday morning each one pitches trades on its own, from a shortlist that fits its style. The ${esc(mgr?.name || "Floor Manager")} (${esc(mgr?.blurb || "")}) rules on every trade.</p>
+      <p class="small">Each AI trader starts with $100,000 of paper money and can buy or short any stock in the app; The Quant and The Bargain Bin trade only rules that passed the Strategy Lab's backtests. Every Saturday morning each one pitches trades on its own, from a shortlist that fits its style. The ${esc(mgr?.name || "Floor Manager")} (${esc(mgr?.blurb || "")}) rules on every trade.</p>
       <p class="small">Code then enforces the house rules regardless: at most 20% of a trader's money in one long, 10% in one short, 40% in one sector, total shorts up to 50%, and limits halve on probation. Orders fill at the next session's close, so nobody trades on a price they couldn't have had. Each trade costs 0.1%, shorts pay 3% a year to borrow, and stops close longs 15% below entry and shorts 20% above entry.</p>
       <p class="small faint" style="margin-bottom:0">AI traders, paper money. A few weeks of results is mostly luck; give it months.</p></details>`;
   },
@@ -2276,6 +2287,54 @@ function trackTables() {
       <p class="faint small" style="margin:8px 0 0">Insiders only trade their own company, so this shows when their buying has paid off, not who to follow market-wide. ${(cv.insiders_ranked || 0).toLocaleString()} insiders with 2+ priced buys in the last year.</p></details>
     <p class="faint small" style="margin-top:10px">How it's measured: each purchase is "bought" at the first close after it was disclosed, which is when you could have followed it, then compared with the ${esc(T.benchmark)} over the next 3 months. Single trades are capped at +100%/−90%. Small samples: treat these as leads, not proof.</p>`;
 }
+// ================================================================ Strategy Lab (lab.json: every combination of the key factors, walk-forward)
+let LAB = null, LAB_P = null;
+function loadLab() { if (!LAB_P) LAB_P = fetch("lab.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { LAB = j || {universes: {}}; if (UI.tab === "research" && UI.resView === "lab" && $("#sheet").hidden) viewResearch(); }); return LAB_P; }
+const LAB_BOTS = () => Object.fromEntries((Picked.arena?.personas || []).filter(p => p.strategy).map(p => [p.strategy.universe + ":" + [...p.strategy.factors].sort().join("+"), p]));
+function labView() {
+  if (!LAB) { loadLab(); return `<div class="card"><p class="muted">Loading the Strategy Lab…</p></div>`; }
+  const uk = UI.labU || "sp500", U = LAB.universes?.[uk];
+  if (!U) return `<div class="card"><h3>Strategy Lab</h3><p class="muted">No backtest results yet. They're rebuilt every Saturday.</p></div>`;
+  const S = U.strategies, L = LAB.labels, M = LAB.months, nT = M.length, ntr = LAB.train_months, bots = LAB_BOTS();
+  const chips = f => f.map(k => `<span class="badge" style="margin:1px 2px 1px 0">${esc(L[k] || k)}</span>`).join("");
+  const mo = v => v == null ? "—" : pct(v, 2);
+  const listK = UI.labList || "top_robust";
+  const ids = (U[listK] || []).slice(0, 25);
+  const curve = id => { const s = S[id]; let a = 1, b = 1, c = 1; const pts = [];
+    s.monthly.forEach((r, k) => { a *= 1 + (r ?? U.avg_stock[k]); b *= 1 + U.avg_stock[k]; c *= 1 + (U.spy[k] ?? 0); pts.push([LAB.ends[k], a - 1, b - 1, c - 1]); });
+    const W = 640, H = 170, ys = pts.flatMap(p => p.slice(1)); const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+    const X = k => 36 + k / (pts.length - 1) * (W - 40), Y = v => 6 + (1 - (v - lo) / (hi - lo || 1)) * (H - 24), xs = X(ntr - 0.5);
+    const path = j => pts.map((p, k) => (k ? "L" : "M") + X(k).toFixed(1) + " " + Y(p[j]).toFixed(1)).join("");
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block" role="img" aria-label="Strategy vs average stock vs S&P 500">
+      <rect x="${xs}" y="0" width="${W - xs}" height="${H - 18}" fill="var(--accent)" opacity=".06"/><text x="${xs + 4}" y="12" font-size="9" fill="var(--faint)">test period (not used to pick)</text>
+      <line x1="36" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/>${[hi, lo].map(v => `<text x="32" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + Math.round(v * 100)}%</text>`).join("")}
+      <path d="${path(3)}" fill="none" stroke="var(--faint)" stroke-width="1.4" stroke-dasharray="4 3"/><path d="${path(2)}" fill="none" stroke="var(--muted)" stroke-width="1.4"/><path d="${path(1)}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+      <text x="36" y="${H - 4}" font-size="9" fill="var(--faint)">${esc(fmtMY(M[0]))}</text><text x="${W}" y="${H - 4}" text-anchor="end" font-size="9" fill="var(--faint)">${esc(fmtMY(LAB.ends[nT - 1]))}</text></svg>
+      <div class="small faint"><span style="color:var(--accent)">━</span> strategy (after costs) · <span style="color:var(--muted)">━</span> average stock · ┅ S&amp;P 500</div>`; };
+  const row = id => { const s = S[id], key = uk + ":" + [...s.f].sort().join("+"), bot = bots[key];
+    return `<tr class="trow" data-lab="${id}"><td>${chips(s.f)}${bot ? ` ${botIcon(bot.id, bot.color, 16)}` : ""}</td><td class="r num ${cls(s.train.avg)}">${mo(s.train.avg)}</td><td class="r num ${cls(s.test.avg)}"><b>${mo(s.test.avg)}</b></td><td class="r num">${s.full.hit != null ? Math.round(s.full.hit * 100) + "%" : "—"}</td><td class="r num">${s.full.t != null ? s.full.t.toFixed(1) : "—"}</td><td class="r num">${s.neighbors_beat != null ? Math.round(s.neighbors_beat * 100) + "%" : "—"}</td><td class="r num">${Math.round((s.turnover || 0) * 100)}%</td></tr>
+      ${UI.labOpen === id ? `<tr><td colspan="7" style="background:color-mix(in srgb,var(--accent) 4%,transparent)">${curve(id)}
+        <p class="small" style="margin:8px 0 0">Buys the top 10% of ${uk === "sp500" ? "the S&amp;P 500" : "all stocks"} by the average rank on ${s.f.map(k => esc(L[k])).join(" + ")}, every month-end; holds a month. Ahead of the average stock by ${mo(s.train.avg)}/month in training and ${mo(s.test.avg)}/month in the test months it never saw; ${s.full.ann != null ? pct(s.full.ann) + "/yr excess overall" : ""}. Strategies one factor away ${s.neighbors_beat != null ? `beat the average stock in testing ${Math.round(s.neighbors_beat * 100)}% of the time` : "—"}.${bot ? ` <b>${esc(bot.name)}</b> in the Arena trades this strategy.` : ""}</p></td></tr>` : ""}`; };
+  const imp = Object.entries(U.importance).map(([k, v]) => ({k, te: v.with_test - v.without_test, tr: v.with_train - v.without_train})).sort((a, b) => (b.te + b.tr) - (a.te + a.tr));
+  const mx = Math.max(...imp.flatMap(x => [Math.abs(x.te), Math.abs(x.tr)]), 0.001);
+  const bar = v => `<span style="display:inline-block;width:70px;position:relative;height:9px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:3px;vertical-align:middle"><i style="position:absolute;top:0;bottom:0;${v >= 0 ? "left:50%" : `right:50%`};width:${Math.abs(v) / mx * 50}%;background:${v >= 0 ? "var(--up)" : "var(--down)"};border-radius:2px"></i></span>`;
+  const luck = U.test_of_train_top50, all = U.test_of_all;
+  return `<div class="card"><h3>Strategy Lab <span class="label">${(LAB.meta?.n_strategies || 0).toLocaleString()} strategies · ${nT} months · updated ${esc(fmtDate(LAB.generated))}</span></h3>
+      <p class="small" style="margin-top:0">Every combination of ${LAB.factors.length} factors was backtested: each month-end, buy the top 10% of stocks by the combined rank, hold a month, pay trading costs. Strategies were ranked on the first ${ntr} months (${esc(fmtMY(M[0]))}–${esc(fmtMY(M[ntr - 1]))}) and then checked on the last ${nT - ntr} months, which they never saw. Returns are monthly, vs the equal-weighted average stock.</p>
+      <div class="seg" style="margin-bottom:10px">${[["sp500", "S&P 500"], ["all", "All stocks"]].map(([k, l]) => `<button data-labu="${k}" aria-pressed="${uk === k}">${l}</button>`).join("")}</div>
+      <div class="callout small"><b>Luck check.</b> The 50 best strategies in training went on to a median of ${mo(luck.p50)}/month in testing, vs ${mo(all.p50)} for all strategies. Training rank vs test result correlation: ${U.train_test_corr} (1 = perfectly repeatable, 0 = pure luck). ${U.train_test_corr < 0.2 ? "Low: treat individual winners with suspicion and lean on the factor patterns below." : "Some real signal: strategies that worked earlier tended to keep working."}</div></div>
+    <div class="grid2" style="margin-top:14px">
+      <div class="card"><h3>Which factors help <span class="label">effect of adding each factor</span></h3>
+        <table><thead><tr><th>Factor</th><th>Training</th><th>Test</th></tr></thead><tbody>${imp.map(x => `<tr><td>${esc(L[x.k])}</td><td>${bar(x.tr)} <span class="num small ${cls(x.tr)}">${pct(x.tr, 2)}</span></td><td>${bar(x.te)} <span class="num small ${cls(x.te)}">${pct(x.te, 2)}</span></td></tr>`).join("")}</tbody></table>
+        <p class="faint small" style="margin:8px 0 0">Average monthly result of every strategy that includes the factor minus every strategy that doesn't. Green in both columns = consistently helpful.</p></div>
+      <div class="card"><h3>Each factor alone</h3><table><thead><tr><th>Factor</th><th class="r">Training</th><th class="r">Test</th></tr></thead><tbody>${U.singles.map(id => S[id]).map(s => `<tr><td>${esc(L[s.f[0]])}</td><td class="r num ${cls(s.train.avg)}">${mo(s.train.avg)}</td><td class="r num ${cls(s.test.avg)}">${mo(s.test.avg)}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="card" style="margin-top:14px"><h3>Leaderboard</h3>
+      <div class="seg" style="margin-bottom:10px">${[["top_robust", "Robust (good in both)"], ["top_train", "Best in training"], ["top_full", "Best overall"]].map(([k, l]) => `<button data-labl="${k}" aria-pressed="${listK === k}">${l}</button>`).join("")}</div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Factors</th><th class="r">Training /mo</th><th class="r">Test /mo</th><th class="r" title="Share of months ahead of the average stock">Hit</th><th class="r" title="t-statistic over all months">t</th><th class="r" title="Share of one-factor-different strategies that also beat the average stock in testing">Neighbours</th><th class="r" title="Share of the portfolio replaced each month">Turnover</th></tr></thead>
+        <tbody>${ids.map(row).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">Tap a row for its chart. Robust = ranked by the worse of its training and test results. A robot icon marks the strategies the Arena's strategy traders use.</p></div>
+    <p class="faint small" style="margin-top:10px">Caveats: only ${nT} months of history (one market regime); today's index members only, which flatters results (survivorship bias); ${LAB.meta?.volume ? "" : "Rally Setup and Trend use price only in this run; "}insider data starts ${esc(fmtDate(LAB.meta?.insider_since))}, so the insider factor only covers recent months; Analyst isn't tested because no free history exists. Treat results as evidence, not proof.</p>`;
+}
 function fundBoard(list) {
   const fs = list.filter(f => f.copycat && !f.error).map(f => ({f, c: f.copycat, ex: f.copycat.ann - f.copycat.spy_ann, tier: fundTier(f.copycat),
     rel: f.copycat.curve.map(p => [p[0], (1 + p[1]) / (1 + p[2]) - 1])})).sort((a, b) => b.ex - a.ex);
@@ -2289,9 +2348,10 @@ function fundBoard(list) {
 }
 function viewResearch() {
   const V = UI.resView || "funds";
-  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
+  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"], ["lab", "Strategy Lab"]];
   let body = "";
   if (V === "track") body = trackTables();
+  else if (V === "lab") body = labView();
   else if (!RES) { body = `<div class="card"><p class="muted">Loading 13F data…</p></div>`; loadResearch(); }
   else if (!RES.filers?.length) body = `<div class="card"><h3>13F holdings</h3><p class="muted">The 13F data hasn't been built yet. It refreshes every Saturday.</p></div>`;
   else if (V === "smart") { const C = RES.consensus || {}; body = `<div class="grid2">${consensusTable("Most owned by tracked funds", C.most_owned)}${consensusTable("Most bought last quarter (new or added)", C.most_bought)}${consensusTable("Most sold last quarter (exited or cut 25%+)", C.most_sold)}</div>
@@ -2310,6 +2370,9 @@ function viewResearch() {
   $$("[data-fopen]").forEach(b => b.onclick = () => { UI.resOpen = UI.resOpen === b.dataset.fopen ? null : b.dataset.fopen; viewResearch(); });
   $$("#view [data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); Sheet.open(b.dataset.open); });
   const rs = $("#rsort"); if (rs) rs.onchange = () => { UI.resSort = rs.value; viewResearch(); };
+  $$("[data-labu]").forEach(b => b.onclick = () => { UI.labU = b.dataset.labu; UI.labOpen = null; viewResearch(); });
+  $$("[data-labl]").forEach(b => b.onclick = () => { UI.labList = b.dataset.labl; UI.labOpen = null; viewResearch(); });
+  $$("[data-lab]").forEach(b => b.onclick = () => { UI.labOpen = UI.labOpen === b.dataset.lab ? null : b.dataset.lab; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-trv]").forEach(b => b.onclick = () => { UI.trView = b.dataset.trv; UI.trOpen = null; viewResearch(); });
   $$("[data-tropen]").forEach(b => b.onclick = e => { if (e.target.closest("[data-open]")) return; UI.trOpen = UI.trOpen === b.dataset.tropen ? null : b.dataset.tropen; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-fjump]").forEach(b => b.onclick = () => { UI.resOpen = b.dataset.fjump; viewResearch(); document.getElementById("fund-" + b.dataset.fjump.replace(/[^A-Za-z0-9]/g, ""))?.scrollIntoView({block: "start"}); });
