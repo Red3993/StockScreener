@@ -159,6 +159,32 @@ LAB_FACTORS = {   # live versions of the Strategy Lab factors, from index.json r
 }
 
 
+SIGNALS: dict | None = None    # signals.json from the Signal Lab (set by cmd_prepare)
+SMART = ("ins_buy", "ins_cluster", "ins_ceo", "cong_buy", "cong_rel")
+SCORE_F = ("value7", "profit7", "health7", "growth7", "mgmt7", "overall6", "junk")
+
+
+def signal_book(strat: dict) -> tuple[list[dict], dict[str, list]]:
+    """The validated signal combinations this trader trades, and which stocks fired them in the last 10 trading days."""
+    S = SIGNALS or {}
+    h = str(strat.get("horizon", 63))
+    lead = (S.get("leaders") or {}).get(h) or {}
+    pool = lead.get("tech" if strat.get("pick") == "tech" else "best") or []
+    if strat.get("pick") == "insider":
+        pool = [k for k in pool if k[0].startswith("ins_") or (k[1] or "").startswith("ins_") or "ins90" in k[2]]
+    combos = []
+    for k in pool[: strat.get("combos", 8)]:
+        key = "|".join([k[0], k[1] or "", ",".join(k[2])])
+        x = ((S.get("results") or {}).get(key) or {}).get(h) or {}
+        nm = S["signals"][k[0]]["name"] + (" + " + S["signals"][k[1]]["name"] if k[1] else "") + "".join(f" [{S['filters'][f]}]" for f in k[2])
+        combos.append({"key": key, "name": nm, "n": x.get("n"), "avg": x.get("avgc"), "hit": x.get("hit"), "t": x.get("t"), "tr": x.get("tr"), "te": x.get("te")})
+    fired: dict[str, list] = {}
+    for c in combos:
+        for d, tk in (S.get("live") or {}).get(c["key"], []):
+            fired.setdefault(tk, []).append((d, c))
+    return combos, fired
+
+
 def strategy_rank(mk: Market, strat: dict) -> list[tuple[str, float]]:
     """Rank the strategy's universe by the average percentile rank of its factors (as in jobs/lab/strategy_lab.py)."""
     R = [r for r in mk.rows.values() if ((r.get("d") or {}).get("px") or 0) >= 3 and (r.get("mc") or 0) >= CFG["limits"]["min_mcap"]
@@ -179,6 +205,13 @@ def strategy_rank(mk: Market, strat: dict) -> list[tuple[str, float]]:
 def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], list[str]]:
     lim = CFG["limits"]
     strat = next((t.get("strategy") for t in CFG["traders"] if t["id"] == tid), None)
+    if strat and strat.get("type") == "signals":
+        combos, fired = signal_book(strat)
+        order = {c["key"]: i for i, c in enumerate(combos)}
+        ok = [(tk, min(order[c["key"]] for _, c in v), max(d for d, _ in v)) for tk, v in fired.items()
+              if tk in mk.rows and (mk.rows[tk].get("mc") or 0) >= lim["min_mcap"] and (mk.rows[tk].get("d") or {}).get("px")]
+        ok.sort(key=lambda x: (x[1], x[2] and -int(x[2].replace("-", ""))))
+        return [tk for tk, _, _ in ok[:30]], []
     if strat:
         ranked = strategy_rank(mk, strat)
         return [t for t, _ in ranked[:30]], []
@@ -238,6 +271,8 @@ def cmd_prepare(a) -> int:
     mk = Market(a.app_data, a.prices)
     st = load(a.state)
     research = load(a.research) if a.research and Path(a.research).exists() else None
+    global SIGNALS
+    SIGNALS = load(a.signals) if getattr(a, "signals", None) and Path(a.signals).exists() else None
     ensure_traders(st, mk.date)
     brief = load(a.brief) if a.brief and Path(a.brief).exists() else None
     out = Path(a.out)
@@ -265,7 +300,17 @@ def cmd_prepare(a) -> int:
                      f"peak ${tr['peak']:,.0f}{', ON PROBATION' if tr['probation'] else ''}. Book: {book}." + (f" Unfilled orders: {pend}." if pend else ""))
         lg, sh = shortlist(mk, t["id"], research)
         model = ""
-        if t.get("strategy"):
+        if (t.get("strategy") or {}).get("type") == "signals":
+            combos, fired = signal_book(t["strategy"])
+            hd = t["strategy"].get("horizon", 63)
+            model = (f"\nYOUR VALIDATED SIGNALS (Signal Lab, holding period {hd} trading days; each worked in both the training and the unseen "
+                     f"test period; returns are vs the average stock, per signal, before costs):\n"
+                     + "\n".join(f"  S{i + 1}. {c['name']}: {c['n']} past signals, avg {fnum(c['avg'], 1, True)}, beat the market {fnum(c['hit'] * 100 if c['hit'] is not None else None, 0)}% of the time, "
+                                  f"t {fnum(c['t'], 1)}, training {fnum(c['tr'], 1, True)} / test {fnum(c['te'], 1, True)}" for i, c in enumerate(combos))
+                     + "\nFIRED IN THE LAST 10 TRADING DAYS: "
+                     + ("; ".join(f"{tk} ({', '.join(sorted({'S' + str(combos.index(c) + 1) + ' on ' + d for d, c in v}))})" for tk, v in list(fired.items())[:40]) or "none")
+                     + "\nYour holdings and when you bought them: " + (", ".join(f"{k} since {p['since']}" for k, p in tr["positions"].items()) or "none") + "\n")
+        elif t.get("strategy"):
             ranked = strategy_rank(mk, t["strategy"])
             pos_ = {k: i + 1 for i, (k, _) in enumerate(ranked)}
             cut = max(10, int(len(ranked) * t["strategy"].get("top_frac", 0.1)))
@@ -284,7 +329,7 @@ YOUR BOOK
 {mkt}
 
 LONG IDEAS that fit your style (from the app's data; you may also pick any stock below):
-""" + "\n".join(("- " + (f"model rank #{n + 1}: " if t.get("strategy") else "") + line(mk.rows[k])) for n, k in enumerate(lg)) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
+""" + "\n".join(("- " + (f"model rank #{n + 1}: " if t.get("strategy") and t["strategy"].get("type") != "signals" else "") + line(mk.rows[k])) for n, k in enumerate(lg)) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
             "\n\nYOUR CURRENT HOLDINGS:\n" + "\n".join("- " + line(mk.rows[k]) for k in held) if held else "") + """
 
 Use only facts from the data above. Reply with JSON only:
@@ -491,6 +536,7 @@ def main() -> int:
     ap.add_argument("--app-data", default="app-data")
     ap.add_argument("--prices")
     ap.add_argument("--research")
+    ap.add_argument("--signals", help="signals.json from the Signal Lab (lab-data branch)")
     ap.add_argument("--brief")
     ap.add_argument("--out", default="arena-packets")
     ap.add_argument("--pitches")

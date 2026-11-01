@@ -222,6 +222,7 @@ tr:last-child td{border-bottom:0}
 .tier.acc{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .tier.bad{background:color-mix(in srgb,var(--down) 16%,transparent);border-color:color-mix(in srgb,var(--down) 40%,var(--line))}
 .trow{cursor:pointer}.trow:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.rnav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}.rnav button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;color:var(--muted)}.rnav button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .indgrp summary{cursor:pointer;font-size:13px;font-weight:600;padding:4px 0}
 .acard .spark{display:block;width:100%;height:26px;margin-top:2px}
 .acard .rank{font:600 12px var(--f-mono);color:var(--faint)}
@@ -2291,6 +2292,74 @@ function trackTables() {
 let LAB = null, LAB_P = null;
 function loadLab() { if (!LAB_P) LAB_P = fetch("lab.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { LAB = j || {universes: {}}; if (UI.tab === "research" && UI.resView === "lab" && $("#sheet").hidden) viewResearch(); }); return LAB_P; }
 const LAB_BOTS = () => Object.fromEntries((Picked.arena?.personas || []).filter(p => p.strategy).map(p => [p.strategy.universe + ":" + [...p.strategy.factors].sort().join("+"), p]));
+let SIG = null, SIG_P = null;
+function loadSig() { if (!SIG_P) SIG_P = fetch("signals.json", {cache: "no-cache"}).then(r => r.ok ? r.json() : null).catch(() => null).then(j => { SIG = j || {results: {}}; if (UI.tab === "research" && UI.resView === "lab" && $("#sheet").hidden) viewResearch(); }); return SIG_P; }
+const LAB_RUNS = "https://github.com/Red3993/StockScreener/actions/workflows/lab.yml";
+function labHome() {
+  const mode = UI.labMode || "signals";
+  const head = `<div class="seg" style="margin-bottom:12px">${[["signals", "Signal tests"], ["scores", "Score rankings"]].map(([k, l]) => `<button data-labm="${k}" aria-pressed="${mode === k}">${l}</button>`).join("")}</div>`;
+  return head + (mode === "signals" ? sigView() : labView());
+}
+const sigKey = k => Array.isArray(k) ? [k[0], k[1] || "", (k[2] || []).join(",")].join("|") : k;
+function sigName(k, short = false) {
+  const [s, p, ks] = sigKey(k).split("|"), S = SIG.signals, F = SIG.filters;
+  return `<b>${esc(S[s]?.name || s)}</b>${p ? ` <span class="faint">+</span> <b>${esc(S[p]?.name || p)}</b>` : ""}${ks ? ks.split(",").map(x => ` <span class="badge" style="margin:1px 0">${esc(F[x] || x)}</span>`).join("") : ""}`;
+}
+function pathSvg(pts, W = 120, H = 30, big = false) {
+  if (!pts || pts.length < 3) return `<span class="faint small">—</span>`;
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys); if (hi - lo < 0.01) hi = lo + 0.01;
+  const L = big ? 36 : 1, xm = Math.max(...xs), X = d => L + d / xm * (W - L - 4), Y = v => 4 + (1 - (v - lo) / (hi - lo)) * (H - (big ? 22 : 8));
+  const col = ys[ys.length - 1] >= 0 ? "var(--up)" : "var(--down)";
+  return `<svg viewBox="0 0 ${W} ${H}" ${big ? `width="100%" style="max-width:${W}px;display:block"` : `width="${W}" height="${H}" style="vertical-align:middle"`} role="img" aria-label="Average return vs the average stock after the signal">
+    <line x1="${L}" x2="${W}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="var(--line)" ${big ? "" : 'stroke-dasharray="2 2"'}/>
+    ${big ? [hi, lo].filter(v => Math.abs(v) > 0.003).map(v => `<text x="${L - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--faint)">${(v > 0 ? "+" : "") + (v * 100).toFixed(1)}%</text>`).join("") + [5, 21, 63, 126].filter(d => d <= xm).map(d => `<text x="${X(d).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="var(--faint)">${{5: "1w", 21: "1m", 63: "3m", 126: "6m"}[d]}</text><line x1="${X(d).toFixed(1)}" x2="${X(d).toFixed(1)}" y1="4" y2="${H - 18}" stroke="var(--line)" stroke-dasharray="1 3"/>`).join("") : ""}
+    <polyline points="${pts.map(p => X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1)).join(" ")}" fill="none" stroke="${col}" stroke-width="${big ? 2.2 : 1.6}"/></svg>`;
+}
+function sigView() {
+  if (!SIG) { loadSig(); return `<div class="card"><p class="muted">Loading signal tests…</p></div>`; }
+  if (!SIG.results || !Object.keys(SIG.results).length) return `<div class="card"><h3>Signal tests</h3><p class="muted">No results yet. The tests run every Saturday morning on GitHub; you can watch a run live <a href="${LAB_RUNS}" target="_blank" rel="noopener">here</a>.</p></div>`;
+  const h = String(UI.sigH || 63), R = SIG.results, B = SIG.baseline[h], M = SIG.meta, HL = SIG.h_labels;
+  const st = k => R[sigKey(k)]?.[h];
+  const f = v => v == null ? "—" : pct(v, 1);
+  const lift = x => x ? Math.round((x.hit - B.hit) * 100) : null;
+  const cat = UI.sigCat || "best";
+  const lists = {best: SIG.leaders[h]?.best || [], tech: SIG.leaders[h]?.tech || [], worst: SIG.leaders[h]?.worst || []};
+  const rows = lists[cat].slice(0, 30);
+  const live = k => SIG.live?.[sigKey(k)] || [];
+  const row = k => { const key = sigKey(k), x = st(k); if (!x) return ""; const lv = live(k);
+    return `<tr class="trow" data-sig="${esc(key)}"><td>${sigName(k)}</td><td class="r num">${x.n.toLocaleString()}</td><td class="r num ${cls(x.avgc)}"><b>${f(x.avgc)}</b></td><td class="r num ${cls(x.med - B.med)}">${f(x.med)}</td><td class="r num">${Math.round(x.hit * 100)}% <span class="faint small">${lift(x) >= 0 ? "+" : ""}${lift(x)}</span></td><td class="r num">${x.t != null ? x.t.toFixed(1) : "—"}</td><td class="r num small"><span class="${cls(x.tr)}">${f(x.tr)}</span> / <span class="${cls(x.te)}">${f(x.te)}</span></td><td>${pathSvg(SIG.paths?.[key])}</td><td class="small">${lv.length ? `<span class="badge acc">${lv.length} now</span>` : ""}</td></tr>
+      ${UI.sigOpen === key ? `<tr><td colspan="9" style="background:color-mix(in srgb,var(--accent) 4%,transparent)">
+        <div class="label">Average return vs the average stock, by days after the signal</div>${pathSvg(SIG.paths?.[key], 640, 160, true)}
+        <table style="margin-top:8px"><thead><tr><th>Holding</th>${SIG.horizons.map(hh => `<th class="r">${esc(HL[hh])}</th>`).join("")}</tr></thead><tbody>
+          <tr><td>Avg vs average stock (capped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num ${cls(y?.avgc)}">${f(y?.avgc)}</td>`; }).join("")}</tr>
+          <tr><td>Avg vs S&amp;P 500 (uncapped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num ${cls(y?.spy)}">${f(y?.spy)}</td>`; }).join("")}</tr>
+          <tr><td>Beat the average stock</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num">${y ? Math.round(y.hit * 100) + "%" : "—"}</td>`; }).join("")}</tr>
+          <tr><td>Training / test (capped)</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num small">${y ? `${f(y.tr)} / ${f(y.te)}` : "—"}</td>`; }).join("")}</tr>
+          <tr><td>Signals measured</td>${SIG.horizons.map(hh => { const y = R[key]?.[hh]; return `<td class="r num">${y ? y.n.toLocaleString() : "—"}</td>`; }).join("")}</tr></tbody></table>
+        ${lv.length ? `<div class="label" style="margin-top:10px">Fired in the last 10 trading days</div><div class="small">${lv.map(([d, t]) => `<span style="white-space:nowrap;margin-right:10px">${tk(t)} <span class="faint">${esc(fmtShort(d))}</span></span>`).join("")}</div>` : `<p class="small muted" style="margin:8px 0 0">Not firing on any stock right now.</p>`}</td></tr>` : ""}`; };
+  const head = `<thead><tr><th>Signal${cat !== "singles" ? " (+ filters)" : ""}</th><th class="r">Times</th><th class="r" title="Average return minus the average stock's over the same days; each event capped so a few huge winners can't carry it">Avg vs mkt</th><th class="r" title="Median return vs the average stock. The typical stock's median is ${f(B.med)}">Median</th><th class="r" title="Share that beat the average stock, and the difference from a random stock (${Math.round(B.hit * 100)}%)">Beat mkt</th><th class="r" title="Month-clustered t-statistic: 2+ means unlikely to be luck">t</th><th class="r">Train / test</th><th>Path</th><th></th></tr></thead>`;
+  const singles = [...SIG.singles].sort((a, b) => (st(b)?.avgc ?? -9) - (st(a)?.avgc ?? -9));
+  const SN = Object.keys(SIG.signals), FN = Object.keys(SIG.filters), MX = SIG.matrix || {};
+  const heat = v => v == null ? "transparent" : `color-mix(in srgb,${v >= 0 ? "var(--up)" : "var(--down)"} ${Math.min(70, Math.round(Math.abs(v) / (h === "5" ? 0.01 : h === "10" ? 0.015 : h === "21" ? 0.02 : h === "63" ? 0.04 : 0.06) * 45))}%,transparent)`;
+  const L = SIG.luck?.[h];
+  return `<div class="card"><h3>Signal tests <span class="label">${(M.tested || 0).toLocaleString()} combinations · ${esc(fmtMY(M.dates[0]))}–${esc(fmtMY(M.dates[1]))} · updated ${esc(fmtDate(SIG.generated))}</span></h3>
+      <p class="small" style="margin-top:0">Every time a classic signal fired on any of ${M.stocks.toLocaleString()} stocks (golden cross, MACD, RSI, breakouts, big moves${M.volume ? ", volume spikes" : ""}, insider and Congress buying), alone, paired with a second signal within ${M.pair_window} days, and with up to two filters (trend, RSI, 52-week range, market regime, our scores, size), we bought at the next close and measured the return ${SIG.horizons.map(x => HL[x]).join(", ")} later against the average stock. Signals before ${esc(fmtDate(M.cut))} are the training period; after it, the test period.</p>
+      <div class="seg" style="margin-bottom:8px">${SIG.horizons.map(x => `<button data-sigh="${x}" aria-pressed="${h === String(x)}">${esc(HL[x])}</button>`).join("")}</div>
+      <div class="callout small"><b>Read this first.</b> The typical stock trails the average stock by ${f(-B.med)} over ${esc(HL[h])} (a few big winners pull the average up), and beats it only ${Math.round(B.hit * 100)}% of the time, so a useful signal needs a positive median and a beat rate above ${Math.round(B.hit * 100)}%. ${L ? `Across all combinations, training and test results barely line up (rank correlation ${L.corr.toFixed(2)}): most combinations are noise, so only ones that worked in both periods with t ≥ 1.5 and 80+ signals make the leaderboard.` : ""}</div></div>
+    <div class="card" style="margin-top:14px"><h3>Classic signals on their own <span class="label">${esc(HL[h])} later</span></h3>
+      <div style="overflow-x:auto"><table>${head}<tbody>${singles.map(row).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">Tap a row for its full path and every holding period.</p></div>
+    <div class="card" style="margin-top:14px"><h3>Combinations <span class="label">${esc(HL[h])} later</span></h3>
+      <div class="seg" style="margin-bottom:10px">${[["best", "Best (worked in both periods)"], ["tech", "Technical only"], ["worst", "Worst"]].map(([k, l]) => `<button data-sigc="${k}" aria-pressed="${cat === k}">${l}</button>`).join("")}</div>
+      <div style="overflow-x:auto"><table>${head}<tbody>${rows.map(row).join("") || `<tr><td colspan="9" class="muted">Nothing passed the bar at this holding period.</td></tr>`}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">"Best" = ranked by the worse of the training and test results, among combinations with 80+ signals, t ≥ 1.5 and a beat rate above a random stock. A "now" badge means it fired on a stock in the last 10 trading days.</p></div>
+    <div class="card" style="margin-top:14px"><h3>Signal × filter <span class="label">avg vs the average stock, ${esc(HL[h])} later</span></h3>
+      <div style="overflow-x:auto"><table class="small" style="font-size:11.5px"><thead><tr><th>Signal</th>${FN.map(k => `<th style="writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;padding:4px 2px;white-space:nowrap">${esc(SIG.filters[k])}</th>`).join("")}</tr></thead><tbody>
+        ${SN.map(sn => `<tr><td style="white-space:nowrap">${esc(SIG.signals[sn].name)}</td>${FN.map(fk => { const v = MX[sn]?.[fk]?.[h]; const ok = v && v[1] >= 80;
+          return `<td class="num" title="${esc(SIG.signals[sn].name)} | ${esc(SIG.filters[fk])}: ${v ? `${f(v[0])} avg, ${v[1]} signals, t ${v[2] ?? "—"}, beat ${Math.round(v[3] * 100)}%, train ${f(v[4])} / test ${f(v[5])}` : "not enough signals"}" style="text-align:center;padding:3px 2px;background:${ok ? heat(v[0]) : "transparent"};color:${ok ? "inherit" : "var(--faint)"}">${ok ? (v[0] * 100).toFixed(1) : "·"}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>
+      <p class="faint small" style="margin:8px 0 0">Each cell: the signal, only when the filter held that day. Numbers are % vs the average stock; blank dots have fewer than 80 signals. Hover or long-press a cell for details.</p></div>
+    <p class="faint small" style="margin-top:10px">Runs every Saturday morning on GitHub (watch a run live <a href="${LAB_RUNS}" target="_blank" rel="noopener">here</a>). Caveats: ~2 years of signals after the 200-day warm-up; insider data starts ${esc(fmtDate(M.insider_since))}; today's index members only (survivorship bias); closing prices only; single-signal returns before trading costs. Treat results as evidence, not proof.</p>`;
+}
 function labView() {
   if (!LAB) { loadLab(); return `<div class="card"><p class="muted">Loading the Strategy Lab…</p></div>`; }
   const uk = UI.labU || "sp500", U = LAB.universes?.[uk];
@@ -2348,10 +2417,10 @@ function fundBoard(list) {
 }
 function viewResearch() {
   const V = UI.resView || "funds";
-  const segs = [["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"], ["lab", "Strategy Lab"]];
+  const segs = [["lab", "Strategy Lab"], ["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
   let body = "";
   if (V === "track") body = trackTables();
-  else if (V === "lab") body = labView();
+  else if (V === "lab") body = labHome();
   else if (!RES) { body = `<div class="card"><p class="muted">Loading 13F data…</p></div>`; loadResearch(); }
   else if (!RES.filers?.length) body = `<div class="card"><h3>13F holdings</h3><p class="muted">The 13F data hasn't been built yet. It refreshes every Saturday.</p></div>`;
   else if (V === "smart") { const C = RES.consensus || {}; body = `<div class="grid2">${consensusTable("Most owned by tracked funds", C.most_owned)}${consensusTable("Most bought last quarter (new or added)", C.most_bought)}${consensusTable("Most sold last quarter (exited or cut 25%+)", C.most_sold)}</div>
@@ -2365,11 +2434,15 @@ function viewResearch() {
       <p class="faint small" style="margin-top:10px">From SEC 13F filings: long US-listed stocks and options only, no shorts or cash, reported up to 45 days after each quarter. "Copycat" buys each reported portfolio (top ${RES.notes?.top_n || 60} positions, value-weighted) at the first close after its filing date and holds until the next filing, which is what a follower could actually do. Updated ${esc(fmtDate(RES.generated))}.</p>`;
   }
   $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Research</h1><span class="muted">Who owns what, and whose picks have worked</span></div>
-    <div class="seg" style="margin-bottom:14px">${segs.map(([k, l]) => `<button data-rv="${k}" aria-pressed="${V === k}">${l}</button>`).join("")}</div>${body}<p class="disclaimer">For personal research. Not financial advice.</p>`;
+    <div class="rnav">${segs.map(([k, l]) => `<button data-rv="${k}" aria-pressed="${V === k}">${l}</button>`).join("")}</div>${body}<p class="disclaimer">For personal research. Not financial advice.</p>`;
   $$("[data-rv]").forEach(b => b.onclick = () => { UI.resView = b.dataset.rv; viewResearch(); });
   $$("[data-fopen]").forEach(b => b.onclick = () => { UI.resOpen = UI.resOpen === b.dataset.fopen ? null : b.dataset.fopen; viewResearch(); });
   $$("#view [data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); Sheet.open(b.dataset.open); });
   const rs = $("#rsort"); if (rs) rs.onchange = () => { UI.resSort = rs.value; viewResearch(); };
+  $$("[data-labm]").forEach(b => b.onclick = () => { UI.labMode = b.dataset.labm; viewResearch(); });
+  $$("[data-sigh]").forEach(b => b.onclick = () => { UI.sigH = +b.dataset.sigh; viewResearch(); });
+  $$("[data-sigc]").forEach(b => b.onclick = () => { UI.sigCat = b.dataset.sigc; UI.sigOpen = null; viewResearch(); });
+  $$("[data-sig]").forEach(b => b.onclick = e => { if (e.target.closest("[data-open]")) return; UI.sigOpen = UI.sigOpen === b.dataset.sig ? null : b.dataset.sig; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-labu]").forEach(b => b.onclick = () => { UI.labU = b.dataset.labu; UI.labOpen = null; viewResearch(); });
   $$("[data-labl]").forEach(b => b.onclick = () => { UI.labList = b.dataset.labl; UI.labOpen = null; viewResearch(); });
   $$("[data-lab]").forEach(b => b.onclick = () => { UI.labOpen = UI.labOpen === b.dataset.lab ? null : b.dataset.lab; const y = scrollY; viewResearch(); scrollTo(0, y); });
