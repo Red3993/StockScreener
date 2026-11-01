@@ -264,7 +264,7 @@ def main() -> int:
     idx, dates, det = load(Path(a.app_data))
     vol = None
     if a.volume and Path(a.volume).exists():
-        vol = pd.read_parquet(a.volume) if a.volume.endswith(".parquet") else pd.read_csv(a.volume, index_col=0, parse_dates=True)
+        vol = pd.read_parquet(a.volume) if a.volume.endswith(".parquet") else pd.read_pickle(a.volume) if a.volume.endswith(".pkl") else pd.read_csv(a.volume, index_col=0, parse_dates=True)
     if vol is None and a.download_volume:
         vol = download_volume(det, dates, prog)
     tick, sp500, panel, meta = build_panel(idx, dates, det, vol, prog)

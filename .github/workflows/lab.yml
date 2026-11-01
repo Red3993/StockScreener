@@ -1,13 +1,14 @@
 name: Strategy Lab (factor backtests)
-# Backtests every combination of the app's key factors (jobs/lab/strategy_lab.py) -> lab.json on the `lab-data` branch.
-# Runs Saturdays after the 13F job, and on changes to the lab code. progress.json is pushed while it runs.
+# Signal Lab (jobs/lab/signal_lab.py): event studies of traditional signals, alone, paired and filtered -> signals.json.
+# Score rankings (jobs/lab/strategy_lab.py): every combination of the 1-10 scores and timing factors -> lab.json.
+# Both on the `lab-data` branch. Runs Saturdays early (before the Arena round) and on changes to the lab code.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths: ["jobs/lab/**", "jobs/lib/rally.py", ".github/workflows/lab.yml"]
   schedule:
-    - cron: "43 14 * * 6"   # Saturdays 14:43 UTC
+    - cron: "13 11 * * 6"   # Saturdays 11:13 UTC (6:13/7:13am ET), before the 9:47am ET Arena round
 permissions:
   contents: write
 concurrency:
@@ -26,11 +27,19 @@ jobs:
         run: |
           git fetch --depth 1 origin app-data:refs/remotes/origin/app-data
           git --work-tree=. checkout origin/app-data -- app-data && git reset -q
-          git fetch --depth 1 origin lab-data:refs/remotes/origin/lab-data && git show origin/lab-data:lab.json > /tmp/prev_lab.json 2>/dev/null || rm -f /tmp/prev_lab.json
-      - name: Run the lab
+          if git fetch --depth 1 origin +lab-data:refs/remotes/origin/lab-data; then
+            git show origin/lab-data:lab.json > /tmp/prev_lab.json 2>/dev/null || rm -f /tmp/prev_lab.json
+            git show origin/lab-data:signals.json > /tmp/prev_signals.json 2>/dev/null || rm -f /tmp/prev_signals.json
+          fi
+      - name: Signal Lab (event studies)
         run: |
           set -o pipefail
-          python -X faulthandler jobs/lab/strategy_lab.py --app-data app-data --download-volume --out /tmp/lab.json --progress /tmp/progress.json 2>&1 | grep -v -i "pandas4warning\|whatsnew\|RuntimeWarning\|_ensure_numeric" | tee /tmp/lab.log
+          python -X faulthandler jobs/lab/signal_lab.py --app-data app-data --download-volume --save-volume /tmp/vol.pkl --out /tmp/signals.json --progress /tmp/progress.json 2>&1 | grep -v -i "pandas4warning\|whatsnew\|RuntimeWarning\|_ensure_numeric" | tee /tmp/lab.log
+      - name: Score rankings
+        if: always()
+        run: |
+          set -o pipefail
+          python -X faulthandler jobs/lab/strategy_lab.py --app-data app-data --volume /tmp/vol.pkl --out /tmp/lab.json 2>&1 | grep -v -i "pandas4warning\|whatsnew\|RuntimeWarning\|_ensure_numeric" | tee -a /tmp/lab.log
       - name: Publish
         if: always()
         run: |
@@ -39,5 +48,6 @@ jobs:
           git rm -rq --cached . || true
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           if [ -s /tmp/lab.json ]; then cp /tmp/lab.json .; elif [ -s /tmp/prev_lab.json ]; then cp /tmp/prev_lab.json lab.json; fi
+          if [ -s /tmp/signals.json ]; then cp /tmp/signals.json .; elif [ -s /tmp/prev_signals.json ]; then cp /tmp/prev_signals.json signals.json; fi
           cp /tmp/progress.json /tmp/lab.log . 2>/dev/null || true
           git add -A && git commit -qm "lab $(date -u +%FT%TZ)" && git push -f origin HEAD:refs/heads/lab-data
