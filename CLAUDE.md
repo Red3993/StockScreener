@@ -204,8 +204,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   train/test rank corr. First run (local, closes only, 24 months Oct 2024–Sep 2026): S&P 500 corr 0.37, all-stocks 0.14.
   Value is the one factor that helps in both windows/universes; low vol, near-52w-low hurt. Robust picks:
   S&P 500 Value+Management+Trend (+0.72%/mo train, +0.85% test, neighbours 93%); all stocks Value+Rally+Oversold (+0.61/+0.78, 86%).
+  Runner run with volume (2026-11-01, the official one; Trend/Rally match the app): S&P corr 0.22, all 0.14; Value+Mgmt+Trend
+  +0.49/+0.92 (nb 93%) kept; all-stocks Value+Rally+Oversold weakened (+0.62/+0.44) → second bot switched to Value+Trend+Rally+Oversold
+  (+0.61/+0.59, neighbours 100%), named **The Dip Buyer** (id `bargain`).
   UI: Research → "Strategy Lab" (luck check, factor effects, singles, leaderboard with curves). Arena: two strategy traders
-  **The Quant** (quant, sp500 value/management/trend) and **The Bargain Bin** (bargain, all value/rally/oversold); `strategy:` in
+  **The Quant** (quant, sp500 value/management/trend) and **The Dip Buyer** (bargain, all value/trend/rally/oversold); `strategy:` in
   arena.yaml, shortlist = `strategy_rank()` (live LAB_FACTORS from index rows), packets show model ranks; `ensure_traders()` adds new
   traders to an existing desk (fresh $100k, `joined`). Build fix: detail `rally`/`rally_hist` were overwritten by placeholder keys.
   Stocks bar: "Industries" button, always-visible chips "Claude's picks" / "Arena traders' buys"; pending Arena orders show as faded icons.
