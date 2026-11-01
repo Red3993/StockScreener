@@ -212,6 +212,19 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   arena.yaml, shortlist = `strategy_rank()` (live LAB_FACTORS from index rows), packets show model ranks; `ensure_traders()` adds new
   traders to an existing desk (fresh $100k, `joined`). Build fix: detail `rally`/`rally_hist` were overwritten by placeholder keys.
   Stocks bar: "Industries" button, always-visible chips "Claude's picks" / "Arena traders' buys"; pending Arena orders show as faded icons.
+- 2026-11-01 (Tom): "the backtest should use traditional metrics, not our 1-10 scores" → **Signal Lab** `jobs/lab/signal_lab.py`
+  (docstring explains) → `signals.json` on `lab-data` (same lab.yml, now Sat 11:13 UTC, before the Arena round; downloads volume once,
+  shares it with strategy_lab via /tmp/vol.pkl). Event studies: 26 classic signals (MA crosses, MACD, RSI, 52w, Bollinger, big moves,
+  volume, insider buy/cluster/CEO, Congress) with 20-day cooldown; pairs within 10 days; 22 filters (trend, RSI, 52w position, SPY vs
+  200d, volume surge, scores 7+, size, insider/Congress 90d); singles, +1, +2 filters, pairs, pairs +1 (~11.5k). Entry next close;
+  5/10/21/63/126-day returns vs the **median stock** (fair coin flip) and SPY; per-event cap for ranking; month-clustered t; train/test
+  split at 60% of days after the 200-day warm-up; redundant filters dropped; leaders = min(train,test), n≥80, t≥1.5, hit>baseline.
+  Output: results for kept combos, leaders {best, tech, worst} per horizon, signal×filter matrix, event-time paths, `live` firings
+  (last 10 trading days). Local run: luck corr ≈ 0 overall; classic signals alone ≈ coin flips; best 3-month combos: insider cluster
+  (+ below lower Bollinger / + Value 7+) ~68-72% hit; S&P 500 washout pairs (10% weekly drop or 8% jump + MACD/RSI divergence).
+  UI: Research opens on Strategy Lab (sub-nav wraps on phones); Lab = "Signal tests" (default) | "Score rankings" (old lab.json).
+  Arena: **The Quant** = `strategy: {type: signals, pick: tech, horizon: 63}` (top 8 technical-only combos), **The Insider Edge**
+  (id `bargain`) = pick insider; `signal_book()` in arena.py, packets list S1..S8 with records + fresh firings; `prepare --signals`.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

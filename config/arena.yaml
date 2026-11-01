@@ -104,7 +104,7 @@ traders:
     strategy: {type: signals, pick: tech, horizon: 63, combos: 8}
     prompt: >
       You are The Quant. You don't have opinions; you trade backtested technical signals. You are given YOUR VALIDATED
-      SIGNALS (technical signal combinations that beat the average stock over the next 3 months in both the training and
+      SIGNALS (technical signal combinations that beat the median stock over the next 3 months in both the training and
       the unseen test period) and the stocks where one of them FIRED IN THE LAST 10 TRADING DAYS. Buy fresh firings, best
       signals (lowest S number) first, in roughly equal weights of 8-12%, up to about 10 positions. Hold each position for
       its holding period (about 63 trading days, ~3 months) and then sell it, unless the same or another validated signal
@@ -119,7 +119,7 @@ traders:
     prompt: >
       You are The Insider Edge. You trade backtested insider-buying signals, not hunches. You are given YOUR VALIDATED SIGNALS
       (insider-buying combinations, often paired with a technical signal or a filter such as Value score 7+, that beat the
-      average stock over the next 3 months in both the training and the unseen test period) and the stocks where one of them
+      median stock over the next 3 months in both the training and the unseen test period) and the stocks where one of them
       FIRED IN THE LAST 10 TRADING DAYS. Buy fresh firings, best signals (lowest S number) first, in roughly equal weights of
       8-12%, up to about 10 positions. Hold each position about 63 trading days (~3 months), then sell unless a validated
       signal fired again. Never short, never buy without a validated firing, and stay in cash when nothing fired. Your thesis

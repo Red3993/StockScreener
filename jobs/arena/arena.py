@@ -304,7 +304,7 @@ def cmd_prepare(a) -> int:
             combos, fired = signal_book(t["strategy"])
             hd = t["strategy"].get("horizon", 63)
             model = (f"\nYOUR VALIDATED SIGNALS (Signal Lab, holding period {hd} trading days; each worked in both the training and the unseen "
-                     f"test period; returns are vs the average stock, per signal, before costs):\n"
+                     f"test period; returns are vs the median stock, per signal, before costs):\n"
                      + "\n".join(f"  S{i + 1}. {c['name']}: {c['n']} past signals, avg {fnum(c['avg'], 1, True)}, beat the market {fnum(c['hit'] * 100 if c['hit'] is not None else None, 0)}% of the time, "
                                   f"t {fnum(c['t'], 1)}, training {fnum(c['tr'], 1, True)} / test {fnum(c['te'], 1, True)}" for i, c in enumerate(combos))
                      + "\nFIRED IN THE LAST 10 TRADING DAYS: "
