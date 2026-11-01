@@ -24,7 +24,7 @@ FILTERS (must hold on the event day; all point-in-time)
 
 MEASUREMENT
   Entry at the close of the day AFTER the signal (no look-ahead). Return over 5/10/21/63/126 trading days minus
-  (a) the equal-weighted average stock over the same days and (b) SPY. Single returns are capped at -90% / +300%.
+  (a) the median stock over the same days (a fair coin flip: half of all stocks beat it) and (b) SPY. Single returns are capped at -90% / +300%.
   Significance uses one average per calendar month (signals cluster in time, so stock-level t-stats would overstate it).
   Walk-forward: the first 60% of the signal history is "training", the rest "test"; a combination only counts as robust
   if it works in both. Tested: every signal, every signal + 1 filter, every signal + 2 filters, every pair, every pair +
@@ -247,7 +247,7 @@ def build(app_data: Path, volume: pd.DataFrame | None, prog: Path | None):
         x = np.vstack([c[1 + h:], np.full((1 + h, N), np.nan)])
         f = np.clip(x / e - 1, -0.9, 3.0)
         f[~alive] = np.nan
-        avg = np.nanmean(np.where(np.isfinite(f), f, np.nan), axis=1)
+        avg = np.nanmedian(np.where(np.isfinite(f), f, np.nan), axis=1)   # the median stock: a fair coin-flip benchmark
         sp_e = np.concatenate([spy[1:], [np.nan]])
         sp_x = np.concatenate([spy[1 + h:], np.full(1 + h, np.nan)])
         FWD[h] = f.astype(np.float32)
@@ -407,7 +407,12 @@ def main() -> int:
     c = meta["c"]
     d1 = c[1:] / c[:-1] - 1
     d1[~np.isfinite(d1) | (np.abs(d1) > 0.9)] = np.nan
-    mkt = np.concatenate([[1.0], np.cumprod(1 + np.nan_to_num(np.nanmean(d1, axis=1)))])   # equal-weighted average-stock index
+    steps = [0, 1, 2, 3, 5, 10, 15, 21, 30, 42, 63, 84, 105, 126]
+    alive_c = np.where(np.nan_to_num(c) >= 3, c, np.nan)
+    MED = np.full((T, len(steps)), np.nan)        # median stock's return from day e0 to e0+d (the path benchmark)
+    for j, d in enumerate(steps):
+        if d < T:
+            MED[: T - d, j] = np.nanmedian(np.clip(c[d:] / alive_c[: T - d] - 1, -0.9, 3), axis=1)
     want = {tuple(x[:2]) + (tuple(x[2]),) for h in ("21", "63") for x in out["leaders"][h]["best"][:25] + out["leaders"][h]["tech"][:15]}
     for kk, r in keep.items():
         s, q, ks = kk
@@ -416,15 +421,14 @@ def main() -> int:
             m = m & K[k]
         ti, si = np.nonzero(m)
         if kk in want or (q is None and not ks):
-            steps = [0, 1, 2, 3, 5, 10, 15, 21, 30, 42, 63, 84, 105, 126]
             pts = []
-            for d in steps:
+            for j, d in enumerate(steps):
                 ok = ti + 1 + d < T
                 if ok.sum() < MIN_N:
                     break
                 e0, e1 = ti[ok] + 1, ti[ok] + 1 + d
                 rr = c[e1, si[ok]] / c[e0, si[ok]] - 1
-                ex = np.clip(rr - (mkt[e1] / mkt[e0] - 1), -0.5, 0.5)
+                ex = np.clip(rr - MED[e0, j], -0.5, 0.5)
                 pts.append([d, round(float(np.nanmean(ex)), 4)])
             cum["|".join([s, q or "", ",".join(ks)])] = pts
         recent_ev = [(int(t), meta["tick"][int(j)]) for t, j in zip(ti, si) if t >= T - LIVE_DAYS]
