@@ -245,6 +245,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   First run: Thiel Macro 8 names $0.42B, Market-like (−0.7%/yr, 2/6 qtrs); Founders Fund matched "Founders Fund IV Management" (1 pos,
   stale); Situational Awareness $20B Q2 13F, +21%/yr copycat → "Beats", but it unwound on 2026-07-30 → funds.yaml `copy: false` + `note`
   (build_research passes note/copy through; fund cards show the note; copycat_book skips copy:false).
+- 2026-11-01 (Tom: "who else should we mirror? Trump, Kushner, others"): added 8 funds (TCI/Hohn, D1/Sundheim, Fundsmith/Smith,
+  Gardner Russo & Quinn/Russo, Aquamarine/Spier, Brave Warrior/Greenberg, Miller Value/Miller, Maverick/Ainslie); verdicts from the
+  copycat test decide whether The Copycat uses them. Kushner's Affinity Partners: private equity, no 13F found. Trump: OGE 278-T
+  PDFs (oge.gov PAS index + whitehouse.gov), thousands of trades/quarter, ranges, often months late, run by third-party managers per
+  his reps → would need an OGE PDF parser (free); offered to Tom, not built.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

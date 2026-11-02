@@ -31,7 +31,16 @@ funds:
   - {name: Bridgewater Associates, manager: Ray Dalio (founder), cik: 1350694, match: [bridgewater], style: Macro / systematic, group: fund}
   - {name: Renaissance Technologies, manager: Jim Simons (founder), cik: 1037389, match: [renaissance, technologies], style: Quant, group: fund}
   - {name: Gates Foundation Trust, manager: Gates Foundation, cik: 1166559, match: [gates, foundation], style: Long-term endowment, group: fund}
-  # companies that file 13Fs for their own investment portfolios
+    # added 2026-11-01 (Tom: "who else should we mirror?") - concentrated, long-term stock pickers; verdicts come from the copycat test
+  - {name: TCI Fund Management, manager: Chris Hohn, match: [tci, fund], style: Concentrated quality / activist, group: fund}
+  - {name: D1 Capital Partners, manager: Dan Sundheim, match: [d1, capital], style: Growth long/short, group: fund}
+  - {name: Fundsmith, manager: Terry Smith, match: [fundsmith], style: Quality compounders, group: fund}
+  - {name: Gardner Russo & Quinn, manager: Tom Russo, match: [gardner, russo], style: Global consumer franchises, group: fund}
+  - {name: Aquamarine Capital, manager: Guy Spier, match: [aquamarine], style: Concentrated value, group: fund}
+  - {name: Brave Warrior Advisors, manager: Glenn Greenberg, match: [brave, warrior], style: Concentrated value, group: fund}
+  - {name: Miller Value Partners, manager: Bill Miller, match: [miller, value], style: Contrarian value, group: fund}
+  - {name: Maverick Capital, manager: Lee Ainslie, match: [maverick, capital], style: Long/short, group: fund}
+# companies that file 13Fs for their own investment portfolios
   - {name: Alphabet, manager: Google's parent, cik: 1652044, match: [alphabet], style: Strategic stakes, group: corporate}
   - {name: NVIDIA, manager: NVIDIA, cik: 1045810, match: [nvidia], style: Strategic stakes (AI ecosystem), group: corporate}
   - {name: Amazon, manager: Amazon.com, cik: 1018724, match: [amazon], style: Strategic stakes, group: corporate}
