@@ -250,6 +250,9 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   copycat test decide whether The Copycat uses them. Kushner's Affinity Partners: private equity, no 13F found. Trump: OGE 278-T
   PDFs (oge.gov PAS index + whitehouse.gov), thousands of trades/quarter, ranges, often months late, run by third-party managers per
   his reps → would need an OGE PDF parser (free); offered to Tom, not built.
+- 2026-11-01 22:00 (Tom): **The Copycat removed** ("not much different from Smart Money"): config entry deleted, live desk doc
+  dropped trader `copycat` + its 6 unfilled round-4 orders (copycat_book code left in arena.py, unused). Smart Money now also adds
+  stocks that Beats-the-market funds/people newly bought or added to in their latest 13F (+2 each), alongside insider/Congress buying.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

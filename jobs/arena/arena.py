@@ -283,7 +283,12 @@ def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], l
             if x.get("kind") != "Congress" or x.get("who") in good:
                 hot[x["t"]] = hot.get(x["t"], 0) + 3
 
-        # fund holdings are The Copycat's job; Smart Money trades fresh buying and selling by insiders and Congress
+        # plus what market-beating funds and people (13F copycat verdict "Beats the market") newly bought or added to
+        for f in (research or {}).get("filers", []):
+            if f.get("group") in ("fund", "person") and not f.get("stale") and f.get("copy") is not False and fund_tier(f.get("copycat")) == "beats":
+                for x in f.get("top") or []:
+                    if x.get("t") and x.get("chg") in ("new", "add"):
+                        hot[x["t"]] = hot.get(x["t"], 0) + 2
         sold = {}
         long = sorted(R, key=lambda r: -(hot.get(r["t"], 0) * 3 + (4 if g(r, "i", "cl") else 0) + g(r, "i", "b90") + 2 * g(r, "cg", "b90")))
         short = sorted(R, key=lambda r: -(sold.get(r["t"], 0) * 3 + g(r, "i", "ds90") - g(r, "i", "b90")))
