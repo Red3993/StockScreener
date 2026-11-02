@@ -237,6 +237,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   "Beats the market" (`fund_tier()`, same rule as the app), each fund equal-weighted, share classes merged (GOOGL→GOOG), top 12 scaled
   to 75%; plus up to 8 recent Congress buys (track `recent_by_top`) by members with avg63>0 & t63≥1.2 (Proven/Promising), equal slices
   of 25%, ~3-month holds. Packet lists the funds, targets and buys; persona rebalances only on >3-point drift. Needs `--research`.
+- 2026-11-01 (Tom: "Smart Money and Copycat are very similar"; add people like Musk, Thiel, PayPal mafia, the Muse presenter):
+  funds.yaml gains `group: person` filers (CIK by EDGAR search): Thiel Macro (Peter Thiel), Founders Fund, Situational Awareness
+  (Aschenbrenner). Not trackable: Musk (no 13F; Tesla Form 4s only), Hoffman/Sacks/Rabois/Levchin (VC, private), Alexandr Wang
+  (Meta exec; presented Meta's Muse). Research nav adds "People" (same cards + leaderboard). Copycat now copies Beats-the-market
+  filers in group fund OR person. Smart Money no longer uses 13F consensus: fresh insider + proven/promising Congress buying only.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

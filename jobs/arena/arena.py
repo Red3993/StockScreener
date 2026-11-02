@@ -196,7 +196,7 @@ def fund_tier(c: dict | None) -> str:
 def copycat_book(mk: Market, research: dict | None, strat: dict) -> tuple[list[dict], list[dict], list[dict]]:
     """Model portfolio: the latest 13F holdings of market-beating funds (each fund equal-weighted, positions by their weight in
     the fund), plus recent purchases by members of Congress with a proven or promising record."""
-    funds = [f for f in (research or {}).get("filers", []) if f.get("group") == "fund" and not f.get("error") and not f.get("stale")
+    funds = [f for f in (research or {}).get("filers", []) if f.get("group") in ("fund", "person") and not f.get("error") and not f.get("stale")
              and fund_tier(f.get("copycat")) == "beats"]
     w: dict[str, float] = {}
     who: dict[str, list] = {}
@@ -283,20 +283,8 @@ def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], l
             if x.get("kind") != "Congress" or x.get("who") in good:
                 hot[x["t"]] = hot.get(x["t"], 0) + 3
 
-        def fund_w(name: str) -> float:
-            f = next((f for f in (research or {}).get("filers", []) if f.get("name") == name), None)
-            c = (f or {}).get("copycat")
-            if not c:
-                return 0.5
-            ex = c["ann"] - c["spy_ann"]
-            return 2.0 if ex >= 0.02 and c["periods"] >= 6 and c["beat"] / c["periods"] >= 0.55 else 0.0 if ex <= -0.02 else 1.0
-        for x in ((research or {}).get("consensus") or {}).get("most_bought", []):
-            if x.get("t"):
-                hot[x["t"]] = hot.get(x["t"], 0) + sum(fund_w(f.get("fund")) for f in x.get("funds", []))
+        # fund holdings are The Copycat's job; Smart Money trades fresh buying and selling by insiders and Congress
         sold = {}
-        for x in ((research or {}).get("consensus") or {}).get("most_sold", []):
-            if x.get("t"):
-                sold[x["t"]] = sold.get(x["t"], 0) + sum(fund_w(f.get("fund")) for f in x.get("funds", []))
         long = sorted(R, key=lambda r: -(hot.get(r["t"], 0) * 3 + (4 if g(r, "i", "cl") else 0) + g(r, "i", "b90") + 2 * g(r, "cg", "b90")))
         short = sorted(R, key=lambda r: -(sold.get(r["t"], 0) * 3 + g(r, "i", "ds90") - g(r, "i", "b90")))
     elif tid == "yolo":

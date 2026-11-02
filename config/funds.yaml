@@ -36,3 +36,9 @@ funds:
   - {name: NVIDIA, manager: NVIDIA, cik: 1045810, match: [nvidia], style: Strategic stakes (AI ecosystem), group: corporate}
   - {name: Amazon, manager: Amazon.com, cik: 1018724, match: [amazon], style: Strategic stakes, group: corporate}
 # Microsoft, Meta and Salesforce were tried: they don't file 13Fs (or stopped in 2023).
+  # people (Research -> People): individuals' own investment vehicles that file 13Fs. The CIK is found by EDGAR search.
+  # Not possible: Elon Musk (no 13F; his public stock is Tesla, already in the Insiders data), Reid Hoffman, David Sacks,
+  # Keith Rabois, Max Levchin, Alexandr Wang (venture/private holdings or company insiders only).
+  - {name: Thiel Macro, manager: Peter Thiel, match: [thiel, macro], style: Macro / concentrated, group: person}
+  - {name: Founders Fund, manager: "Peter Thiel, Keith Rabois & partners", match: [founders, fund], style: Venture (public stakes only), group: person}
+  - {name: Situational Awareness, manager: Leopold Aschenbrenner, match: [situational, awareness], style: AI-focused, leveraged, group: person}

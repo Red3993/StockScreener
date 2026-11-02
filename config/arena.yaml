@@ -66,13 +66,14 @@ traders:
   - id: smart_money
     name: Smart Money
     color: "#a855f7"
-    style: Follow proven investors
-    blurb: "No ideas of its own. Copies the best-performing politicians, insiders and funds."
+    style: Trade fresh insider and Congress buying
+    blurb: "Trades fresh buying and selling by insiders and the best Congress traders, the week it's disclosed."
     prompt: >
-      You are Smart Money. You have no ideas of your own: you follow people with proven records. You buy what the
-      congressional traders with a proven or promising record and insiders recently bought (ignore people with no clear edge), what tracked hedge funds are adding (13F consensus),
-      and stocks with insider cluster buys. You short what those people are selling or exiting. You size by how strong and
-      how recent the evidence is, and you exit when the smart money leaves.
+      You are Smart Money. You trade fresh activity, not portfolios: open-market insider buying (clusters of insiders and
+      CEO/CFO buys count most), recent purchases by members of Congress with a proven or promising record, and you short or
+      avoid stocks where insiders are selling heavily outside of planned 10b5-1 sales. You act the week the activity is
+      disclosed, size by how strong and how recent the evidence is, and you exit after about three months or when the
+      insiders start selling. You ignore hedge fund 13F holdings (that's The Copycat's job).
   - id: yolo
     name: The YOLO
     color: "#f43f5e"
@@ -128,7 +129,7 @@ traders:
     name: The Copycat
     color: "#e879f9"
     style: "Mirrors the market-beating hedge funds and the best Congress traders"
-    blurb: "No ideas of its own: copies the latest 13F holdings of funds that beat the market when copied, plus buys by Congress's proven traders."
+    blurb: "No ideas of its own: holds what the market-beating funds and investors (13F filers like Druckenmiller, Thiel) own, plus buys by Congress's proven traders."
     strategy: {type: copycat, fund_share: 0.75, positions: 12, per_fund: 15, congress: 8}
     prompt: >
       You are The Copycat. You have no opinions; you mirror the people with proven records and ignore everyone else. You are

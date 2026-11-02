@@ -2475,7 +2475,7 @@ function fundBoard(list) {
 }
 function viewResearch() {
   const V = UI.resView || "lab";
-  const segs = [["lab", "Strategy Lab"], ["funds", "Funds"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
+  const segs = [["lab", "Strategy Lab"], ["funds", "Funds"], ["people", "People"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
   let body = "";
   if (V === "track") body = trackTables();
   else if (V === "lab") body = labHome();
@@ -2484,11 +2484,12 @@ function viewResearch() {
   else if (V === "smart") { const C = RES.consensus || {}; body = `<div class="grid2">${consensusTable("Most owned by tracked funds", C.most_owned)}${consensusTable("Most bought last quarter (new or added)", C.most_bought)}${consensusTable("Most sold last quarter (exited or cut 25%+)", C.most_sold)}</div>
       <p class="faint small" style="margin-top:10px">Across the ${RES.filers.filter(f => f.group === "fund" && !f.error).length} funds tracked, from each one's latest 13F. Counts use each fund's top ${RES.notes?.top_n || 60} positions.</p>`; }
   else {
-    const grp = V === "corp" ? "corporate" : "fund", sortK = UI.resSort || "copycat";
+    const grp = V === "corp" ? "corporate" : V === "people" ? "person" : "fund", sortK = UI.resSort || "copycat";
     const list = RES.filers.filter(f => f.group === grp).sort((a, b) => a.error ? 1 : b.error ? -1 : a.stale !== b.stale ? (a.stale ? 1 : -1) : sortK === "aum" ? (b.value || 0) - (a.value || 0) : sortK === "name" ? a.name.localeCompare(b.name)
       : ((b.copycat ? b.copycat.ann - b.copycat.spy_ann : -9) - (a.copycat ? a.copycat.ann - a.copycat.spy_ann : -9)));
     body = `${V === "funds" ? `<div class="bar" style="margin-bottom:10px"><select class="sel" id="rsort" aria-label="Sort funds"><option value="copycat" ${sortK === "copycat" ? "selected" : ""}>Sort: copycat vs S&amp;P</option><option value="aum" ${sortK === "aum" ? "selected" : ""}>Sort: 13F size</option><option value="name" ${sortK === "name" ? "selected" : ""}>Sort: name</option></select></div>` : `<p class="muted small" style="margin-top:0">Stocks these companies hold in their own investment portfolios, often strategic stakes in partners and suppliers.</p>`}
-      ${V === "funds" ? fundBoard(list) : ""}<div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>
+      ${V === "people" ? `<div class="callout small" style="margin-bottom:12px">Individuals' own investment firms that file 13Fs with the SEC (quarterly holdings of US stocks and options). Not possible: <b>Elon Musk</b> (no 13F; his public stock is Tesla, shown on Tesla's Insiders tab), <b>Reid Hoffman, David Sacks, Keith Rabois personally, Max Levchin</b> (venture funds hold private companies and don't file 13Fs) and company executives like <b>Alexandr Wang</b> (only their own company's stock, via Form 4).</div>` : ""}
+      ${V === "funds" || V === "people" ? fundBoard(list) : ""}<div style="display:grid;gap:12px">${list.map(filerCard).join("")}</div>
       <p class="faint small" style="margin-top:10px">From SEC 13F filings: long US-listed stocks and options only, no shorts or cash, reported up to 45 days after each quarter. "Copycat" buys each reported portfolio (top ${RES.notes?.top_n || 60} positions, value-weighted) at the first close after its filing date and holds until the next filing, which is what a follower could actually do. Updated ${esc(fmtDate(RES.generated))}.</p>`;
   }
   $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Research</h1><span class="muted">Who owns what, and whose picks have worked</span></div>
