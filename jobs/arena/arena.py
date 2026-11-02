@@ -196,7 +196,7 @@ def fund_tier(c: dict | None) -> str:
 def copycat_book(mk: Market, research: dict | None, strat: dict) -> tuple[list[dict], list[dict], list[dict]]:
     """Model portfolio: the latest 13F holdings of market-beating funds (each fund equal-weighted, positions by their weight in
     the fund), plus recent purchases by members of Congress with a proven or promising record."""
-    funds = [f for f in (research or {}).get("filers", []) if f.get("group") in ("fund", "person") and not f.get("error") and not f.get("stale")
+    funds = [f for f in (research or {}).get("filers", []) if f.get("group") in ("fund", "person") and not f.get("error") and not f.get("stale") and f.get("copy") is not False
              and fund_tier(f.get("copycat")) == "beats"]
     w: dict[str, float] = {}
     who: dict[str, list] = {}

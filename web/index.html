@@ -2230,6 +2230,7 @@ function filerCard(f) {
       <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><h3 style="margin:0">${esc(f.name)}</h3><span class="muted small">${esc(f.manager || "")} · ${esc(f.style || "")}</span><span style="margin-left:auto" class="faint small">${open ? "▲" : "▼"}</span></div>
       <div class="pill-row" style="margin-top:8px"><span class="badge">${fmtB(f.value)} · ${f.n} stocks</span><span class="badge">Top 10 = ${Math.round(f.top10_pct * 100)}%</span>
         ${f.stale ? `<span class="badge warn">No 13F since ${esc(fmtMY(f.filed))}</span>` : ""}${c ? `<span class="tier ${fundTier(c)[1]}">${fundTier(c)[0]}</span><span class="badge ${ex > 0 ? "good" : "bad"}" title="Buying each 13F on its filing date and holding to the next">Copycat ${pct(c.ann)}/yr vs S&amp;P ${pct(c.spy_ann)}</span>` : ""}<span class="badge">${esc(f.period ? "Q end " + fmtShort(f.period) : "")}</span></div>
+      ${f.note ? `<div class="small" style="margin-top:8px;color:var(--warn)">${esc(f.note)}</div>` : ""}
       <div class="small" style="margin-top:8px">${f.top.slice(0, 6).map(x => `<span style="white-space:nowrap;margin-right:10px"><b>${esc(x.t || x.name.slice(0, 14))}</b> <span class="faint">${(x.pct * 100).toFixed(1)}%</span>${x.chg && x.chg !== "same" ? ` <span class="${CHG[x.chg][1] === "bad" ? "down" : "up"}">${x.chg === "new" ? "new" : x.chg === "add" ? "↑" : "↓"}</span>` : ""}</span>`).join("")}</div>
     </button>
     ${open ? `<div style="margin-top:12px">

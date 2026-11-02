@@ -40,5 +40,7 @@ funds:
   # Not possible: Elon Musk (no 13F; his public stock is Tesla, already in the Insiders data), Reid Hoffman, David Sacks,
   # Keith Rabois, Max Levchin, Alexandr Wang (venture/private holdings or company insiders only).
   - {name: Thiel Macro, manager: Peter Thiel, match: [thiel, macro], style: Macro / concentrated, group: person}
-  - {name: Founders Fund, manager: "Peter Thiel, Keith Rabois & partners", match: [founders, fund], style: Venture (public stakes only), group: person}
-  - {name: Situational Awareness, manager: Leopold Aschenbrenner, match: [situational, awareness], style: AI-focused, leveraged, group: person}
+  - {name: Founders Fund, manager: "Peter Thiel, Keith Rabois & partners", match: [founders, fund], style: Venture (public stakes only), group: person,
+     note: "A venture firm: almost everything it owns is private, so its 13F filings are tiny or missing."}
+  - {name: Situational Awareness, manager: Leopold Aschenbrenner, match: [situational, awareness], style: "AI-focused, leveraged", group: person, copy: false,
+     note: "Sold most of its public portfolio to Citadel on 2026-07-30 after margin calls (about 4x leverage, plus software shorts that 13Fs don't show). Its last 13F no longer reflects what it owns, so The Copycat doesn't copy it."}

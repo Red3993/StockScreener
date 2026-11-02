@@ -242,6 +242,9 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (Aschenbrenner). Not trackable: Musk (no 13F; Tesla Form 4s only), Hoffman/Sacks/Rabois/Levchin (VC, private), Alexandr Wang
   (Meta exec; presented Meta's Muse). Research nav adds "People" (same cards + leaderboard). Copycat now copies Beats-the-market
   filers in group fund OR person. Smart Money no longer uses 13F consensus: fresh insider + proven/promising Congress buying only.
+  First run: Thiel Macro 8 names $0.42B, Market-like (−0.7%/yr, 2/6 qtrs); Founders Fund matched "Founders Fund IV Management" (1 pos,
+  stale); Situational Awareness $20B Q2 13F, +21%/yr copycat → "Beats", but it unwound on 2026-07-30 → funds.yaml `copy: false` + `note`
+  (build_research passes note/copy through; fund cards show the note; copycat_book skips copy:false).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.

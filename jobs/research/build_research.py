@@ -367,7 +367,7 @@ def main() -> int:
 
     out_f = []
     for f in filers:
-        base = {k: f.get(k) for k in ("name", "manager", "style", "group", "cik", "entity")}
+        base = {k: f.get(k) for k in ("name", "manager", "style", "group", "cik", "entity", "note", "copy")}
         if f.get("error") or not f.get("qs"):
             out_f.append({**base, "error": f.get("error") or "No 13F filings found"})
             continue
