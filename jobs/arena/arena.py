@@ -185,6 +185,49 @@ def signal_book(strat: dict) -> tuple[list[dict], dict[str, list]]:
     return combos, fired
 
 
+def fund_tier(c: dict | None) -> str:
+    """Same verdict as the app's Funds leaderboard (copying each 13F when filed vs the S&P 500)."""
+    if not c:
+        return "none"
+    ex, br = c["ann"] - c["spy_ann"], (c["beat"] / c["periods"] if c.get("periods") else 0)
+    return "beats" if c["periods"] >= 6 and ex >= 0.02 and br >= 0.55 else "lags" if ex <= -0.02 else "market"
+
+
+def copycat_book(mk: Market, research: dict | None, strat: dict) -> tuple[list[dict], list[dict], list[dict]]:
+    """Model portfolio: the latest 13F holdings of market-beating funds (each fund equal-weighted, positions by their weight in
+    the fund), plus recent purchases by members of Congress with a proven or promising record."""
+    funds = [f for f in (research or {}).get("filers", []) if f.get("group") == "fund" and not f.get("error") and not f.get("stale")
+             and fund_tier(f.get("copycat")) == "beats"]
+    w: dict[str, float] = {}
+    who: dict[str, list] = {}
+    for f in funds:
+        top = [x for x in (f.get("top") or []) if x.get("t") in mk.rows][: strat.get("per_fund", 15)]
+        tot = sum(x["pct"] for x in top) or 1
+        for x in top:
+            t_ = {"GOOGL": "GOOG", "BRK-A": "BRK-B", "FOXA": "FOX", "NWSA": "NWS"}.get(x["t"], x["t"])   # one share class per company
+            x = {**x, "t": t_ if t_ in mk.rows else x["t"]}
+            w[x["t"]] = w.get(x["t"], 0) + x["pct"] / tot / len(funds)
+            who.setdefault(x["t"], []).append(f"{f['name']} {x['pct']:.1%}{' (' + x['chg'] + ')' if x.get('chg') in ('new', 'add') else ''}")
+    model = sorted(({"t": t, "w": v, "funds": who[t]} for t, v in w.items()), key=lambda x: -x["w"])[: strat.get("positions", 12)]
+    s_ = sum(x["w"] for x in model) or 1
+    fund_share = strat.get("fund_share", 0.75)
+    for x in model:
+        x["w"] = round(x["w"] / s_ * fund_share, 4)
+    tr = mk.idx.get("track") or {}
+    good = {c["name"]: ("Proven edge" if c.get("t63", 0) >= 2 and c.get("n63", 0) >= 8 else "Promising")
+            for c in tr.get("congress", []) if (c.get("avg63") or 0) > 0 and (c.get("t63") or 0) >= 1.2}
+    buys = [x for x in tr.get("recent_by_top", []) if x.get("kind") == "Congress" and x.get("who") in good and x.get("t") in mk.rows]
+    seen, cong = set(), []
+    for x in sorted(buys, key=lambda x: x.get("filed") or "", reverse=True):
+        if x["t"] in seen:
+            continue
+        seen.add(x["t"])
+        cong.append({**x, "tier": good[x["who"]]})
+    fund_info = [{"name": f["name"], "manager": f.get("manager"), "period": f.get("period"), "filed": f.get("filed"),
+                  "ex": f["copycat"]["ann"] - f["copycat"]["spy_ann"], "beat": f["copycat"]["beat"], "periods": f["copycat"]["periods"]} for f in funds]
+    return model, cong[: strat.get("congress", 8)], fund_info
+
+
 def strategy_rank(mk: Market, strat: dict) -> list[tuple[str, float]]:
     """Rank the strategy's universe by the average percentile rank of its factors (as in jobs/lab/strategy_lab.py)."""
     R = [r for r in mk.rows.values() if ((r.get("d") or {}).get("px") or 0) >= 3 and (r.get("mc") or 0) >= CFG["limits"]["min_mcap"]
@@ -205,6 +248,9 @@ def strategy_rank(mk: Market, strat: dict) -> list[tuple[str, float]]:
 def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], list[str]]:
     lim = CFG["limits"]
     strat = next((t.get("strategy") for t in CFG["traders"] if t["id"] == tid), None)
+    if strat and strat.get("type") == "copycat":
+        model, cong, _ = copycat_book(mk, research, strat)
+        return list(dict.fromkeys([x["t"] for x in model] + [x["t"] for x in cong])), []
     if strat and strat.get("type") == "signals":
         combos, fired = signal_book(strat)
         order = {c["key"]: i for i, c in enumerate(combos)}
@@ -310,6 +356,16 @@ def cmd_prepare(a) -> int:
                      + "\nFIRED IN THE LAST 10 TRADING DAYS: "
                      + ("; ".join(f"{tk} ({', '.join(sorted({'S' + str(combos.index(c) + 1) + ' on ' + d for d, c in v}))})" for tk, v in list(fired.items())[:40]) or "none")
                      + "\nYour holdings and when you bought them: " + (", ".join(f"{k} since {p['since']}" for k, p in tr["positions"].items()) or "none") + "\n")
+        elif (t.get("strategy") or {}).get("type") == "copycat":
+            mdl, cong, fi = copycat_book(mk, research, t["strategy"])
+            cs_ = t["strategy"].get("fund_share", 0.75)
+            model = (f"\nFUNDS YOU COPY (verdict 'Beats the market': copying each 13F when it was filed beat the S&P 500 by 2%+/yr and in most quarters):\n"
+                     + ("\n".join(f"  - {f['name']} ({f['manager']}): {f['ex']:+.1%}/yr vs S&P 500, ahead in {f['beat']}/{f['periods']} quarters; latest 13F for quarter ended {f['period']}, filed {f['filed']}" for f in fi) or "  none qualify right now")
+                     + f"\nMODEL PORTFOLIO, fund part ({cs_:.0%} of your money; each fund equal-weighted, positions by their weight in each fund):\n"
+                     + ("\n".join(f"  {x['t']}: target {x['w']:.1%}  <- {'; '.join(x['funds'][:4])}" for x in mdl) or "  empty")
+                     + f"\nCONGRESS PART (up to {1 - cs_:.0%}, about {(1 - cs_) / max(1, len(cong)):.1%} each, hold ~3 months): recent purchases by members rated Proven edge or Promising:\n"
+                     + ("\n".join(f"  {x['t']}: {x['who']} ({x['tier']}), traded {x.get('date')}, disclosed {x.get('filed')}" for x in cong) or "  none in the last 60 days")
+                     + "\nYour holdings and when you bought them: " + (", ".join(f"{k} since {p['since']}" for k, p in tr["positions"].items()) or "none") + "\n")
         elif t.get("strategy"):
             ranked = strategy_rank(mk, t["strategy"])
             pos_ = {k: i + 1 for i, (k, _) in enumerate(ranked)}
@@ -329,7 +385,7 @@ YOUR BOOK
 {mkt}
 
 LONG IDEAS that fit your style (from the app's data; you may also pick any stock below):
-""" + "\n".join(("- " + (f"model rank #{n + 1}: " if t.get("strategy") and t["strategy"].get("type") != "signals" else "") + line(mk.rows[k])) for n, k in enumerate(lg)) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
+""" + "\n".join(("- " + (f"model rank #{n + 1}: " if t.get("strategy") and t["strategy"].get("type") not in ("signals", "copycat") else "") + line(mk.rows[k])) for n, k in enumerate(lg)) + "\n\nSHORT IDEAS that fit your style:\n" + "\n".join("- " + line(mk.rows[k]) for k in sh) + (
             "\n\nYOUR CURRENT HOLDINGS:\n" + "\n".join("- " + line(mk.rows[k]) for k in held) if held else "") + """
 
 Use only facts from the data above. Reply with JSON only:

@@ -232,6 +232,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   and meta.by_size. UI: leaderboard ranked client-side from `table` with "Any / 1 / 2 / 3 variables" chips, and a
   "Test your own combination" card (pick up to 3 variables; canonical key via sigCanon). Local run (no volume): ~13.5k combos,
   table 2.7 MB of a 3.7 MB file, 130 s.
+- 2026-11-01 (Tom): **The Copycat** (id `copycat`, #e879f9, `strategy: {type: copycat, fund_share: 0.75, positions: 12, per_fund: 15,
+  congress: 8}`). `copycat_book()` in arena.py: model = latest 13F top positions of non-stale funds whose copycat verdict is
+  "Beats the market" (`fund_tier()`, same rule as the app), each fund equal-weighted, share classes merged (GOOGL→GOOG), top 12 scaled
+  to 75%; plus up to 8 recent Congress buys (track `recent_by_top`) by members with avg63>0 & t63≥1.2 (Proven/Promising), equal slices
+  of 25%, ~3-month holds. Packet lists the funds, targets and buys; persona rebalances only on >3-point drift. Needs `--research`.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
