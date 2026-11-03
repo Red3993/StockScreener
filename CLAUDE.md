@@ -258,6 +258,8 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   `topup()` scales a trader's longs up proportionally (position/sector caps) to 90% of equity; `arena.py topup` does it on demand; pitches up to 15
   trades; prompts ask for 8-15 names. Tom: a bot that fears a sell-off/bear market may set `cash` (+ `cash_reason`) in its pitch → `tr.cash_target`,
   floor = 1 − cash for that round. First round under the new rules fired manually 2026-11-03 01:28 UTC (fills at the Nov 3 close).
+- 2026-11-03 (Tom): **watchlist sort** (`WL_SORTS` in web/index.html, saved as UI.wsort/wdir): order added, date added, change since added,
+  today, 1 month, share price, most flags & signals, newest technical flag, most Arena traders long (Claude pick = +0.5) / short, overall, ticker.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
