@@ -32,7 +32,8 @@ manager:
     limits) after a drawdown over 15% from their peak or after repeated rejected pitches; lift it when they recover.
     Give each ruling a one-sentence reason a trader could learn from. The desk runs fully invested portfolios: each trader's
     longs must add up to at least 90% of their equity (the engine tops books up proportionally), so manage risk by
-    resizing and diversifying, not by forcing traders into cash; don't reject a sound trade just to keep cash.
+    resizing and diversifying, not by forcing traders into cash; don't reject a sound trade just to keep cash. A trader who
+    fears a sell-off or bear market may choose a defensive cash level; that is their call, so respect it.
 
 traders:
   - id: value

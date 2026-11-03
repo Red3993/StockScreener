@@ -324,7 +324,9 @@ def cmd_prepare(a) -> int:
              f"Stops (automatic): longs close {CFG['stops']['long']:.0%} below entry, shorts cover {CFG['stops']['short']:+.0%} above entry. "
              f"FULLY INVESTED: after this round your longs must add up to at least {lim.get('min_invested', 0):.0%} of your equity (cash at most "
              f"{1 - lim.get('min_invested', 0):.0%}); hold roughly 8-15 positions so you can get there within the position limit. If your book "
-             f"falls short, the engine scales all your longs up proportionally, so pick enough names you actually want to own.")
+             f"falls short, the engine scales all your longs up proportionally, so pick enough names you actually want to own. Exception: if you "
+             f"believe a sell-off or bear market is coming, you may choose a defensive cash level (the \"cash\" field) and explain why; "
+             f"it lasts until the next round, so set it again each week you still want it.")
     mkt = ""
     if brief:
         mkt = "MARKET BRIEF (" + str(brief.get("asof")) + "): " + (brief.get("summary") or "") + "\n" + "\n".join(
@@ -338,8 +340,10 @@ def cmd_prepare(a) -> int:
         book = "; ".join(f"{k} {v:+.1%} (entry {p['entry']:.2f}, now {mk.price(k) or p.get('last')}, since {p['since']})"
                          for k, v in sorted(ex.items(), key=lambda kv: -abs(kv[1])) for p in [tr["positions"][k]]) or "no positions (all cash)"
         pend = [o for o in st["pending"] if o["trader"] == t["id"]]
+        ct = tr.get("cash_target") or 0
+        defensive = f", defensive cash target {ct:.0%}" if ct else ""
         board.append(f"{t['name']} ({t['id']}): equity ${eq:,.0f} ({eq / CFG['start_cash'] - 1:+.1%} since start), cash ${tr['cash']:,.0f}, "
-                     f"peak ${tr['peak']:,.0f}{', ON PROBATION' if tr['probation'] else ''}. Book: {book}." + (f" Unfilled orders: {pend}." if pend else ""))
+                     f"peak ${tr['peak']:,.0f}{', ON PROBATION' if tr['probation'] else ''}{defensive}. Book: {book}." + (f" Unfilled orders: {pend}." if pend else ""))
         lg, sh = shortlist(mk, t["id"], research)
         model = ""
         if (t.get("strategy") or {}).get("type") == "signals":
@@ -386,6 +390,8 @@ LONG IDEAS that fit your style (from the app's data; you may also pick any stock
 
 Use only facts from the data above. Reply with JSON only:
 {"view": "1-2 sentences on how you see the market this week",
+ "cash": optional, only if you fear a sell-off or bear market: share of your equity to hold in cash this week (0.4 = 40%; leave it out to stay fully invested),
+ "cash_reason": "if you set cash: 1-2 sentences on why, from the data",
  "trades": [{"ticker": "XYZ", "action": "buy|sell|short|cover", "weight": target share of your equity after the trade (0.10 = 10%; for shorts give a positive number; 0 to close),
              "thesis": "1-2 sentences in your own voice", "evidence": ["2-4 specific facts from the data"]}]}
 Propose up to 15 trades (enough to stay fully invested). "sell" and "cover" close or reduce a position; "buy" and "short" open or add to one."""
@@ -410,12 +416,14 @@ Closing trades (sell, cover) should normally be approved.""")
     return 0
 
 
-def topup(st: dict, mk: "Market", rid: int) -> list:
+def topup(st: dict, mk: "Market", rid: int, cash: dict | None = None) -> list:
     """Keep every book fully invested (Tom, 2026-11-03: "I'm looking for full portfolios").
     After the round's orders, a trader's longs (holdings + queued orders) must add up to at least limits.min_invested of
     equity. If they fall short, every long that isn't being sold is scaled up by the same factor, each capped at the
     position limit and its sector at the sector limit, repeated until the floor is met or no long has room left (a book
-    with only a few names can stay below the floor). Extra buys are queued for the next close like any other order."""
+    with only a few names can stay below the floor). Extra buys are queued for the next close like any other order.
+    A trader who fears a sell-off can choose a defensive cash level in their pitch ("cash": 0.4 = keep up to 40% in cash);
+    it's stored as tr["cash_target"] and lowers that trader's floor to 1 - cash (Tom: bots may go to cash if they feel that's better)."""
     lim = CFG["limits"]
     floor = lim.get("min_invested") or 0
     out = []
@@ -424,6 +432,9 @@ def topup(st: dict, mk: "Market", rid: int) -> list:
     for t in CFG["traders"]:
         tid = t["id"]
         tr = st["traders"][tid]
+        if cash is not None and tid in cash:
+            tr["cash_target"] = cash[tid]
+        fl = min(floor, 1 - (tr.get("cash_target") or 0))
         f = lim["probation_factor"] if tr["probation"] else 1.0
         cap, scap = lim["max_long"] * f, lim["max_sector"] * f
         ex = exposures(tr, mk)
@@ -437,7 +448,7 @@ def topup(st: dict, mk: "Market", rid: int) -> list:
         new = dict(longs)
         sec = lambda k: (mk.rows.get(k) or {}).get("sec", "?")
         for _ in range(12):
-            need = floor - sum(new.values())
+            need = fl - sum(new.values())
             if need <= 1e-4:
                 break
             ssum = {}
@@ -548,13 +559,22 @@ def cmd_apply(a) -> int:
                     if e["trader"] == tid and e["ticker"] == o["ticker"]:
                         e["engine_note"] = (e.get("engine_note") or "") + f" Scaled to {abs(o['target']):.1%} to stay within sector/gross limits."
     st["pending"] = [o for o in st["pending"] if (o["trader"], o["ticker"]) not in {(q["trader"], q["ticker"]) for q in queued}] + queued
-    tops = topup(st, mk, rid)
+    cash = {}
+    for tid, p in pitches.items():
+        if tid in ids:
+            try:
+                c = float(p.get("cash") or 0)
+            except (TypeError, ValueError):
+                c = 0.0
+            cash[tid] = round(min(1.0, max(0.0, c)), 3) if c > 1 - (lim.get("min_invested") or 0) + 1e-9 else 0.0
+    tops = topup(st, mk, rid, cash)
     for o in tops:
         for e in log_trades:
             if e["trader"] == o["trader"] and e["ticker"] == o["ticker"]:
                 e["engine_note"] = (e.get("engine_note") or "") + f" Topped up to {o['target']:.1%} to keep the book fully invested."
     summary = {"round": rid, "asof": mk.date, "at": now(), "manager_note": rulings.get("note"),
                "views": {k: (v.get("view") or "") for k, v in pitches.items() if k in ids},
+               "cash": {k: {"target": cash[k], "why": pitches[k].get("cash_reason")} for k in cash if cash[k]},
                "counts": {"pitched": len(log_trades), "approved": sum(1 for e in log_trades if e["decision"] in ("approve", "resize") and not (e.get("engine_note") or "").startswith(("Not in", "Below", "Nothing", "Unknown"))),
                           "rejected": sum(1 for e in log_trades if e["decision"] == "reject")},
                "manual": bool(a.manual)}
