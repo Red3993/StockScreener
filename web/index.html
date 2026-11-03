@@ -469,7 +469,7 @@ function snippet(t, term) {
 const UI = {calFilter: "top", mk: {ins: true, cong: true}, scope: "all", page: 1, tab: "stocks", q: "", sort: "overall", dir: "desc", filters: [], list: null, calMonth: null, range: "1y", openCat: null, insiderFilter: "buys", dtab: "overview"};
 try { Object.assign(UI, JSON.parse(localStorage.getItem("ss-ui2") || "{}")); } catch (e) {}
 UI.q = ""; UI.dtab = "overview";
-const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({scope: UI.scope, tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, mk: UI.mk, list: UI.list, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
+const saveUI = () => { try { localStorage.setItem("ss-ui2", JSON.stringify({scope: UI.scope, tab: UI.tab, sort: UI.sort, dir: UI.dir, filters: UI.filters, range: UI.range, mk: UI.mk, list: UI.list, wsort: UI.wsort, wdir: UI.wdir, calFilter: UI.calFilter, insiderFilter: UI.insiderFilter})); } catch (e) {} };
 
 // Watchlists, notes, saved screens: owner-only database doc; AI synopses: one doc per stock. Browser fallback.
 const Store = {
@@ -1140,12 +1140,40 @@ const Filters = {
 };
 
 // ================================================================ watchlists
+// Recent technical flags (last 7 trading days) and the signal badges shown on a watchlist row.
+const recentFlags = r => Object.keys(FLAGS).filter(k => r.d?.ev?.[k] != null && r.d.ev[k] < 7);
+const wlSignals = r => (r.i?.b30 ? 1 : 0) + (r.i?.ceo ? 1 : 0) + (r.i?.cl ? 1 : 0) + (r.cg?.b90 ? 1 : 0) + (r.mo?.rg && r.mo.rg !== "Neutral" ? 1 : 0) + recentFlags(r).length;
+const botsOn = (t, short) => (Picked.map[t] || []).filter(x => x.k === "bot" && !!x.short === short).length;
+// [key, label, value(item, row), default direction]. Items without a value sort last.
+const WL_SORTS = [
+  ["order", "Order added", null, "asc"],
+  ["added", "Date added", ({it}) => Date.parse(it.added) || null, "desc"],
+  ["since", "Change since added", ({it, s}) => it.price && s.d?.px != null ? s.d.px / it.price - 1 : null, "desc"],
+  ["chg1d", "Change today", ({s}) => s.d?.c1 ?? null, "desc"],
+  ["r21", "Change, 1 month", ({s}) => FIELDS.r21?.get(s) ?? null, "desc"],
+  ["price", "Share price", ({s}) => s.d?.px ?? null, "asc"],
+  ["flags", "Most flags & signals", ({s}) => wlSignals(s), "desc"],
+  ["flagNew", "Newest technical flag", ({s}) => { const v = recentFlags(s).map(k => s.d.ev[k]); return v.length ? Math.min(...v) : null; }, "asc"],
+  ["botLong", "Most Arena traders long", ({it}) => botsOn(it.ticker, false) + ((Picked.map[it.ticker] || []).some(x => x.k === "claude") ? 0.5 : 0), "desc"],
+  ["botShort", "Most Arena traders short", ({it}) => botsOn(it.ticker, true), "desc"],
+  ["overall", "Overall score", ({s}) => s.ov ?? null, "desc"],
+  ["ticker", "Ticker A–Z", null, "asc"],
+];
+function sortWatch(items) {
+  const S = WL_SORTS.find(x => x[0] === UI.wsort) || WL_SORTS[0], dir = (UI.wdir || S[3]) === "asc" ? 1 : -1;
+  if (S[0] === "order") return dir > 0 ? items : items.slice().reverse();
+  if (S[0] === "ticker") return items.slice().sort((a, b) => dir * a.it.ticker.localeCompare(b.it.ticker));
+  return items.map((x, i) => ({x, i, v: S[2](x)})).sort((a, b) => {
+    if (a.v == null && b.v == null) return a.i - b.i; if (a.v == null) return 1; if (b.v == null) return -1;
+    return dir * (a.v - b.v) || a.i - b.i; }).map(o => o.x);
+}
 function viewWatch() {
   const L = lists();
   if (!UI.list || !L.some(l => l.id === UI.list)) UI.list = L[0].id;
   const list = L.find(l => l.id === UI.list);
-  const items = list.items.map(it => ({it, s: RB[it.ticker]})).filter(x => x.s);
+  const items = sortWatch(list.items.map(it => ({it, s: RB[it.ticker]})).filter(x => x.s));
   const missing = list.items.filter(it => !RB[it.ticker]);
+  const WS = WL_SORTS.find(x => x[0] === UI.wsort) || WL_SORTS[0], wdir = UI.wdir || WS[3];
   $("#view").innerHTML = `
     <div class="bar">
       <select class="sel" id="wl" aria-label="Watchlist">${L.map(l => `<option value="${esc(l.id)}" ${l.id === UI.list ? "selected" : ""}>${esc(l.name)} (${l.items.length})</option>`).join("")}</select>
@@ -1153,6 +1181,8 @@ function viewWatch() {
       ${L.length > 1 ? `<button class="btn small" id="delList">Delete</button>` : ""}
       <span class="faint" style="margin-left:auto;font-size:12px">${Store.mode === "synced" ? "Synced to your account" : "Saved in this browser only"}</span>
     </div>
+    ${list.items.length > 1 ? `<div class="bar"><select class="sel" id="wsort" aria-label="Sort watchlist">${WL_SORTS.map(([v, l]) => `<option value="${v}" ${v === WS[0] ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
+      <button class="btn small" id="wdir" aria-label="Sort direction" title="Reverse order">${wdir === "asc" ? "↑" : "↓"}</button></div>` : ""}
     ${items.length ? `<div class="list">${headRow(esc(list.name))}${items.map(({it, s}) => {
       const r = s, px = r.d?.px, ch = px - it.price, chp = it.price ? px / it.price - 1 : null, ev = r.d?.ev || {};
       const icons = [r.i?.b30 ? `<span class="badge good">▲ ${r.i.b30} insider buy${r.i.b30 > 1 ? "s" : ""} (30d)</span>` : "", r.i?.ceo ? `<span class="badge acc">CEO/CFO buy</span>` : "", r.i?.cl ? `<span class="badge acc">Cluster buy</span>` : "",
@@ -1163,6 +1193,8 @@ function viewWatch() {
     ${missing.length ? `<p class="callout">Not in this data snapshot: ${missing.map(m => esc(m.ticker)).join(", ")}</p>` : ""}
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   $("#wl").onchange = e => { UI.list = e.target.value; saveUI(); viewWatch(); };
+  $("#wsort") && ($("#wsort").onchange = e => { UI.wsort = e.target.value; UI.wdir = null; saveUI(); viewWatch(); });
+  $("#wdir") && ($("#wdir").onclick = () => { UI.wdir = wdir === "asc" ? "desc" : "asc"; saveUI(); viewWatch(); });
   $("#newList").onclick = () => askText("New watchlist", "", name => { const id = "l" + uid(); lists().push({id, name, items: []}); UI.list = id; saveUI(); Store.save(); viewWatch(); });
   $("#renList").onclick = () => askText("Rename list", list.name, name => { list.name = name; Store.save(); viewWatch(); });
   $("#delList") && ($("#delList").onclick = () => confirmDlg(`Delete “${list.name}”? Its ${list.items.length} stocks will be removed from this list.`, "Delete list", () => { Store.state.watchlists = lists().filter(l => l !== list); UI.list = lists()[0].id; Store.save(); viewWatch(); }));
