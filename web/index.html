@@ -298,7 +298,31 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .pick h3{margin:0}
 .conv{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 @media (prefers-reduced-motion:no-preference){.row,.cat,.btn{transition:background-color .12s}}
+/* boot screen: covers the app until index.json is downloaded, parsed and the first view is drawn */
+.boot{position:fixed;inset:0;z-index:70;background:var(--bg);display:grid;place-items:center;padding:24px var(--gut-r) 24px var(--gut)}
+.boot.gone{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.boot{transition:opacity .35s ease}.boot .bars i{animation:bootbar 1.1s ease-in-out infinite}}
+.boot-in{width:min(360px,100%);display:grid;gap:14px;justify-items:center;text-align:center}
+.boot .brand{font-size:30px}
+.boot .bars{display:flex;align-items:flex-end;gap:5px;height:34px}
+.boot .bars i{display:block;width:8px;border-radius:3px;background:var(--accent);transform-origin:bottom}
+.boot .bars i:nth-child(1){height:40%;background:var(--s3)}.boot .bars i:nth-child(2){height:70%;background:var(--s5);animation-delay:.12s}
+.boot .bars i:nth-child(3){height:55%;background:var(--s7);animation-delay:.24s}.boot .bars i:nth-child(4){height:90%;background:var(--s9);animation-delay:.36s}
+.boot .bars i:nth-child(5){height:75%;background:var(--accent);animation-delay:.48s}
+@keyframes bootbar{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.45)}}
+.boot .track{width:100%;height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.boot .fill{height:100%;width:3%;border-radius:3px;background:var(--accent);transition:width .2s ease}
+.boot .step{font-size:14px;font-weight:600}
+.boot .sub{font:12px var(--f-mono);color:var(--muted);min-height:1.4em}
+.boot .err{color:var(--down);font-size:14px}
 </style>
+<div class="boot" id="boot" role="status" aria-live="polite"><div class="boot-in">
+  <div class="brand">Stock<b>Screener</b></div>
+  <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="track" aria-hidden="true"><div class="fill" id="bootFill"></div></div>
+  <div class="step" id="bootStep">Starting up…</div>
+  <div class="sub" id="bootSub"></div>
+</div></div>
 
 <div class="top"><div class="top-row">
   <div class="brand">Stock<b>Screener</b></div>
@@ -830,17 +854,53 @@ ${marketContext()}`;
 };
 
 // ================================================================ load
+// Boot screen: progress while index.json (~5 MB) downloads, then the remaining steps, then fades out.
+const Boot = {
+  set(step, frac, sub) {
+    const s = $("#bootStep"); if (!s) return;
+    if (step != null) s.textContent = step;
+    if (frac != null) $("#bootFill").style.width = Math.max(3, Math.min(100, frac * 100)).toFixed(1) + "%";
+    if (sub != null) $("#bootSub").textContent = sub;
+  },
+  done() { const b = $("#boot"); if (!b) return; this.set(null, 1); b.classList.add("gone"); setTimeout(() => b.remove(), 400); },
+  fail(msg) {
+    const b = $("#boot"); if (!b) return; $(".bars", b)?.remove();
+    this.set("Couldn’t load the stock data", null, "");
+    $("#bootSub").innerHTML = `<div class="err">${esc(msg)}</div><button class="btn primary" style="margin-top:12px" onclick="location.reload()">Try again</button>`;
+  },
+};
+async function fetchJSONProgress(url, onProg) {
+  const r = await fetch(url, {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status);
+  const total = +r.headers.get("content-length") || 0;
+  if (!r.body?.getReader || typeof TextDecoder === "undefined") return r.json();
+  const rd = r.body.getReader(), chunks = []; let got = 0;
+  for (;;) { const {done, value} = await rd.read(); if (done) break; chunks.push(value); got += value.length; onProg(got, total); }
+  const buf = new Uint8Array(got); let o = 0; for (const c of chunks) { buf.set(c, o); o += c.length; }
+  return JSON.parse(new TextDecoder().decode(buf));
+}
+const nextFrame = () => new Promise(res => requestAnimationFrame(() => setTimeout(res, 0)));
 async function load() {
-  try { const r = await fetch("index.json", {cache: "no-cache"}); if (!r.ok) throw new Error("HTTP " + r.status); DATA = await r.json(); }
-  catch (e) { $("#view").innerHTML = `<div class="empty">Couldn’t load the data file (${esc(e.message)}). Reload the page to try again.</div>`; $("#asof").textContent = "No data"; return; }
+  Boot.set("Downloading stock data…", 0.03);
+  try {
+    DATA = await fetchJSONProgress("index.json", (got, total) => {
+      // content-length is the compressed size when the server gzips, so fall back to an estimate once we pass it
+      const f = total && got <= total * 1.02 ? got / total : 1 - Math.exp(-got / 2.6e6);
+      Boot.set(null, 0.03 + 0.72 * f, (got / 1e6).toFixed(1) + " MB" + (total && got <= total * 1.02 ? " of " + (total / 1e6).toFixed(1) + " MB" : ""));
+    });
+  }
+  catch (e) { $("#view").innerHTML = `<div class="empty">Couldn’t load the data file (${esc(e.message)}). Reload the page to try again.</div>`; $("#asof").textContent = "No data"; Boot.fail(e.message); return; }
+  Boot.set("Applying tonight’s closing prices…", 0.8, `${(DATA.rows?.length || 0).toLocaleString()} stocks`);
+  await nextFrame();
   DATA.lastDate = DATA.dates[DATA.dates.length - 1];
   ROWS = DATA.rows; ROWS.forEach(r => { RB[r.t] = r; });
   await applyQuickPrices();
   DATA.top_n = DATA.count;
+  Boot.set("Scoring and building the screener…", 0.9);
+  await nextFrame();
   buildMetricFields();
   UI.filters = (UI.filters || []).filter(f => f.type !== "range" || FIELDS[f.key]);
   $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}${DATA.quickPrices ? ` <span class="faint" title="Closing prices are in; scores, news and filings update when tonight's full build finishes">· scores updating</span>` : ""}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
-  render();
+  try { render(); } finally { Boot.done(); }
   await Store.init();
   await Picked.load().catch(() => {});
   AI.init();
