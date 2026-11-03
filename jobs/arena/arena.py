@@ -321,7 +321,10 @@ def cmd_prepare(a) -> int:
              f"{lim['max_short']:.0%}, total shorts up to {lim['max_short_total']:.0%}, longs + shorts up to {lim['max_gross']:.0%}, one sector up to "
              f"{lim['max_sector']:.0%}; limits halve on probation. Minimum market cap ${lim['min_mcap'] / 1e9:.0f}B (YOLO ${lim['yolo_min_mcap'] / 1e6:.0f}M). "
              f"Orders fill at the next session's close, after you pitch; trading costs {CFG['cost_bps'] / 100:.2f}%; shorts pay {CFG['borrow_rate']:.0%}/yr borrow. "
-             f"Stops (automatic): longs close {CFG['stops']['long']:.0%} below entry, shorts cover {CFG['stops']['short']:+.0%} above entry.")
+             f"Stops (automatic): longs close {CFG['stops']['long']:.0%} below entry, shorts cover {CFG['stops']['short']:+.0%} above entry. "
+             f"FULLY INVESTED: after this round your longs must add up to at least {lim.get('min_invested', 0):.0%} of your equity (cash at most "
+             f"{1 - lim.get('min_invested', 0):.0%}); hold roughly 8-15 positions so you can get there within the position limit. If your book "
+             f"falls short, the engine scales all your longs up proportionally, so pick enough names you actually want to own.")
     mkt = ""
     if brief:
         mkt = "MARKET BRIEF (" + str(brief.get("asof")) + "): " + (brief.get("summary") or "") + "\n" + "\n".join(
@@ -385,7 +388,7 @@ Use only facts from the data above. Reply with JSON only:
 {"view": "1-2 sentences on how you see the market this week",
  "trades": [{"ticker": "XYZ", "action": "buy|sell|short|cover", "weight": target share of your equity after the trade (0.10 = 10%; for shorts give a positive number; 0 to close),
              "thesis": "1-2 sentences in your own voice", "evidence": ["2-4 specific facts from the data"]}]}
-Propose 0-6 trades. "sell" and "cover" close or reduce a position; "buy" and "short" open or add to one."""
+Propose up to 15 trades (enough to stay fully invested). "sell" and "cover" close or reduce a position; "buy" and "short" open or add to one."""
         (out / f"{t['id']}.md").write_text(txt)
     (out / "manager.md").write_text(f"""{CFG['manager']['prompt'].strip()}
 
@@ -404,6 +407,67 @@ You will be given every trader's pitches (JSON). For each trade reply with JSON 
 Closing trades (sell, cover) should normally be approved.""")
     (out / "tickers.json").write_text(json.dumps(sorted(mk.rows)))
     print(f"prepared round {st['round'] + 1} as of {mk.date} for {len(CFG['traders'])} traders -> {out}")
+    return 0
+
+
+def topup(st: dict, mk: "Market", rid: int) -> list:
+    """Keep every book fully invested (Tom, 2026-11-03: "I'm looking for full portfolios").
+    After the round's orders, a trader's longs (holdings + queued orders) must add up to at least limits.min_invested of
+    equity. If they fall short, every long that isn't being sold is scaled up by the same factor, each capped at the
+    position limit and its sector at the sector limit, repeated until the floor is met or no long has room left (a book
+    with only a few names can stay below the floor). Extra buys are queued for the next close like any other order."""
+    lim = CFG["limits"]
+    floor = lim.get("min_invested") or 0
+    out = []
+    if floor <= 0:
+        return out
+    for t in CFG["traders"]:
+        tid = t["id"]
+        tr = st["traders"][tid]
+        f = lim["probation_factor"] if tr["probation"] else 1.0
+        cap, scap = lim["max_long"] * f, lim["max_sector"] * f
+        ex = exposures(tr, mk)
+        frozen = set()
+        for o in st["pending"]:
+            if o["trader"] == tid:
+                ex[o["ticker"]] = o["target"]
+                if o["action"] in ("sell", "cover", "short"):
+                    frozen.add(o["ticker"])
+        longs = {k: v for k, v in ex.items() if v > 0 and k in mk.rows}
+        new = dict(longs)
+        sec = lambda k: (mk.rows.get(k) or {}).get("sec", "?")
+        for _ in range(12):
+            need = floor - sum(new.values())
+            if need <= 1e-4:
+                break
+            ssum = {}
+            for k, v in ex.items():
+                ssum[sec(k)] = ssum.get(sec(k), 0) + abs(new.get(k, v))
+            room = {k: min(cap - v, scap - ssum[sec(k)]) for k, v in new.items() if k not in frozen}
+            room = {k: r for k, r in room.items() if r > 1e-4}
+            base = sum(new[k] for k in room)
+            if not room or base <= 0:
+                break
+            for k in room:
+                new[k] += min(room[k], need * new[k] / base)
+        for k, v in new.items():
+            if v > longs[k] + 0.002:
+                o = {"round": rid, "trader": tid, "ticker": k, "target": round(v, 4), "action": "buy", "asof": mk.date, "topup": True}
+                st["pending"] = [p for p in st["pending"] if not (p["trader"] == tid and p["ticker"] == k)] + [o]
+                out.append(o)
+    return out
+
+
+def cmd_topup(a) -> int:
+    mk = Market(a.app_data, a.prices)
+    st = load(a.state)
+    ensure_traders(st, mk.date)
+    tops = topup(st, mk, st["round"])
+    save(a.state, st)
+    by = {}
+    for o in tops:
+        by.setdefault(o["trader"], []).append(f"{o['ticker']} {o['target']:.1%}")
+    print(f"topped up as of {mk.date}: {len(tops)} orders queued for the next close; " + "; ".join(f"{k}: {', '.join(v)}" for k, v in by.items()))
     return 0
 
 
@@ -428,7 +492,7 @@ def cmd_apply(a) -> int:
             continue
         tr = st["traders"][tid]
         f = lim["probation_factor"] if tr["probation"] else 1.0
-        for x in (p.get("trades") or [])[:8]:
+        for x in (p.get("trades") or [])[:15]:
             t, act = (x.get("ticker") or "").upper(), x.get("action")
             tr["pitched"] += 1
             r = rmap.get((tid, t, act)) or {"decision": "reject", "reason": "No ruling from the Floor Manager."}
@@ -484,6 +548,11 @@ def cmd_apply(a) -> int:
                     if e["trader"] == tid and e["ticker"] == o["ticker"]:
                         e["engine_note"] = (e.get("engine_note") or "") + f" Scaled to {abs(o['target']):.1%} to stay within sector/gross limits."
     st["pending"] = [o for o in st["pending"] if (o["trader"], o["ticker"]) not in {(q["trader"], q["ticker"]) for q in queued}] + queued
+    tops = topup(st, mk, rid)
+    for o in tops:
+        for e in log_trades:
+            if e["trader"] == o["trader"] and e["ticker"] == o["ticker"]:
+                e["engine_note"] = (e.get("engine_note") or "") + f" Topped up to {o['target']:.1%} to keep the book fully invested."
     summary = {"round": rid, "asof": mk.date, "at": now(), "manager_note": rulings.get("note"),
                "views": {k: (v.get("view") or "") for k, v in pitches.items() if k in ids},
                "counts": {"pitched": len(log_trades), "approved": sum(1 for e in log_trades if e["decision"] in ("approve", "resize") and not (e.get("engine_note") or "").startswith(("Not in", "Below", "Nothing", "Unknown"))),
@@ -580,7 +649,7 @@ def cmd_mark(a) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["init", "prepare", "apply", "mark"])
+    ap.add_argument("cmd", choices=["init", "prepare", "apply", "mark", "topup"])
     ap.add_argument("--state", required=True)
     ap.add_argument("--app-data", default="app-data")
     ap.add_argument("--prices")
@@ -600,7 +669,7 @@ def main() -> int:
         save(a.state, init_state())
         print("initialized")
         return 0
-    return {"prepare": cmd_prepare, "apply": cmd_apply, "mark": cmd_mark}[a.cmd](a)
+    return {"prepare": cmd_prepare, "apply": cmd_apply, "mark": cmd_mark, "topup": cmd_topup}[a.cmd](a)
 
 
 if __name__ == "__main__":
