@@ -253,6 +253,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
 - 2026-11-01 22:00 (Tom): **The Copycat removed** ("not much different from Smart Money"): config entry deleted, live desk doc
   dropped trader `copycat` + its 6 unfilled round-4 orders (copycat_book code left in arena.py, unused). Smart Money now also adds
   stocks that Beats-the-market funds/people newly bought or added to in their latest 13F (+2 each), alongside insider/Congress buying.
+- 2026-11-03 (Tom): **loading screen** (web/index.html `Boot`: progress bar while index.json streams in, then steps, fades after first render;
+  error state with Try again). **Arena full portfolios** (Tom: "I'm looking for full portfolios"): `limits.min_invested: 0.90` — after each round
+  `topup()` scales a trader's longs up proportionally (position/sector caps) to 90% of equity; `arena.py topup` does it on demand; pitches up to 15
+  trades; prompts ask for 8-15 names. Tom: a bot that fears a sell-off/bear market may set `cash` (+ `cash_reason`) in its pitch → `tr.cash_target`,
+  floor = 1 − cash for that round. First round under the new rules fired manually 2026-11-03 01:28 UTC (fills at the Nov 3 close).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
