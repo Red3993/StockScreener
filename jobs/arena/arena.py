@@ -141,7 +141,8 @@ def line(r: dict) -> str:
             f" | {fnum(d.get('fh'), 0, True)} from 52w high, {fnum(d.get('fl'), 0, True)} above low | RSI {fnum(d.get('rsi'), 0)} | vs200d {fnum(d.get('v200'), 0, True)}",
             f"scores: overall {r.get('ov')} ({sc}) | cheap-vs-own-history {fnum(r.get('own'), 0)}/100 | Trend {ry.get('t')}/10 Rally {ry.get('r')}/10"
             f"{' (drivers: ' + ', '.join(ry.get('k') or []) + ')' if ry.get('k') else ''} | momentum regime {mo.get('rg')}",
-            f"analysts {a.get('n')} rating {a.get('rm')} up/down 90d {a.get('ug')}/{a.get('dg')} target {a.get('tm')} | short interest {fnum(mo.get('si'), 1, True).lstrip('+')} of float"
+            f"analysts {a.get('n')} rating {a.get('rm')} up/down 90d {a.get('ug')}/{a.get('dg')} target {a.get('tm')}"
+            f"{' (gap ' + fnum(a['tm'] / d['px'] - 1, 0, True) + ')' if a.get('tm') and d.get('px') else ''} | short interest {fnum(mo.get('si'), 1, True).lstrip('+')} of float"
             f" | insider buys 90d {i.get('b90', 0)}{' (cluster)' if i.get('cl') else ''}{' (CEO/CFO)' if i.get('ceo') else ''}, disc. sales {i.get('ds90', 0)}"
             f" | congress buys 90d {cg.get('b90', 0)} | earnings {e.get('earn') or 'n/a'}"]
     return "\n  ".join(bits)
@@ -159,6 +160,7 @@ LAB_FACTORS = {   # live versions of the Strategy Lab factors, from index.json r
 }
 
 
+LONG_ONLY = {t["id"] for t in CFG["traders"] if t.get("long_only")}   # code-enforced: these traders never short
 SIGNALS: dict | None = None    # signals.json from the Signal Lab (set by cmd_prepare)
 SMART = ("ins_buy", "ins_cluster", "ins_ceo", "cong_buy", "cong_rel")
 SCORE_F = ("value7", "profit7", "health7", "growth7", "mgmt7", "overall6", "junk")
@@ -298,6 +300,23 @@ def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], l
             return 1 if ed and mk.date < ed <= f"{mk.date[:8]}{min(28, int(mk.date[8:]) + 10):02d}" else 0
         long = sorted(R, key=lambda r: -((g(r, "mo", "si") or 0) * 20 + (g(r, "ry", "r") or 0) + abs(g(r, "d", "r21") or 0) * 15 + 3 * soon(r)))
         short = sorted(R, key=lambda r: -((g(r, "mo", "st") or 0) / 8 + (g(r, "d", "r63") or 0) * 8 - cs(r, 1)))
+    elif tid == "analyst":
+        # Wall Street's favourites (Tom, 2026-11-04): Strong Buy consensus, big gap to the mean target, preferably 4+ analysts. Long only.
+        def gap(r):
+            a, px = r.get("a") or {}, g(r, "d", "px", None)
+            return a["tm"] / px - 1 if a.get("tm") and px else None
+        A = [r for r in R if (g(r, "a", "n") or 0) >= 3 and g(r, "a", "rm", None) is not None and g(r, "a", "rm") <= 2.0 and (gap(r) or 0) > 0.05]
+        def score(r):   # gaps count up to +60%; above +100% they are more often stale targets on a collapsed stock
+            gp, n = gap(r), g(r, "a", "n")
+            return (min(gp, 0.6) * 10 - max(0.0, gp - 1.0) * 4 + (2.0 - g(r, "a", "rm")) * 6 + (3 if n >= 4 else -3) + min(n, 25) / 5
+                    + 1.5 * (g(r, "a", "ug") - g(r, "a", "dg")) - (4 if g(r, "mo", "rg") == "Falling knife" else 0))
+        long, per = [], {}
+        for r in sorted(A, key=lambda r: -score(r)):   # spread the shortlist: at most 8 per sector, 5 per industry
+            k1, k2 = r["sec"], "ind:" + (r.get("ind") or r["sec"])
+            if per.get(k1, 0) < 8 and per.get(k2, 0) < 5:
+                long.append(r)
+                per[k1], per[k2] = per.get(k1, 0) + 1, per.get(k2, 0) + 1
+        short = []
     else:   # frontier
         F = [r for r in R if r["sec"] in FRONTIER_SECTORS and (not r.get("ind") or (FRONTIER_WORDS.search(r["ind"]) and not NOT_FRONTIER.search(r["ind"])))]
         long = sorted(F, key=lambda r: -(cs(r, 3) * 2 + (g(r, "ry", "t") or 0) + cs(r, 6) + (g(r, "ry", "r") or 0) / 2))
@@ -514,6 +533,8 @@ def cmd_apply(a) -> int:
                 entry["decision"], note = "reject", "Not in the app's universe."
             elif act not in ("buy", "sell", "short", "cover"):
                 entry["decision"], note = "reject", "Unknown action."
+            elif act == "short" and tid in LONG_ONLY:
+                entry["decision"], note = "reject", "This trader is long-only."
             elif r.get("decision") in ("approve", "resize"):
                 w = abs(float(r.get("weight") if r.get("weight") is not None else x.get("weight") or 0))
                 minc = lim["yolo_min_mcap"] if tid == "yolo" else lim["min_mcap"]

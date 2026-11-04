@@ -260,6 +260,11 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   floor = 1 − cash for that round. First round under the new rules fired manually 2026-11-03 01:28 UTC (fills at the Nov 3 close).
 - 2026-11-03 (Tom): **watchlist sort** (`WL_SORTS` in web/index.html, saved as UI.wsort/wdir): order added, date added, change since added,
   today, 1 month, share price, most flags & signals, newest technical flag, most Arena traders long (Claude pick = +0.5) / short, overall, ticker.
+- 2026-11-04 (Tom): **The Analyst Follower** (id `analyst`, #d946ef, Arena trader 9, long only). Shortlist in `shortlist()`: >=3 analysts,
+  rating mean <= 2.0, gap to mean target > 5%; score = gap (counts up to +60%, penalised above +100% as likely stale) + rating + breadth
+  (4+ analysts +3, else -3) + net upgrades 90d - falling knife; at most 8 per sector / 5 per industry. `long_only: true` in arena.yaml
+  is code-enforced in apply (`LONG_ONLY`). Packets now show "(gap +X%)" after each target. Joins the desk via ensure_traders (fresh $100k).
+  Page bot icon `analyst` (target) published to v2. Arena round task prompt updated to nine traders.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
