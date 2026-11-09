@@ -265,7 +265,7 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (4+ analysts +3, else -3) + net upgrades 90d - falling knife; at most 8 per sector / 5 per industry. `long_only: true` in arena.yaml
   is code-enforced in apply (`LONG_ONLY`). Packets now show "(gap +X%)" after each target. Joins the desk via ensure_traders (fresh $100k).
   Page bot icon `analyst` (target) published to v2. Arena round task prompt updated to nine traders.
-- 2026-11-09 (Tom; on branch `dev`, NOT merged to main, shown on the test artifact TFeQVoVNfs1QEGfPNELRmp only):
+- 2026-11-09 (Tom; on branch `dev`, NOT merged to main, shown only on the new dev artifact "StockScreener Dev" WpBXXhbJEMQfWPvjKKDwiY: own db seeded from v2 on 2026-11-09, no mcp capability, data is a one-off snapshot not refreshed nightly):
   `web/index.html` re-synced from the published v2 page (v2 had changes that were never committed), then:
   **Insights layer** `jobs/app/insights.py` (docstring explains; runs after build_all on its output, no network, ~2 s) → `insights.json`
   beside index.json; the page loads it optionally (`INS`, `loadInsights`) and hides every feature below without it.
