@@ -25,7 +25,7 @@ jobs:
       - name: Restore caches and congress data
         run: |
           mkdir -p cache
-          git fetch origin cache-data && for f in yahoo insiders news; do git show origin/cache-data:$f.json.gz > cache/$f.json.gz || true; done || echo "no cache yet"
+          git fetch origin cache-data && for f in yahoo insiders news universe_log; do git show origin/cache-data:$f.json.gz > cache/$f.json.gz || true; done || echo "no cache yet"
           git fetch origin politics-data && git show origin/politics-data:politics.json > politics.json || echo "no politics data"
       - name: Build
         env:
@@ -36,6 +36,10 @@ jobs:
           set -o pipefail
           python jobs/app/build_all.py --out app-data --cache cache 2>&1 | tee app-build.log
           echo "exit ok" >> app-build.log
+      - name: Insights (report card, quality checks, insider clusters)
+        # reads the build's own output; a failure here must not block publishing the data
+        continue-on-error: true
+        run: python jobs/app/insights.py --app-data app-data --universe-log cache/universe_log.json.gz 2>&1 | tee -a app-build.log
       - name: Save caches
         if: always()
         run: |

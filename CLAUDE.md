@@ -265,6 +265,25 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (4+ analysts +3, else -3) + net upgrades 90d - falling knife; at most 8 per sector / 5 per industry. `long_only: true` in arena.yaml
   is code-enforced in apply (`LONG_ONLY`). Packets now show "(gap +X%)" after each target. Joins the desk via ensure_traders (fresh $100k).
   Page bot icon `analyst` (target) published to v2. Arena round task prompt updated to nine traders.
+- 2026-11-09 (Tom; on branch `dev`, NOT merged to main, shown on the test artifact TFeQVoVNfs1QEGfPNELRmp only):
+  `web/index.html` re-synced from the published v2 page (v2 had changes that were never committed), then:
+  **Insights layer** `jobs/app/insights.py` (docstring explains; runs after build_all on its output, no network, ~2 s) → `insights.json`
+  beside index.json; the page loads it optionally (`INS`, `loadInsights`) and hides every feature below without it.
+  (1) Report card: Research → Strategy Lab → "Report card" (`cardView`): scores 8–10 minus 1–3 over the next 1/3/6 months per score
+  (quarter-end score_history for Overall + 6 categories, weekly rally_hist for Trend/Rally), t on non-overlapping periods, top bucket vs
+  SPY/IWM, split by breadth (share above 200-day), luck bar sqrt(2 ln tests). First run: Valuation and Rally Setup lean right;
+  Overall, Profitability, Management lean backwards; nothing clears the bar. (2) Evidence-weighted Overall `ow` (0.5×–1.5× tilt per
+  category, Analyst 1×) as sort/filter/line under Overall — shown beside the plain average, NOT replacing it (thin evidence; Tom to decide).
+  (3) Quality check `q`: Piotroski-style F-score from metric_history (latest vs 4 quarters earlier), accruals, Altman zone, dilution,
+  interest cover, burn → red flags, "possible value trap"; card on the Scores tab, row tags, filters, presets. (4) Insider cluster
+  score `ic` 0–100 (buyers in best 30-day window of last 90 days, size vs market cap, CEO/CFO, first buying in 9 months, offset by
+  selling); card on the Insiders tab, row tag, filters. (5) `realityStrip` on both Lab views (combinations tried → luck t, survivorship);
+  `--universe-log cache/universe_log.json.gz` appends monthly index membership (app-build.yml restores/saves it) so later backtests
+  can be point-in-time. Market-regime panel: declined by Tom as noise; regime only appears as the breadth split inside the report card.
+  Style pass (Tom picked "B + C"): uppercase tracked nav/tab/page titles + brand, half-pixel hairlines on retina, bigger hero numbers,
+  tab slide/fade (`enter`), sliding indicators (`moveTabInd`, `moveDtInd`), count-up (`countUp`), skeleton loaders (`skel`). Colours,
+  tables, cards unchanged. Go-live checklist: merge dev → main (app-build then writes insights.json), add `insights.json` to the
+  nightly publish task's second `files` list, publish web/index.html to v2 (the dev build only swaps the title and nulls ARENA_TRIGGER).
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
