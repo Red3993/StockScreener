@@ -379,8 +379,20 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .wbar .trk{position:relative;height:8px;border-radius:4px;background:var(--sunk)}
 .wbar .trk i{position:absolute;top:0;bottom:0;border-radius:4px}
 .wbar .trk u{position:absolute;top:-3px;bottom:-3px;left:50%;width:1px;background:var(--faint)}
+
+/* space layer: starfield behind the loading screen and a short star sweep between tabs. One look in both themes (tokens below). */
+:root{--space:7,10,20;--space-ink:#e9edf5;--space-dim:#a3adbf;--space-accent:#8fa5ff}
+.boot{background:radial-gradient(120% 70% at 50% -10%,rgba(60,80,170,.38),transparent 62%),radial-gradient(90% 60% at 85% 110%,rgba(120,70,160,.22),transparent 60%),rgba(var(--space),.84);color:var(--space-ink);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.boot canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.boot-in{position:relative}
+.boot .brand b{color:var(--space-accent)}
+.boot .track{background:rgba(255,255,255,.16)}
+.boot .fill{background:var(--space-accent)}
+.boot .sub{color:var(--space-dim)}
+.boot .err{color:#ff9d90}
+#warp{position:fixed;inset:0;width:100%;height:100%;z-index:19;pointer-events:none}
 </style>
-<div class="boot" id="boot" role="status" aria-live="polite"><div class="boot-in">
+<div class="boot" id="boot" role="status" aria-live="polite"><canvas id="bootStars" aria-hidden="true"></canvas><div class="boot-in">
   <div class="brand">Stock<b>Screener</b></div>
   <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="track" aria-hidden="true"><div class="fill" id="bootFill"></div></div>
@@ -393,6 +405,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <div class="asof" id="asof">Loading data…</div>
 </div></div>
 
+<canvas id="warp" aria-hidden="true" hidden></canvas>
 <main id="view"><div class="empty">Loading…</div></main>
 
 <nav class="tabs" aria-label="Sections">
@@ -987,7 +1000,7 @@ async function load() {
 }
 
 // ================================================================ routing
-function setTab(t) { const a = TAB_ORDER.indexOf(UI.tab), b = TAB_ORDER.indexOf(t); UI.tab = t; saveUI(); render(); window.scrollTo(0, 0); if (a !== b) enter($("#view"), b > a ? 18 : -18); }
+function setTab(t) { const a = TAB_ORDER.indexOf(UI.tab), b = TAB_ORDER.indexOf(t); UI.tab = t; saveUI(); render(); window.scrollTo(0, 0); if (a !== b) { enter($("#view"), b > a ? 18 : -18); Space.warp(b > a ? 1 : -1); } }
 $$(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function render() {
   if (!DATA) return;
@@ -2801,6 +2814,43 @@ function viewResearch() {
   $$("[data-tropen]").forEach(b => b.onclick = e => { if (e.target.closest("[data-open]")) return; UI.trOpen = UI.trOpen === b.dataset.tropen ? null : b.dataset.tropen; const y = scrollY; viewResearch(); scrollTo(0, y); });
   $$("[data-fjump]").forEach(b => b.onclick = () => { UI.resOpen = b.dataset.fjump; viewResearch(); document.getElementById("fund-" + b.dataset.fjump.replace(/[^A-Za-z0-9]/g, ""))?.scrollIntoView({block: "start"}); });
 }
+// ================================================================ space layer: stars behind the loading screen, star sweep between tabs
+const Space = {
+  fit(cv) { const d = Math.min(2, devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight; if (cv.width !== Math.round(w * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); } const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); return [g, w, h]; },
+  stars(n) { return Array.from({length: n}, () => ({x: Math.random(), y: Math.random(), z: 0.25 + Math.random() * 0.75, p: Math.random() * 6.28})); },
+  // slow drifting, twinkling field; stops by itself once the loading screen is removed
+  boot() {
+    const cv = document.getElementById("bootStars"); if (!cv) return;
+    const S = this.stars(170), still = matchMedia("(prefers-reduced-motion: reduce)").matches, t0 = performance.now();
+    const frame = now => {
+      if (!cv.isConnected) return;
+      const [g, w, h] = this.fit(cv), t = (now - t0) / 1000; g.clearRect(0, 0, w, h);
+      for (const s of S) { const x = ((s.x - t * 0.012 * s.z) % 1 + 1) % 1 * w, y = ((s.y - t * 0.004 * s.z) % 1 + 1) % 1 * h, tw = still ? 0.8 : 0.55 + 0.45 * Math.sin(t * (1 + s.z * 2) + s.p);
+        g.globalAlpha = tw * (0.35 + 0.65 * s.z); g.fillStyle = "#fff"; g.beginPath(); g.arc(x, y, 0.5 + s.z * 1.1, 0, 6.2832); g.fill(); }
+      g.globalAlpha = 1; if (!still) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  },
+  // tab change: a brief translucent night veil with stars streaking across in the direction of travel
+  warp(dir) {
+    const cv = document.getElementById("warp"); if (!cv || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const S = this.stars(110), t0 = performance.now(), D = 520, run = (this.run = (this.run || 0) + 1); cv.hidden = false;
+    const frame = now => {
+      if (run !== this.run) return;
+      const k = Math.min(1, (now - t0) / D), [g, w, h] = this.fit(cv), a = Math.pow(Math.sin(Math.PI * k), 0.9), ease = 1 - Math.pow(1 - k, 3);
+      g.clearRect(0, 0, w, h); g.fillStyle = `rgba(7,10,20,${(0.62 * a).toFixed(3)})`; g.fillRect(0, 0, w, h);
+      g.lineCap = "round"; g.strokeStyle = "#fff"; g.fillStyle = "#fff";
+      for (const s of S) { const sp = 0.25 + s.z * 0.75, x = ((s.x - dir * ease * sp * 0.9) % 1 + 1) % 1 * w, y = s.y * h, len = dir * sp * 10 * (1 - k) * a;
+        g.globalAlpha = a * (0.35 + 0.65 * s.z); g.lineWidth = 0.8 + s.z * 1.3;
+        if (Math.abs(len) > 1.5) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y); g.stroke(); } else { g.beginPath(); g.arc(x, y, 0.5 + s.z * 1.1, 0, 6.2832); g.fill(); } }
+      g.globalAlpha = 1;
+      if (k < 1) requestAnimationFrame(frame); else { g.clearRect(0, 0, w, h); cv.hidden = true; }
+    };
+    requestAnimationFrame(frame);
+  },
+};
+Space.boot();
+
 // ================================================================ motion helpers (all skipped when the device asks for reduced motion)
 const TAB_ORDER = ["stocks", "watch", "ideas", "arena", "research", "cal", "about"];
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
