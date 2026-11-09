@@ -1,4 +1,4 @@
-<title>StockScreener</title>
+<title>StockScreener v2</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -247,6 +247,25 @@ tr:last-child td{border-bottom:0}
 .hl .meta{font-size:11.5px;color:var(--faint)}
 .suggest button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 10px;font-size:12.5px;color:var(--muted)}
 .thinking{color:var(--muted);font-style:italic}
+.stag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid}
+.stag.new{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.stag.held{color:var(--muted);border-color:var(--line);background:var(--sunk)}
+.stag.drop{color:var(--down);border-color:color-mix(in srgb,var(--down) 45%,var(--line));background:color-mix(in srgb,var(--down) 10%,transparent)}
+.slegend{display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted);margin:0 0 10px}
+.dropsec{margin-top:18px;padding-top:12px;border-top:2px dashed color-mix(in srgb,var(--down) 40%,var(--line))}
+.dropsec h4{font-family:var(--f-display);font-size:15px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+.droprow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
+.droprow:first-of-type{border-top:0}
+tr.dsep td{padding:12px 6px 6px;border-bottom:1px solid var(--line);border-top:2px dashed color-mix(in srgb,var(--down) 40%,var(--line))}
+tr.dropped td{color:var(--muted)}
+.pstat{display:grid;gap:4px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px 12px;margin:0 0 12px}
+.pstat.run{border-color:var(--accent)} .pstat.ok{border-color:var(--up)} .pstat.ok b{color:var(--up)} .pstat.bad{border-color:var(--down)} .pstat.bad b{color:var(--down)}
+.psteps{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:2px;font-size:13px;color:var(--muted)}
+.psteps li.done{color:var(--up)} .psteps li.now{color:var(--fg);font-weight:600}
+.pbar{height:4px;border-radius:2px;background:var(--sunk);overflow:hidden;margin-top:4px} .pbar i{display:block;height:100%;background:var(--accent);transition:width .8s}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}.pbar i{transition:none}}
 
 /* calendar */
 .month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:16px}
@@ -351,6 +370,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => { const s = String(u ?? "").trim(); return /^https?:\/\//i.test(s) ? s : "#"; };   // links from feeds: http(s) only, never javascript:
 const CATS = ["Valuation","Profitability","Financial Health","Growth","Dividends","Management","Analyst"];
 const CAT_SHORT = {"Valuation":"Val","Profitability":"Prof","Financial Health":"Hlth","Growth":"Grow","Dividends":"Div","Management":"Mgmt","Analyst":"Anl"};
 const sc = n => n == null ? "var(--sunk)" : `var(--s${Math.max(1, Math.min(10, Math.round(n)))})`;
@@ -367,7 +387,8 @@ const timing = r => TIMING.map(([k, l, title]) => { const v = r.ry?.[k];
     : `<span class="sc7 tm" style="background:${sc(v)}" title="${esc(tt)}"><small>${l}</small><b>${v}</b></span>`; }).join("");
 const RALLY_LBL = {revisions: "estimate revisions", drift: "gap up holding", insider: "insider buying", buyback: "buybacks", accumulation: "accumulation",
   squeeze: "short squeeze setup", peer_lag: "lagging peers", near_low: "near 52-week low", rsi_div: "RSI divergence", vol_squeeze: "volatility squeeze"};
-const fmtMoney = (v, d = 2) => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(Number(v)).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
+const NF = {};   // one Intl formatter per decimals setting (building one per call was a hot spot)
+const fmtMoney = (v, d = 2) => v == null ? "—" : (v < 0 ? "−$" : "$") + (NF[d] ||= new Intl.NumberFormat(undefined, {minimumFractionDigits: d, maximumFractionDigits: d})).format(Math.abs(Number(v)));
 const fmtBig = v => { if (v == null) return "—"; const a = Math.abs(v), s = v < 0 ? "−" : "";
   return a >= 1e12 ? s + "$" + (a / 1e12).toFixed(2) + "T" : a >= 1e9 ? s + "$" + (a / 1e9).toFixed(1) + "B" : a >= 1e6 ? s + "$" + (a / 1e6).toFixed(1) + "M" : s + "$" + Math.round(a).toLocaleString(); };
 const pct = (v, d = 1, sign = true) => { if (v == null || !isFinite(v)) return "—"; let x = (v * 100).toFixed(d); if (/^-0(\.0+)?$/.test(x)) x = x.slice(1); return (sign && +x > 0 ? "+" : "") + x + "%"; };
@@ -398,7 +419,7 @@ const pad2 = n => String(n).padStart(2, "0");
 async function getDetail(t) {
   if (BY[t]) return BY[t];
   const r = RB[t]; if (!r) return null;
-  if (!SHARD_CACHE[r.sh]) SHARD_CACHE[r.sh] = fetch(`detail/${pad2(r.sh)}.json`, {cache: "no-cache"}).then(x => { if (!x.ok) throw new Error("HTTP " + x.status); return x.json(); });
+  if (!SHARD_CACHE[r.sh]) SHARD_CACHE[r.sh] = fetch(`detail/${pad2(r.sh)}.json`, {cache: "no-cache"}).then(x => { if (!x.ok) throw new Error("HTTP " + x.status); return x.json(); }).catch(e => { delete SHARD_CACHE[r.sh]; throw e; });
   const shard = await SHARD_CACHE[r.sh];
   for (const [k, v] of Object.entries(shard)) if (!BY[k]) { patchCloses(k, v); BY[k] = v; DER[k] = derive(v); }
   return BY[t] || null;
@@ -512,8 +533,8 @@ const Store = {
     try { return JSON.parse(localStorage.getItem("ss-" + key) || "null"); } catch (e) { return null; }
   },
   async setDoc(key, body) {
-    if (this.db) { try { await this.db.doc("app/" + key).set(body); return; } catch (e) {} }
-    try { localStorage.setItem("ss-" + key, JSON.stringify(body)); } catch (e) {}
+    if (this.db) { try { await this.db.doc("app/" + key).set(body); return "db"; } catch (e) {} }
+    try { localStorage.setItem("ss-" + key, JSON.stringify(body)); return "local"; } catch (e) { return false; }
   },
   async getSyn(t) {
     const key = "syn_" + t.replace(/[^A-Za-z0-9_.-]/g, "_");
@@ -794,10 +815,10 @@ ${marketContext()}`;
           <h4>What moved markets</h4>${list(b.moved)}
           <h4>World events</h4>${list(b.world)}
           <h4>Coming up</h4>${list(b.ahead, true)}
-          ${(b.sources || []).length ? `<details class="small" style="margin-top:10px"><summary class="faint">Sources (${b.sources.length})</summary><ul style="margin-top:6px">${b.sources.map(x => `<li><a class="link" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>${x.src ? ` <span class="faint">· ${esc(x.src)}</span>` : ""}</li>`).join("")}</ul></details>` : ""}
+          ${(b.sources || []).length ? `<details class="small" style="margin-top:10px"><summary class="faint">Sources (${b.sources.length})</summary><ul style="margin-top:6px">${b.sources.map(x => `<li><a class="link" href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a>${x.src ? ` <span class="faint">· ${esc(x.src)}</span>` : ""}</li>`).join("")}</ul></details>` : ""}
           <p class="faint small" style="margin:8px 0 0">${b.by === "nightly" ? "Written by Claude after the close" + (b.web ? " from the news feed plus a web search" : "") : "Written by Claude from the news feed"} · ${esc(new Date(b.generated).toLocaleString())}${stale ? " · newer market data is available, tap Rewrite" : ""}.</p>`
         : `<p class="muted" style="margin-top:14px">${AI.sample ? "No brief yet for this close. Tap Write brief for a summary of what moved markets, world events, and what's coming up." : AI.ready ? "Claude isn't available in this view, so the written brief can't be generated here. Headlines are below." : "Checking AI availability…"}</p>`}
-      ${(M.news || []).length ? `<details style="margin-top:12px"><summary class="faint small">Latest headlines (${M.news.length})</summary><div class="hl">${M.news.slice(0, 30).map(h => `<div><a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.title)}</a><div class="meta">${esc(h.src || "")} · ${esc(new Date(h.ts * 1000).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))}</div></div>`).join("")}</div></details>`
+      ${(M.news || []).length ? `<details style="margin-top:12px"><summary class="faint small">Latest headlines (${M.news.length})</summary><div class="hl">${M.news.slice(0, 30).map(h => `<div><a href="${esc(safeUrl(h.url))}" target="_blank" rel="noopener">${esc(h.title)}</a><div class="meta">${esc(h.src || "")} · ${esc(new Date(h.ts * 1000).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))}</div></div>`).join("")}</div></details>`
         : `<p class="faint small" style="margin-top:12px">No market headlines in this snapshot.</p>`}
     </div>`;
   },
@@ -899,9 +920,10 @@ async function load() {
   await nextFrame();
   buildMetricFields();
   UI.filters = (UI.filters || []).filter(f => f.type !== "range" || FIELDS[f.key]);
-  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}${DATA.quickPrices ? ` <span class="faint" title="Closing prices are in; scores, news and filings update when tonight's full build finishes">· scores updating</span>` : ""}<br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
+  $("#asof").innerHTML = `Prices as of ${esc(fmtDate(DATA.lastDate))}${DATA.quickPrices ? ` <span class="faint" title="Closing prices are in; scores, news and filings update when tonight's full build finishes">· scores updating</span>` : ""}<span class="faint" id="asofStatus"></span><br><span class="faint">${DATA.count.toLocaleString()} stocks</span>`;
   try { render(); } finally { Boot.done(); }
   await Store.init();
+  Status.init();
   await Picked.load().catch(() => {});
   AI.init();
   rerender();
@@ -1007,6 +1029,7 @@ function sortedFiltered() {
   return rows;
 }
 const PAGE = 120;
+let qTimer = null;
 const SCOPES = [["all", "All"], ["IVV", "S&P 500"], ["IJH", "Mid 400"], ["IJR", "Small 600"], ["IWB", "Russell 1000"], ["IWM", "Russell 2000"], ["top", "Top 100"]];
 function viewStocks() {
   const rows = sortedFiltered();
@@ -1031,7 +1054,8 @@ function viewStocks() {
     <p class="disclaimer">For personal research. Not financial advice.</p>`;
   $$("[data-sc]").forEach(b => b.onclick = () => { UI.scope = b.dataset.sc; UI.page = 1; saveUI(); viewStocks(); });
   $("#more") && ($("#more").onclick = () => { UI.page++; const y = window.scrollY; viewStocks(); window.scrollTo(0, y); });
-  const q = $("#q"); q.oninput = () => { UI.q = q.value; UI.page = 1; const pos = q.selectionStart; viewStocks(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  const q = $("#q"); q.oninput = () => { UI.q = q.value; UI.page = 1; clearTimeout(qTimer);   // debounce: redraw once typing pauses
+    qTimer = setTimeout(() => { const c = $("#q"); if (!c || UI.tab !== "stocks") return; const had = document.activeElement === c, pos = c.selectionStart; viewStocks(); const n = $("#q"); if (had) { n.focus(); n.setSelectionRange(pos, pos); } }, 150); };
   $("#sort").onchange = e => { UI.page = 1; UI.sort = e.target.value; UI.dir = DEFAULT_DIR[UI.sort] || "desc"; saveUI(); viewStocks(); };
   $("#dir").onclick = () => { UI.dir = UI.dir === "asc" ? "desc" : "asc"; saveUI(); viewStocks(); };
   $("#openF").onclick = () => Filters.open();
@@ -1284,11 +1308,42 @@ function viewCal() {
 }
 
 // ================================================================ data status
+// ---- refresh status: the nightly and Arena scheduled tasks write app/status_nightly and app/status_arena as they run
+const Status = {
+  docs: {}, on: false,
+  init() {
+    if (this.on || !Store.db) return; this.on = true;
+    for (const k of ["nightly", "arena"]) {
+      try { Store.db.doc("app/status_" + k).onSnapshot(s => { this.docs[k] = s.exists ? s.data() : null; this.paint(); }, () => {}); } catch (e) {}
+    }
+  },
+  live: d => d?.state === "running" && Date.now() - Date.parse(d.updated || d.started || 0) < 6 * 3600e3,
+  paint() {
+    const a = $("#asofStatus"), d = [this.docs.nightly, this.docs.arena].find(this.live);
+    if (a) { a.textContent = d ? (d.job === "arena" ? " · Arena round running…" : " · Updating…") : ""; a.title = d?.step || ""; }
+    const c = $("#refreshCard"); if (c) c.innerHTML = this.html();
+  },
+  html() {
+    const tm = x => { const d = new Date(x); return isNaN(d) ? "" : d.toLocaleString(undefined, {weekday: "short", hour: "numeric", minute: "2-digit"}); };
+    const ST = {done: ["Done", "good"], running: ["Running", "acc"], waiting: ["Waiting", "acc"], failed: ["Failed", "bad"], skipped: ["Skipped", ""], pending: ["Not started", ""]};
+    const job = (title, d) => {
+      if (!d) return `<div class="label" style="margin-top:14px">${title}</div><p class="muted small" style="margin:4px 0 0">No runs reported yet.</p>`;
+      const [l, c] = this.live(d) ? ["Running", "acc"] : d.state === "running" ? ["Stopped reporting", "warn"] : (ST[d.state] || [d.state || "—", ""]);
+      return `<div class="label" style="margin-top:14px">${title} <span class="badge ${c}">${esc(l)}</span></div>
+        <p class="muted small" style="margin:4px 0 8px">${this.live(d) && d.step ? esc(d.step) + " · " : ""}started ${esc(tm(d.started))}${d.updated ? ", updated " + esc(tm(d.updated)) : ""}</p>
+        <dl class="kv">${(d.steps || []).map(x => { const [sl, sc] = ST[x.status] || [x.status || "—", ""];
+          return `<dt>${esc(x.label)}${x.note ? `<div class="faint small">${esc(x.note)}</div>` : ""}</dt><dd><span class="badge ${sc}">${esc(sl)}</span>${x.at ? `<div class="faint small">${esc(tm(x.at))}</div>` : ""}</dd>`; }).join("")}</dl>`;
+    };
+    if (!Store.db) return `<h3>Refresh status</h3><p class="muted small" style="margin-bottom:0">Shows each night's data refresh and Arena round as they run. Open this page inside Claude while signed in to see it.</p>`;
+    return `<h3>Refresh status</h3>${job("Nightly data refresh", this.docs.nightly)}${job("Arena round", this.docs.arena)}`;
+  },
+};
 function viewAbout() {
   const v = DATA.validation || {}, h = DATA.health || [];
   const kinds = {}; h.forEach(x => (kinds[x.kind] ||= []).push(x.detail));
   $("#view").innerHTML = `
     <div style="display:grid;gap:14px">
+    <div class="card" id="refreshCard">${Status.html()}</div>
     <div class="card"><h3>How the scores work</h3>
       <p>Each stock gets seven category scores from 1 to 10: Valuation, Profitability, Financial Health, Growth, Dividends, Management and Analyst. Every metric is ranked as a percentile against the stock’s GICS sector across <b>${DATA.fundamentals_rows.toLocaleString()} stocks</b> in the Russell 1000 and S&P 1500. Valuation ratios blend that sector rank 50/50 with the stock’s own 3-year history. Category scores are deciles of the average percentile. The overall score is the simple average of the categories that apply.</p>
       <p>Banks, insurers and REITs use their own metric sets, chosen by SEC industry code. A non-payer’s Dividends score is N/A, not 1. Tap any category on a stock to see every metric, its raw value and its rank.</p></div>
@@ -1320,7 +1375,7 @@ function viewAbout() {
 try { const th = localStorage.getItem("ss-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
 
 // ================================================================ price chart
-const RN = {"3m": 63, "6m": 126, "1y": 252, "3y": 99999};
+const RN = {"1w": 5, "1m": 21, "3m": 63, "6m": 126, "1y": 252, "3y": 99999};
 function chartIdx(s, range) { const n = RN[range] || 252, from = Math.max(0, s.closes.length - n), idx = []; for (let i = from; i < s.closes.length; i++) if (s.closes[i] != null) idx.push(i); return idx; }
 function priceChart(s, range) {
   const all = s.closes, dates = DATA.dates, s50 = smaArr(all, 50), s200 = smaArr(all, 200), idx = chartIdx(s, range);
@@ -1338,8 +1393,8 @@ function priceChart(s, range) {
   const area = path(all) + `L${X(idx.length - 1).toFixed(1)} ${H - padB}L${X(0).toFixed(1)} ${H - padB}Z`;
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" id="pchart" role="img" aria-label="${esc(s.ticker)} price chart with 50- and 200-day moving averages">
     <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".16"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
-    ${ticks.map(t => `<line x1="${padL}" x2="${W - padR}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${W - padR + 6}" y="${Y(t) + 4}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t >= 1000 ? Math.round(t).toLocaleString() : t.toFixed(t < 20 ? 2 : 0)}</text>`).join("")}
-    ${xt.map(([k, d]) => `<text x="${X(k)}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="${k === 0 ? "start" : k === idx.length - 1 ? "end" : "middle"}">${new Date(d + "T12:00:00").toLocaleDateString(undefined, range === "3m" ? {month: "short", day: "numeric"} : {month: "short", year: "2-digit"})}</text>`).join("")}
+    ${ticks.map(t => `<line x1="${padL}" x2="${W - padR}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${W - padR + 6}" y="${Y(t) + 4}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t >= 1000 ? Math.round(t).toLocaleString() : t.toFixed(t < 20 || (RN[range] < 63 && hi - lo < 10) ? 2 : 0)}</text>`).join("")}
+    ${xt.map(([k, d]) => `<text x="${X(k)}" y="${H - 6}" font-size="11" fill="var(--muted)" text-anchor="${k === 0 ? "start" : k === idx.length - 1 ? "end" : "middle"}">${new Date(d + "T12:00:00").toLocaleDateString(undefined, ["1w", "1m", "3m"].includes(range) ? {month: "short", day: "numeric"} : {month: "short", year: "2-digit"})}</text>`).join("")}
     <path d="${area}" fill="url(#ga)" stroke="none"/>
     <path d="${path(s200)}" fill="none" stroke="var(--sma200)" stroke-width="1.6"/><path d="${path(s50)}" fill="none" stroke="var(--sma50)" stroke-width="1.6"/>
     <path d="${path(all)}" fill="none" stroke="var(--price)" stroke-width="1.8" stroke-linejoin="round"/>
@@ -1632,7 +1687,7 @@ function overviewHtml(s) {
     <div class="card wide" id="pickedBox" hidden></div>
     <div class="card wide">
       ${p.longBusinessSummary ? `<p id="bio" class="clamp" style="margin-top:0">${esc(p.longBusinessSummary)}</p><button class="link" id="moreBio" style="font-size:13px">More</button>` : `<p class="muted" style="margin-top:0">No company description in this snapshot.</p>`}
-      <div class="pill-row" style="margin:10px 0 14px">${hq ? `<span class="badge">${esc(hq)}</span>` : ""}${p.fullTimeEmployees ? `<span class="badge">${Number(p.fullTimeEmployees).toLocaleString()} employees</span>` : ""}${p.website ? `<a class="badge acc" href="${esc(p.website)}" target="_blank" rel="noopener">${esc(p.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>` : ""}${s.sic_desc ? `<span class="badge">SIC: ${esc(s.sic_desc.toLowerCase())}</span>` : ""}</div>
+      <div class="pill-row" style="margin:10px 0 14px">${hq ? `<span class="badge">${esc(hq)}</span>` : ""}${p.fullTimeEmployees ? `<span class="badge">${Number(p.fullTimeEmployees).toLocaleString()} employees</span>` : ""}${p.website ? `<a class="badge acc" href="${esc(safeUrl(p.website))}" target="_blank" rel="noopener">${esc(p.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>` : ""}${s.sic_desc ? `<span class="badge">SIC: ${esc(s.sic_desc.toLowerCase())}</span>` : ""}</div>
       <div class="stats">
         ${stat("Market cap", fmtBig(s.mcap))}${stat("P/E (trailing)", d.metrics.pe != null ? d.metrics.pe.toFixed(1) + "×" : p.trailingPE ? p.trailingPE.toFixed(1) + "×" : "—")}
         ${stat("Forward P/E", p.forwardPE ? p.forwardPE.toFixed(1) + "×" : "—")}${stat("Dividend yield", d.metrics.div_yield != null ? (d.metrics.div_yield * 100).toFixed(2) + "%" : "None")}
@@ -1663,14 +1718,14 @@ function overviewHtml(s) {
       </dl>
     </div>
     <div class="card"><h3>Recent news <span class="label">last 2 weeks</span></h3>
-      ${news.length ? `<div class="news">${news.map(n => `<a href="${esc(n.url || "#")}" target="_blank" rel="noopener"><b>${esc(n.title)}</b><span class="faint small">${esc(n.publisher || "")}${n.date ? " · " + esc(fmtDate(n.date)) : ""}</span></a>`).join("")}</div>` : `<p class="muted">No headlines in this snapshot.</p>`}
-      ${(s.filings || []).length ? `<div class="label" style="margin-top:14px">SEC filings, last 4 months</div><div class="news">${s.filings.slice(0, 6).map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener"><b>${esc(f.form)}${f.items.length ? " · " + esc(f.items.join(", ")) : ""}</b><span class="faint small">Filed ${esc(fmtDate(f.date))}</span></a>`).join("")}</div>` : ""}</div>
+      ${news.length ? `<div class="news">${news.map(n => `<a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener"><b>${esc(n.title)}</b><span class="faint small">${esc(n.publisher || "")}${n.date ? " · " + esc(fmtDate(n.date)) : ""}</span></a>`).join("")}</div>` : `<p class="muted">No headlines in this snapshot.</p>`}
+      ${(s.filings || []).length ? `<div class="label" style="margin-top:14px">SEC filings, last 4 months</div><div class="news">${s.filings.slice(0, 6).map(f => `<a href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener"><b>${esc(f.form)}${f.items.length ? " · " + esc(f.items.join(", ")) : ""}</b><span class="faint small">Filed ${esc(fmtDate(f.date))}</span></a>`).join("")}</div>` : ""}</div>
   </div>`;
 }
 function chartInner(s, compact = false) {
   const d = DER[s.ticker];
   return `<div class="bar" style="justify-content:space-between;margin-bottom:6px"><h3 style="margin:0">Price</h3>
-      <div class="seg" id="rng">${["3m","6m","1y","3y"].map(r => `<button data-r="${r}" aria-pressed="${UI.range === r}">${r.toUpperCase()}</button>`).join("")}</div></div>
+      <div class="seg" id="rng">${["1w","1m","3m","6m","1y","3y"].map(r => `<button data-r="${r}" aria-pressed="${UI.range === r}">${r.toUpperCase()}</button>`).join("")}</div></div>
     <div id="chartWrap">${priceChart(s, UI.range)}</div>
     <div class="legend"><span><i style="background:var(--price)"></i>Close</span><span><i style="background:var(--sma50)"></i>50-day avg ${fmtMoney(d.sma50)}</span><span><i style="background:var(--sma200)"></i>200-day avg ${fmtMoney(d.sma200)}</span></div>
     <div class="toggles"><button class="tog" data-mk="ins" aria-pressed="${!!UI.mk.ins}"><i style="background:var(--up)"></i>Insider trades</button><button class="tog" data-mk="cong" aria-pressed="${!!UI.mk.cong}"><i style="background:var(--sma200);transform:rotate(45deg)"></i>Congress trades</button>${UI.mk.cong ? `<button class="tog" data-mk="congAll" aria-pressed="${!!UI.mk.congAll}">Include non-committee trades</button>` : ""}</div>
@@ -1942,7 +1997,24 @@ function candidates(n = 45) {
   return out;
 }
 const inScopeIdeas = r => (UI.ideasScope || "all") === "all" || r.ix?.includes(UI.ideasScope);
-const Ideas = {state: null, loadedWeek: null, busy: false, ctl: null};
+const Ideas = {state: null, loadedWeek: null, busy: false, ctl: null, run: null, timer: null};
+// Live status for a picks refresh: shown at the top of the card so it is visible wherever the button was tapped.
+function pickStatusHTML() {
+  const r = Ideas.run; if (!r) return "";
+  const el = Math.max(0, Math.round((Date.now() - r.started) / 1000)), mmss = `${Math.floor(el / 60)}:${String(el % 60).padStart(2, "0")}`;
+  const steps = [["load", "Load candidate data"], ["ai", "Claude reviews candidates"], ["save", "Save picks"]], order = steps.map(x => x[0]);
+  const at = order.indexOf(r.phase);
+  if (r.phase === "done") return `<div class="pstat ok" role="status"><b>✓ Claude’s picks updated</b><span class="small">${r.n} picks saved ${esc(new Date(r.at).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}))}${r.where === "local" ? " · on this device only (couldn’t reach the shared database)" : ""}${r.added != null ? ` · ${r.added} new, ${r.dropped} dropped` : ""}. Took ${mmss}.</span></div>`;
+  if (r.phase === "error" || r.phase === "stopped") return `<div class="pstat ${r.phase === "error" ? "bad" : ""}" role="status"><b>${r.phase === "error" ? "Refresh didn’t finish" : "Refresh stopped"}</b><span class="small">${esc(r.msg || "")} Your previous picks are unchanged.</span></div>`;
+  return `<div class="pstat run" role="status" aria-live="polite"><div style="display:flex;align-items:baseline;gap:8px"><b>Refreshing Claude’s picks…</b><span class="num faint small" style="margin-left:auto">${mmss}</span></div>
+    <ol class="psteps">${steps.map(([k, l], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">${i < at ? "✓" : i === at ? "<i class=\"spin\"></i>" : "○"} ${l}${k === "load" && i === at && r.total ? ` <span class="faint">(${r.loaded}/${r.total})</span>` : ""}${k === "ai" && i === at ? ` <span class="faint">usually 1–3 min</span>` : ""}</li>`).join("")}</ol>
+    <div class="pbar"><i style="width:${r.phase === "load" ? Math.round(15 * (r.loaded || 0) / (r.total || 1)) : r.phase === "ai" ? Math.min(90, 15 + Math.round(75 * el / 150)) : 95}%"></i></div></div>`;
+}
+function paintPickStatus() {
+  const box = $("#pickStatus"); if (box) box.innerHTML = pickStatusHTML();
+  const busy = Ideas.busy; $$("#pickGo, #pickGo2").forEach(b => { b.disabled = busy; if (busy) b.textContent = "Refreshing…"; });
+  const st = $("#pickStop"); if (st) st.hidden = !busy;
+}
 async function viewIdeas() {
   const week = isoWeek(DATA.lastDate), key = "picks_" + week.replace("-", "_");
   const cands = candidates();
@@ -1967,7 +2039,44 @@ async function viewIdeas() {
       const last = await Store.getDoc("picks_" + pw.replace("-", "_")); if (last?.result) Ideas.state = {...last, lastWeek: pw};
     }
   }
+  try { await PickLog.load(); } catch (e) {}
   if (UI.tab === "ideas") renderPicks(week, key, cands);
+}
+// Status tags shared by Claude's Picks and the Arena: new this week, held since a date, dropped this week.
+const STAG = {new: () => `<span class="stag new" title="Added this week">✦ New</span>`,
+  held: d => `<span class="stag held" title="Picked or held since ${esc(fmtDate(d))}">↻ Since ${esc(fmtShort(d))}</span>`,
+  drop: d => `<span class="stag drop" title="Dropped ${esc(fmtDate(d))}">✕ Dropped${d ? " " + esc(fmtShort(d)) : ""}</span>`};
+const stagLegend = () => `<div class="slegend"><span>Key:</span>${STAG.new()}<span>added this week</span>${STAG.held(DATA.lastDate).replace(/Since [^<]*/, "Since date")}<span>kept from earlier</span>${STAG.drop("")}<span>dropped this week</span></div>`;
+// Monday of the trading week that DATA.lastDate falls in (YYYY-MM-DD).
+function weekStart(ds = DATA.lastDate) { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
+// Tickers that were in a pick set earlier this week (or the last set before the week began) but are not in the current set.
+function droppedPicks(st) {
+  if (!st?.generated) return [];
+  const cur = new Set((st.result?.picks || []).map(p => p.ticker)), ws = weekStart(st.dataAsof || DATA.lastDate);
+  let sets = (PickLog.doc?.sets || []).filter(x => x.generated < st.generated).sort((a, b) => a.generated < b.generated ? -1 : 1);
+  if (st.prev && !sets.some(x => x.id === st.prev.generated)) sets.push({id: st.prev.generated, generated: st.prev.generated, dataAsof: st.prev.dataAsof, picks: (st.prev.tickers || []).map(t => ({t, px0: st.prev.px?.[t] ?? null}))});
+  sets.sort((a, b) => a.generated < b.generated ? -1 : 1);
+  const before = sets.filter(x => x.dataAsof < ws), during = sets.filter(x => x.dataAsof >= ws);
+  const seq = [...(before.length ? [before[before.length - 1]] : []), ...during, {dataAsof: st.dataAsof, picks: [...cur].map(t => ({t}))}];
+  const out = {};
+  for (let i = 1; i < seq.length; i++) { const nxt = new Set(seq[i].picks.map(p => p.t));
+    for (const p of seq[i - 1].picks) if (!nxt.has(p.t) && !cur.has(p.t)) {
+      out[p.t] = {t: p.t, lastPicked: seq[i - 1].dataAsof, droppedOn: seq[i].dataAsof, px0: p.px0 ?? null}; } }
+  return Object.values(out).map(x => ({...x, chg: x.px0 && RB[x.t]?.d?.px ? RB[x.t].d.px / x.px0 - 1 : null})).sort((a, b) => a.t < b.t ? -1 : 1);
+}
+// A pick that was also in the previous set: price then, and how far back the unbroken run of picks goes.
+function keptInfo(t, st) {
+  if (!st?.generated) return null;
+  const sets = (PickLog.doc?.sets || []).filter(x => x.generated < st.generated).sort((a, b) => b.generated < a.generated ? -1 : 1);
+  let prior = null;
+  if (st.prev) {
+    if (!(st.prev.tickers || []).includes(t)) return null;
+    const px = st.prev.px?.[t] ?? sets.find(x => x.id === st.prev.generated)?.picks.find(p => p.t === t)?.px0;
+    prior = {date: st.prev.dataAsof, px};
+  } else { const s0 = sets[0]; const p0 = s0?.picks.find(p => p.t === t); if (!p0) return null; prior = {date: s0.dataAsof, px: p0.px0}; }
+  let first = prior; for (const x of sets) { const p0 = x.picks.find(p => p.t === t); if (!p0) { if (x.dataAsof < first.date) break; continue; } if (x.dataAsof <= first.date) first = {date: x.dataAsof, px: p0.px0}; }
+  const now = RB[t]?.d?.px;
+  return {date: prior.date, chg: now && prior.px ? now / prior.px - 1 : null, first: first.date !== prior.date ? {date: first.date, chg: now && first.px ? now / first.px - 1 : null} : null};
 }
 // Market move since a set of picks: median change of S&P 500 stocks from the prices saved with the picks.
 function pxSnapshot() { const o = {}; for (const r of ROWS) if (r.d?.px != null && (r.ix?.includes("IVV") || r.ix?.includes("IWM"))) o[r.t] = r.d.px; return o; }
@@ -1994,20 +2103,25 @@ function renderPicks(week, key, cands) {
       <b>${mv.big ? "The market has moved a lot since these picks." : "There’s newer data since these picks."}</b>
       <span class="small">${mv.sp != null || mv.sm != null ? `Since ${esc(fmtDate(st.dataAsof))}: S&amp;P 500 stocks ${mv.sp != null ? `<span class="${cls(mv.sp)}">${pct(mv.sp)}</span>` : "n/a"} (median)${mv.sm != null ? `, Russell 2000 small caps <span class="${cls(mv.sm)}">${pct(mv.sm)}</span>` : ""}${mv.avg != null ? `; these picks <span class="${cls(mv.avg)}">${pct(mv.avg)}</span> on average` : ""}.` : `Picked from data as of ${esc(fmtDate(st.dataAsof))}.`}</span>
       <div class="bar" style="margin:8px 0 0"><button class="btn ${mv.big ? "primary" : ""} small" id="pickGo2">Refresh Claude’s picks with today’s data</button></div></div>` : "";
-  box.innerHTML = head + banner + (res ? `
+  box.innerHTML = head + `<div id="pickStatus">${pickStatusHTML()}</div>` + banner + (res ? `
     ${st.lastWeek ? `<p class="small muted" style="margin-top:0">These are last week’s picks (${esc(st.lastWeek)}). Refresh to pick for this week.</p>` : ""}
     ${res.week_summary ? `<p style="margin-top:0">${esc(res.week_summary)}</p>` : ""}
+    ${stagLegend()}
     ${st?.prev ? `<p class="small muted" style="margin-top:0">Refreshed from the ${esc(fmtDate(st.prev.dataAsof))} picks: ${added.length ? `new <b>${added.map(esc).join(", ")}</b>` : "no new names"}${dropped.length ? `; dropped ${dropped.map(esc).join(", ")}` : ""}.</p>` : ""}
     <div style="display:grid;gap:14px">${(res.picks || []).filter(p => RB[p.ticker]).map((p, k) => { const r = RB[p.ticker], d = {price: r.d?.px, fromHigh: r.d?.fh}; return `<div class="card pick" style="background:var(--bg)">
-      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="faint num">#${k + 1}</span><h3 style="font-size:20px">${esc(p.ticker)}</h3><span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="badge">${esc(sizeOf(r))}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="faint num">#${k + 1}</span><h3 style="font-size:20px">${esc(p.ticker)}</h3>${(() => { if (!st.prev && !(PickLog.doc?.sets || []).some(x => x.generated < st.generated)) return ""; const ki = keptInfo(p.ticker, st); return ki ? STAG.held(ki.first?.date || ki.date) : STAG.new(); })()}<span class="muted">${esc(r.n)}</span><span class="badge ${THEME_C[p.theme] || ""}">${esc(p.theme || "")}</span><span class="badge">${esc(sizeOf(r))}</span><span class="conv ${p.conviction === "High" ? "up" : p.conviction === "Low" ? "faint" : "muted"}">${esc(p.conviction || "")} conviction</span></div>
       <b>${esc(p.headline || "")}</b>
-      <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span>${st.px?.[p.ticker] && d.price ? `<span class="badge ${d.price >= st.px[p.ticker] ? "good" : "bad"}">${pct(d.price / st.px[p.ticker] - 1)} since picked</span>` : ""}</div>
+      <div class="pill-row">${chip(r.ov, "Overall")}<span class="badge">Valuation ${r.cs?.[0] ?? "–"}/10</span><span class="badge">${esc(r.mo?.rg || "")}</span><span class="badge">${fmtMoney(d.price)} · ${pct(d.fromHigh)} from 52w high</span>${st.px?.[p.ticker] && d.price ? `<span class="badge ${d.price >= st.px[p.ticker] ? "good" : "bad"}">${pct(d.price / st.px[p.ticker] - 1)} since picked</span>` : ""}${(() => { const k = keptInfo(p.ticker, st); if (!k) return "";
+        return `<span class="badge ${k.chg == null ? "" : k.chg >= 0 ? "good" : "bad"}" title="${esc(`Also picked from ${fmtDate(k.date)} data${k.first ? `; on the list since ${fmtDate(k.first.date)} (${pct(k.first.chg)})` : ""}`)}">↻ Kept from ${esc(fmtShort(k.date))}${k.chg != null ? ` · ${pct(k.chg)} since` : ""}</span>${k.first ? `<span class="badge" title="Unbroken run of picks">Since ${esc(fmtShort(k.first.date))} ${pct(k.first.chg)}</span>` : ""}`; })()}</div>
       <div><div class="label">Why it’s flagged</div><ul style="margin:4px 0;padding-left:18px">${(p.why_now || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>
       <div class="md">${md(p.synopsis || "")}</div>
       ${(p.risks || []).length ? `<div><div class="label">Risks</div><ul style="margin:4px 0;padding-left:18px" class="muted">${p.risks.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
       ${p.watch ? `<p class="small muted" style="margin:0"><b>Watch:</b> ${esc(p.watch)}</p>` : ""}
       <div class="bar" style="margin:4px 0 0"><button class="btn small" data-open="${esc(p.ticker)}">Open ${esc(p.ticker)}</button><button class="btn primary small" data-wl="${esc(p.ticker)}">${inLists(p.ticker).length ? "★ On a watchlist" : "+ Watchlist"}</button></div>
     </div>`; }).join("")}</div>
+    ${(() => { const dr = droppedPicks(st); if (!dr.length) return ""; return `<div class="dropsec"><h4>${STAG.drop("")} Dropped this week <span class="label">${dr.length}</span></h4>
+      <p class="small muted" style="margin:0 0 6px">In last week’s final picks or an earlier set this week, but not in the current list. The change is since Claude last picked it, so you can see whether dropping it was right.</p>
+      ${dr.map(x => `<div class="droprow"><span>${tk(x.t)}</span><span class="muted" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(RB[x.t]?.n || "")} · last picked ${esc(fmtShort(x.lastPicked))}, dropped ${esc(fmtShort(x.droppedOn))}${RB[x.t] ? "" : " · no longer in the data"}</span><span class="num ${cls(x.chg)}">${x.chg != null ? pct(x.chg) : "—"}</span></div>`).join("")}</div>`; })()}
     <p class="faint small">Picked ${esc(new Date(st.generated).toLocaleString())} from data as of ${esc(fmtDate(st.dataAsof))}.${st.dataAsof !== DATA.lastDate ? " Newer data is available." : ""}</p>
     <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Refresh picks</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
     : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks the top ${PICKS_N} regardless of company size and explains why each is worth a look. It uses your Claude usage and takes about a minute.</p>
@@ -2015,17 +2129,20 @@ function renderPicks(week, key, cands) {
   $("#pickGo").onclick = () => runPicks(week, key, cands);
   $("#pickGo2") && ($("#pickGo2").onclick = () => runPicks(week, key, cands));
   $("#pickStop").onclick = () => Ideas.ctl?.abort();
+  paintPickStatus();
   $$("[data-open]", box).forEach(b => b.onclick = () => Sheet.open(b.dataset.open));
   $$("[data-wl]", box).forEach(b => b.onclick = async () => { const s = await getDetail(b.dataset.wl); if (s) Sheet.pickList(s); });
 }
 async function runPicks(week, key, cands) {
   if (Ideas.busy) return; Ideas.busy = true; Ideas.ctl = new AbortController();
-  $("#pickGo").disabled = true; $("#pickStop").hidden = false;
-  let out = $("#pickOut"); if (!out) { $("#picksCard").insertAdjacentHTML("beforeend", `<div id="pickOut"></div>`); out = $("#pickOut"); }
-  out.innerHTML = `<p class="thinking">Loading candidate details…</p>`;
-  try { await Promise.all(cands.map(c => getDetail(c.s.t))); } catch (e) { out.innerHTML = `<p class="down small">Couldn’t load stock details. Try again.</p>`; Ideas.busy = false; $("#pickGo").disabled = false; $("#pickStop").hidden = true; return; }
+  Ideas.run = {phase: "load", started: Date.now(), loaded: 0, total: cands.length};
+  clearInterval(Ideas.timer); Ideas.timer = setInterval(paintPickStatus, 1000);
+  const finish = () => { Ideas.busy = false; clearInterval(Ideas.timer); Ideas.timer = null; paintPickStatus(); };
+  paintPickStatus(); $("#pickStatus")?.scrollIntoView({behavior: "smooth", block: "nearest"});
+  try { await Promise.all(cands.map(c => getDetail(c.s.t).then(x => { Ideas.run.loaded++; return x; }))); }
+  catch (e) { Ideas.run = {...Ideas.run, phase: "error", msg: "Couldn’t load stock details. Try again."}; finish(); return; }
   cands = cands.map(c => ({s: BY[c.s.t], o: c.o, size: c.size || sizeOf(c.s)})).filter(c => c.s);
-  out.innerHTML = `<p class="thinking">Reviewing ${cands.length} candidates… this usually takes 1–3 minutes.</p>`;
+  Ideas.run.phase = "ai"; paintPickStatus();
   const block = ({s, o, size}) => { const d = DER[s.ticker];
     const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
     const news = (s.news || []).slice(0, 5).map(n => `  - ${n.date}: ${n.title}`).join("\n");
@@ -2059,13 +2176,22 @@ ${cands.map(block).join("\n\n")}`;
     if (!result || !Array.isArray(result.picks)) throw {code: "invalid_json"};
     const old = Ideas.state, pickPx = {}; for (const p of result.picks) if (RB[p.ticker]?.d?.px != null) pickPx[p.ticker] = RB[p.ticker].d.px;
     const body = {result, generated: new Date().toISOString(), dataAsof: DATA.lastDate, candidates: cands.map(c => c.s.ticker), scope: UI.ideasScope || "all",
-                  px: {...pxSnapshot(), ...pickPx}, prev: old?.result ? {dataAsof: old.dataAsof, generated: old.generated, tickers: (old.result.picks || []).map(p => p.ticker)} : null};
-    await Store.setDoc(key, body); Ideas.state = body;
+                  px: {...pxSnapshot(), ...pickPx}, prev: old?.result ? {dataAsof: old.dataAsof, generated: old.generated, tickers: (old.result.picks || []).map(p => p.ticker),
+                        px: Object.fromEntries((old.result.picks || []).map(p => [p.ticker, old.px?.[p.ticker] ?? null]).filter(([, v]) => v != null))} : null};
+    Ideas.run.phase = "save"; paintPickStatus();
+    const where = await Store.setDoc(key, body);
+    if (!where) throw {code: "save_failed"};
+    Ideas.state = body;
     await PickLog.add(body, week);
+    const prevT = new Set(old?.result?.picks?.map(p => p.ticker) || []), curT = result.picks.map(p => p.ticker);
+    Ideas.run = {...Ideas.run, phase: "done", at: Date.now(), n: curT.length, where,
+                 added: old?.result ? curT.filter(t => !prevT.has(t)).length : null, dropped: old?.result ? [...prevT].filter(t => !curT.includes(t)).length : null};
+    toast(where === "db" ? `Claude’s picks updated: ${curT.length} picks saved` : "Picks saved on this device only");
     if (UI.tab === "ideas") renderPicks(week, key, cands);
   } catch (e) {
-    out.innerHTML = e?.code === "cancelled" ? `<p class="faint small">Stopped.</p>` : `<p class="down small">${esc(e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : AI.errText(e))}</p>`;
-  } finally { Ideas.busy = false; const g = $("#pickGo"); if (g) g.disabled = false; const st = $("#pickStop"); if (st) st.hidden = true; }
+    Ideas.run = {...Ideas.run, phase: e?.code === "cancelled" ? "stopped" : "error",
+                 msg: e?.code === "cancelled" ? "" : e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : e?.code === "save_failed" ? "Claude finished, but the picks couldn’t be saved. Try again." : AI.errText(e)};
+  } finally { finish(); if (UI.tab === "ideas" && Ideas.run?.phase !== "done") renderPicks(week, key, cands); $("#pickStatus")?.scrollIntoView({behavior: "smooth", block: "nearest"}); }
 }
 
 
@@ -2261,11 +2387,15 @@ const Arena = {
     const L = this.logs[this.sel];
     const name = id => P.find(p => p.id === id)?.name || id;
     const DEC = {approve: ["Approved", "good"], resize: ["Resized", "warn"], reject: ["Rejected", "bad"]};
-    const detail = r => `<div class="adetail" style="--pc:${r.p.color}">
-      ${r.s.pos.length ? `<div style="overflow-x:auto"><table><thead><tr><th>Position</th><th class="r">Weight</th><th class="r">Entry</th><th class="r">Now</th><th class="r">P&amp;L</th></tr></thead><tbody>${r.s.pos.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)).map(x => `<tr><td>${tk(x.t)} <span class="badge ${x.shares < 0 ? "bad" : "good"}">${x.shares < 0 ? "Short" : "Long"}</span></td><td class="r num">${(Math.abs(x.val) / r.s.eq * 100).toFixed(1)}%</td><td class="r num">${fmtMoney(x.entry)}</td><td class="r num">${fmtMoney(x.px)}</td><td class="r num ${cls(x.pnl)}">${pct(x.pnl)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small" style="margin:0">All cash.</p>`}
+    const ws = weekStart();
+    const detail = r => { const shut = (r.tr.closed || []).filter(c => (c.until || "") >= ws).slice().reverse();
+      return `<div class="adetail" style="--pc:${r.p.color}">${stagLegend()}
+      ${r.s.pos.length || shut.length ? `<div style="overflow-x:auto"><table><thead><tr><th>Position</th><th class="r">Weight</th><th class="r">Entry</th><th class="r">Now</th><th class="r">P&amp;L</th></tr></thead><tbody>${r.s.pos.sort((a, b) => Math.abs(b.val) - Math.abs(a.val)).map(x => `<tr><td>${tk(x.t)} <span class="badge ${x.shares < 0 ? "bad" : "good"}">${x.shares < 0 ? "Short" : "Long"}</span> ${(x.since || "") >= ws ? STAG.new() : x.since ? STAG.held(x.since) : ""}</td><td class="r num">${(Math.abs(x.val) / r.s.eq * 100).toFixed(1)}%</td><td class="r num">${fmtMoney(x.entry)}</td><td class="r num">${fmtMoney(x.px)}</td><td class="r num ${cls(x.pnl)}">${pct(x.pnl)}</td></tr>`).join("")}${r.s.pos.length ? "" : `<tr><td colspan="5" class="muted small">No open positions: all cash.</td></tr>`}
+        ${shut.length ? `<tr class="dsep"><td colspan="5"><b class="small">Dropped this week</b> <span class="faint small">· closed since ${esc(fmtShort(ws))}; exit price and result</span></td></tr>${shut.map(c => { const ret = c.side === "short" ? c.entry / c.exit - 1 : c.exit / c.entry - 1;
+          return `<tr class="dropped"><td>${tk(c.t)} <span class="badge">${c.side === "short" ? "Short" : "Long"}</span> ${STAG.drop(c.until)}${c.why === "stop" ? ` <span class="badge bad">Stop hit</span>` : ""}</td><td class="r num">—</td><td class="r num">${fmtMoney(c.entry)}</td><td class="r num">${fmtMoney(c.exit)}</td><td class="r num ${cls(ret)}">${pct(ret)}<div class="small ${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</div></td></tr>`; }).join("")}` : ""}</tbody></table></div>` : `<p class="muted small" style="margin:0">All cash.</p>`}
       <p class="small" style="margin:8px 0 0">Cash ${fmtMoney(r.tr.cash, 0)} · realized P&amp;L ${fmtMoney(r.tr.realized || 0, 0)} · worst drawdown ${pct(r.s.dd)} · ${r.tr.trades || 0} trades · ${r.s.approval != null ? Math.round(r.s.approval * 100) + "% of pitches approved" : "no pitches yet"}</p>
       ${(r.tr.closed || []).length ? `<p class="small" style="margin:4px 0 0">Recently closed: ${r.tr.closed.slice(-5).reverse().map(c => `${esc(c.t)} ${c.side} <span class="${cls(c.pnl)}">${fmtMoney(c.pnl, 0)}</span>${c.why === "stop" ? " (stop)" : ""}`).join(", ")}</p>` : ""}
-      ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</div>`;
+      ${lastR?.views?.[r.p.id] ? `<p class="small muted" style="margin:6px 0 0">“${esc(lastR.views[r.p.id])}”</p>` : ""}</div>`; };
     const spark = (h, c) => { if (h.length < 2) return ""; const v = h.map(x => x[1]), lo = Math.min(...v, st.start_cash || 1e5), hi = Math.max(...v, st.start_cash || 1e5), rg = hi - lo || 1, Wd = 200, Hd = 26;
       const pts = v.map((y, i) => `${(i / (v.length - 1) * Wd).toFixed(1)},${(2 + (1 - (y - lo) / rg) * (Hd - 4)).toFixed(1)}`).join(" "), y0 = (2 + (1 - ((st.start_cash || 1e5) - lo) / rg) * (Hd - 4)).toFixed(1);
       return `<svg class="spark" viewBox="0 0 ${Wd} ${Hd}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${Wd}" y1="${y0}" y2="${y0}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`; };
@@ -2714,7 +2844,7 @@ function congressCard(s) {
       <td>${t.chamber ? `<span class="badge" title="${t.chamber === "Senate" ? "Senator" : "Representative"}">${t.chamber === "Senate" ? "Sen." : "Rep."}</span> ` : ""}${esc(t.name)} <span class="faint">${esc((t.party || "?")[0])}-${esc(t.state || "")}</span>${t.tracked ? ` <span class="badge acc">Tracked</span>` : ""}
         <div class="faint" style="font-size:11.5px">${t.committees?.length ? "Committee: " + esc(t.committees.join("; ")) : t.tracked ? esc(t.tracked) : "No committee link"}</div></td>
       <td><span class="${/Purchase/.test(t.type) ? "up" : /Sale/.test(t.type) ? "down" : ""}">${esc(t.type || "")}</span>${t.asset_type === "OP" ? ` <span class="badge warn">Options</span>` : ""}<div class="faint" style="font-size:11.5px">${esc(t.owner || "")}${t.desc ? " · " + esc(t.desc) : ""}</div></td>
-      <td class="r num">${esc(amtRange(t))}${t.url ? `<div><a class="link" href="${esc(t.url)}" target="_blank" rel="noopener">Filing</a></div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
+      <td class="r num">${esc(amtRange(t))}${t.url ? `<div><a class="link" href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener">Filing</a></div>` : ""}</td></tr>`).join("")}</tbody></table></div>`
       : `<p class="muted">${UI.congAll ? "No member of the House or Senate reported trading this stock in the last 3 years." : "No trades by members whose committees oversee this sector, or by tracked traders."}</p>`}
     <p class="faint small" style="margin:8px 0 0">House and Senate periodic transaction reports. House: parsed from the Clerk’s e-filed PDFs (${st.filings ?? "?"} filings; ${st.paper_skipped ?? "?"} scanned paper filings not read). Senate: ${st.senate ? `${(st.senate.trades || 0).toLocaleString()} trades from ${(st.senate.reports || 0).toLocaleString()} reports, via the open Kadoa congress-trading dataset (a daily copy of the Senate’s eFD filings, since the Senate site blocks cloud servers)` : "not loaded in this build"}. Members must report within 45 days, so filings lag trades. Amounts are ranges. Committee links use current assignments, which may differ from when the trade happened.</p></div>`;
 }
