@@ -197,6 +197,9 @@ tr:last-child td{border-bottom:0}
 .gcap b{font-weight:600}
 .rangebar.gb{margin:4px 4px 8px}
 .vsel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--sunk);border-radius:8px}
+.vax{position:relative;height:16px;margin:4px 4px 0;font:11px var(--f-mono);color:var(--muted)}
+.vax span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.vax span:first-child{transform:none}.vax span:last-child{transform:translateX(-100%)}
 .vrow{font-size:12px;color:var(--muted);margin:10px 0 0}
 .vsw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .feed{display:grid;gap:0;max-height:340px;overflow-y:auto}
@@ -2892,12 +2895,115 @@ function fundBoard(list) {
       ${fs.map(x => `<tr class="trow" data-fjump="${esc(x.f.name)}"><td>${esc(x.f.name)}${x.f.stale ? ` <span class="badge warn">stale</span>` : ""} <span class="faint small">${esc(x.f.manager || "")}</span></td><td><span class="tier ${x.tier[1]}">${x.tier[0]}</span></td><td class="r num ${cls(x.ex)}"><b>${pct(x.ex)}</b></td><td class="r num">${x.c.beat}/${x.c.periods}</td><td>${exSvg([[x.c.start, 0], ...x.rel])}</td></tr>`).join("")}</tbody></table></div>
     <p class="faint small" style="margin:8px 0 0">Beats the market = 2%+ a year ahead of the S&amp;P 500 and ahead in more than half of the quarters (6+ quarters of history). Tap a fund to open its holdings.</p></div>`;
 }
+// ================================================================ Research → Valuation (P/E-implied price across the whole universe)
+let VLSEL = null, VLN = 25, VLPTS = [];
+const VL_SIZES = ["Large cap", "Mid cap", "Small cap"];
+const vlMed = a => { a = a.filter(x => x != null && isFinite(x)).sort((x, y) => x - y); return a.length ? a[a.length >> 1] : null; };
+function valRows() {
+  const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", minU = UI.vMin;
+  const out = [];
+  for (const r of ROWS) {
+    const v = INS.val?.[r.t]; if (!v || !v[mode]) continue;
+    if (sec && r.sec !== sec) continue;
+    if (size && sizeOf(r) !== size) continue;
+    const px = r.d?.px; if (!px) continue;
+    const [lo, base, hi] = v[mode], up = base / px - 1;
+    if (minU != null && up * 100 < minU) continue;
+    out.push({r, v, px, lo, base, hi, up, au: r.m?.target_upside ?? null});
+  }
+  return out;
+}
+function valScatter(rows) {
+  const pts = rows.filter(o => o.v.fpe != null && o.v.g != null);
+  const W = 340, H = 280, L = 46, R = 12, T = 12, B = 32;
+  const XM = Math.min(100, Math.max(20, Math.ceil(qtile(pts.map(o => o.v.fpe), 0.95) * 1.1 / 10) * 10));
+  const YL = Math.max(-0.5, Math.min(0, Math.floor(qtile(pts.map(o => o.v.g), 0.05) * 10) / 10));
+  const YH = Math.min(1, Math.max(0.2, Math.ceil(qtile(pts.map(o => o.v.g), 0.95) * 10) / 10));
+  const inb = o => o.v.fpe <= XM && o.v.g >= YL && o.v.g <= YH;
+  const X = x => L + x / XM * (W - L - R), Y = y => T + (YH - y) / (YH - YL) * (H - T - B);
+  const xStep = XM <= 30 ? 5 : XM <= 60 ? 10 : 20, yStep = (YH - YL) <= 0.6 ? 0.1 : 0.2, xt = [], yt = [];
+  for (let x = 0; x <= XM; x += xStep) xt.push(x);
+  for (let y = YL; y <= YH + 1e-9; y += yStep) yt.push(Math.round(y * 100) / 100);
+  const grid = xt.map(x => `<line x1="${X(x)}" x2="${X(x)}" y1="${T}" y2="${H - B}" stroke="var(--line)" stroke-width="0.5"/><text x="${X(x)}" y="${H - B + 13}" font-size="10" text-anchor="middle" fill="var(--muted)">${x}×</text>`).join("")
+    + yt.map(y => `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="${y === 0 ? "var(--faint)" : "var(--line)"}" stroke-width="${y === 0 ? 1 : 0.5}"/><text x="${L - 5}" y="${Y(y) + 3}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(y * 100)}%</text>`).join("");
+  const shown = pts.filter(inb), off = pts.length - shown.length;
+  VLPTS = shown.map(o => ({t: o.r.t, x: X(o.v.fpe), y: Y(o.v.g)}));
+  const col = o => o.up >= 0.25 ? "var(--up)" : o.up <= -0.25 ? "var(--down)" : "var(--muted)";
+  const r0 = shown.length > 600 ? 2.2 : 3.2;
+  const dots = shown.map(o => `<circle cx="${X(o.v.fpe).toFixed(1)}" cy="${Y(o.v.g).toFixed(1)}" r="${r0}" fill="${col(o)}" opacity="${VLSEL && VLSEL !== o.r.t ? 0.35 : 0.75}"/>`).join("");
+  const so = VLSEL && shown.find(o => o.r.t === VLSEL);
+  const sel = so ? `<circle cx="${X(so.v.fpe)}" cy="${Y(so.v.g)}" r="6" fill="none" stroke="var(--fg)" stroke-width="2"/><text x="${Math.min(W - 30, X(so.v.fpe) + 9)}" y="${Y(so.v.g) - 8}" font-size="11" font-weight="700" fill="var(--fg)" style="paint-order:stroke;stroke:var(--surface);stroke-width:3px">${esc(so.r.t)}</text>` : "";
+  const mx = vlMed(pts.map(o => o.v.fpe)), my = vlMed(pts.map(o => o.v.g));
+  const cross = mx == null ? "" : `<line x1="${X(mx)}" x2="${X(mx)}" y1="${T}" y2="${H - B}" stroke="var(--faint)" stroke-dasharray="4 3"/><line x1="${L}" x2="${W - R}" y1="${Y(my)}" y2="${Y(my)}" stroke="var(--faint)" stroke-dasharray="4 3"/>`;
+  const info = so ? `<div class="vsel"><div><b>${esc(so.r.t)}</b> <span class="muted">${esc(so.r.n)}</span></div><div class="num small">${so.v.fpe}× fwd P/E · ${pct(so.v.g)} EPS growth · implied ${pct(so.up, 0)}</div><button class="btn small" data-vlopen="${esc(so.r.t)}">Open ${esc(so.r.t)}</button></div>` : `<p class="faint small" style="margin:8px 0 0">Tap a dot to see which stock it is.</p>`;
+  return `<div class="card"><h3>P/E vs expected EPS growth <span class="label">${pts.length} stocks</span></h3>
+    <svg viewBox="0 0 ${W} ${H}" class="chart" id="vlsvg" style="cursor:pointer" role="img" aria-label="Scatterplot of forward P/E against expected EPS growth">${grid}${cross}${dots}${sel}
+      <text x="${L + (W - L - R) / 2}" y="${H - 3}" font-size="10.5" text-anchor="middle" fill="var(--muted)">Forward P/E</text>
+      <text transform="translate(9 ${T + (H - T - B) / 2}) rotate(-90)" font-size="10.5" text-anchor="middle" fill="var(--muted)">Expected EPS growth, next year</text></svg>
+    <div class="legend"><span><i style="background:var(--up);border-radius:50%"></i>Implied upside ≥ 25%</span><span><i style="background:var(--muted);border-radius:50%"></i>Within ±25%</span><span><i style="background:var(--down);border-radius:50%"></i>Implied ≤ −25%</span><span><i style="background:none;border-top:2px dashed var(--faint);height:0"></i>Median</span></div>
+    ${info}<p class="faint" style="font-size:11.5px;margin:6px 0 0">Up and left = cheaper for its growth.${off ? ` ${off} outside the axes aren’t drawn.` : ""}</p></div>`;
+}
+function valGauges(rows) {
+  const max = Math.max(120, UI.vMax || 200), sortK = UI.vSort || "up";
+  const P = x => Math.min(100, Math.max(0, x / max * 100)), pc = (a, px) => a / px * 100;
+  const key = {up: o => o.up, au: o => o.au ?? -9, gap: o => o.au == null ? -9 : o.up - o.au, mc: o => o.r.mc || 0}[sortK];
+  const list = [...rows].sort(sortK === "az" ? (a, b) => a.r.t.localeCompare(b.r.t) : (a, b) => key(b) - key(a));
+  const shownL = list.slice(0, VLN);
+  const row = o => {
+    const l = pc(o.lo, o.px), b = pc(o.base, o.px), h = pc(o.hi, o.px), a = o.au != null ? (1 + o.au) * 100 : null;
+    const off = h > max ? " ›" : "";
+    return `<div class="grow" data-vlopen="${esc(o.r.t)}" style="cursor:pointer"><div class="gcap"><span><b>${esc(o.r.t)}</b> <span class="muted small">${esc(o.r.n)}</span></span><span class="num small">Implied <span class="${cls(o.up)}">${pct(o.up, 0)}</span>${o.au != null ? ` · Analysts <span class="${cls(o.au)}">${pct(o.au, 0)}</span>` : ""}</span></div>
+      <div class="rangebar gb"><div class="track"></div><div class="band" style="left:${P(l)}%;width:${Math.max(0.8, P(h) - P(l))}%"></div><div class="base" style="left:${P(b)}%" title="P/E base ${b.toFixed(0)}% of today"></div>${a != null ? `<div class="mean" style="left:${P(a)}%" title="Analyst mean ${a.toFixed(0)}% of today"></div>` : ""}<div class="mark" style="left:${P(100)}%" title="Today’s price = 100%"></div></div>
+      <div class="faint small num" style="margin:-4px 0 0">P/E range ${l.toFixed(0)}%–${h.toFixed(0)}%${off} of today’s price</div></div>`;
+  };
+  const axis = `<div class="vax">${P(100) > 22 ? `<span style="left:0">0%</span>` : ""}<span style="left:${P(100)}%">${P(100) < 14 ? "100%" : "Today = 100%"}</span><span style="left:100%">${max}%</span></div>`;
+  return `<div class="card"><h3>Implied price vs today <span class="label">${rows.length} stocks</span></h3>
+    <p class="faint small" style="margin:0 0 6px">Each bar is a percentage of today’s price: the band is the P/E-implied low–high, the tick is the base case, the dot is the mean analyst target. Anything past the right edge is flagged ›.</p>
+    <div class="bar"><span class="faint small">Sort</span><select class="sel" id="vlsort">${[["up", "Implied upside"], ["au", "Analyst upside"], ["gap", "Implied minus analyst"], ["mc", "Market cap"], ["az", "Ticker"]].map(([k, l]) => `<option value="${k}" ${sortK === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    ${axis}${shownL.map(row).join("") || `<p class="muted">No stocks match these filters.</p>`}
+    ${list.length > VLN ? `<div style="margin-top:10px"><button class="btn small" id="vlmore">Show 25 more (${list.length - VLN} left)</button></div>` : ""}</div>`;
+}
+function valView() {
+  if (!INS?.val) return `<div class="card"><h3>Valuation</h3><p class="muted">Needs the nightly insights file, which isn’t loaded.</p></div>`;
+  const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", max = Math.max(120, UI.vMax || 200);
+  const rows = valRows();
+  const secs = [...new Set(ROWS.map(r => r.sec).filter(Boolean))].sort();
+  const mu = vlMed(rows.map(o => o.up)), ma = vlMed(rows.map(o => o.au));
+  const ctl = `<div class="card"><div class="bar"><select class="sel" id="vlsec" aria-label="Sector"><option value="">All sectors</option>${secs.map(x => `<option ${x === sec ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>
+      <div class="seg" id="vlsize">${[["", "All sizes"], ...VL_SIZES.map(x => [x, x])].map(([k, l]) => `<button data-vls="${k}" aria-pressed="${size === k}">${l}</button>`).join("")}</div></div>
+    <div class="bar"><div class="seg" id="vlmode">${VMODES.map(([k, l]) => `<button data-vlm="${k}" aria-pressed="${mode === k}">${l}</button>`).join("")}</div></div>
+    <div class="bar"><span class="faint small">Bar max</span><div class="seg">${[150, 200, 300, 500].map(x => `<button data-vlx="${x}" aria-pressed="${max === x}">${x}%</button>`).join("")}</div>
+      <input class="sel" id="vlmax" type="number" min="120" max="2000" step="50" value="${max}" style="width:84px" aria-label="Custom bar maximum, percent of today’s price"><span class="faint small">% of price</span></div>
+    <div class="bar" style="margin-bottom:0"><span class="faint small">Only implied upside ≥</span><input class="sel" id="vlmin" type="number" step="10" placeholder="any" value="${UI.vMin ?? ""}" style="width:84px" aria-label="Minimum implied upside, percent"><span class="faint small">%</span></div>
+    <p class="small" style="margin:10px 0 0">${rows.length} stocks · median implied <b class="${cls(mu)}">${mu == null ? "—" : pct(mu, 0)}</b> · median analyst upside <b class="${cls(ma)}">${ma == null ? "—" : pct(ma, 0)}</b></p></div>`;
+  return `${ctl}<div class="grid2" style="margin-top:12px;align-items:start">${valScatter(rows)}${valGauges(rows)}</div>
+    <p class="faint small" style="margin-top:10px">P/E-implied price = today’s price scaled by typical P/E (own 3-year history, sector forward P/E, or an average of both). A yardstick, not a forecast; sector multiples include small caps, and a tiny next-year EPS estimate can inflate the result. Prices and estimates as of ${esc(fmtDate(INS.val_asof || INS.asof))}.</p>`;
+}
+function bindVal() {
+  const rr = () => { const y = scrollY; viewResearch(); scrollTo(0, y); };
+  const set = (k, v) => { UI[k] = v; VLN = 25; VLSEL = null; saveUI(); rr(); };
+  $("#vlsec") && ($("#vlsec").onchange = e => set("vSec", e.target.value));
+  $$("[data-vls]").forEach(b => b.onclick = () => set("vSize", b.dataset.vls));
+  $$("[data-vlm]").forEach(b => b.onclick = () => set("vMode", b.dataset.vlm));
+  $$("[data-vlx]").forEach(b => b.onclick = () => set("vMax", +b.dataset.vlx));
+  $("#vlmax") && ($("#vlmax").onchange = e => { const n = +e.target.value; set("vMax", isFinite(n) ? Math.min(2000, Math.max(120, n)) : 200); });
+  $("#vlmin") && ($("#vlmin").onchange = e => set("vMin", e.target.value === "" || !isFinite(+e.target.value) ? null : +e.target.value));
+  $("#vlsort") && ($("#vlsort").onchange = e => { UI.vSort = e.target.value; saveUI(); rr(); });
+  $("#vlmore") && ($("#vlmore").onclick = () => { VLN += 25; rr(); });
+  $$("[data-vlopen]").forEach(b => b.onclick = () => { UI.dtab = "analysts"; Sheet.open(b.dataset.vlopen); });
+  const sv = $("#vlsvg"); if (sv) sv.onclick = e => {
+    const rc = sv.getBoundingClientRect(), k = 340 / rc.width, x = (e.clientX - rc.left) * k, y = (e.clientY - rc.top) * k;
+    let best = null, bd = 18 * 18; for (const p of VLPTS) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p.t; } }
+    VLSEL = best === VLSEL ? null : best; rr(); };
+}
+
 function viewResearch() {
   const V = UI.resView || "lab";
-  const segs = [["lab", "Strategy Lab"], ["funds", "Funds"], ["people", "People"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
+  const segs = [["lab", "Strategy Lab"], ["val", "Valuation"], ["funds", "Funds"], ["people", "People"], ["corp", "Companies"], ["smart", "Smart money"], ["track", "Congress records"]];
   let body = "";
   if (V === "track") body = trackTables();
   else if (V === "lab") body = labHome();
+  else if (V === "val") body = valView();
   else if (!RES) { body = skelCard("Loading 13F data"); loadResearch(); }
   else if (!RES.filers?.length) body = `<div class="card"><h3>13F holdings</h3><p class="muted">The 13F data hasn't been built yet. It refreshes every Saturday.</p></div>`;
   else if (V === "smart") { const C = RES.consensus || {}; body = `<div class="grid2">${consensusTable("Most owned by tracked funds", C.most_owned)}${consensusTable("Most bought last quarter (new or added)", C.most_bought)}${consensusTable("Most sold last quarter (exited or cut 25%+)", C.most_sold)}</div>
@@ -2913,6 +3019,7 @@ function viewResearch() {
   }
   $("#view").innerHTML = `<div class="title-row" style="margin-bottom:10px"><h1 style="font-size:24px">Research</h1><span class="muted">Who owns what, and whose picks have worked</span></div>
     <div class="rnav">${segs.map(([k, l]) => `<button data-rv="${k}" aria-pressed="${V === k}">${l}</button>`).join("")}</div>${body}<p class="disclaimer">For personal research. Not financial advice.</p>`;
+  if (V === "val") bindVal();
   $$("[data-rv]").forEach(b => b.onclick = () => { UI.resView = b.dataset.rv; viewResearch(); enter($("#view")); });
   $$("[data-fopen]").forEach(b => b.onclick = () => { UI.resOpen = UI.resOpen === b.dataset.fopen ? null : b.dataset.fopen; viewResearch(); });
   $$("#view [data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); Sheet.open(b.dataset.open); });
