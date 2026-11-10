@@ -114,6 +114,65 @@ def quality(row: dict, det: dict) -> dict | None:
             "acc": rnd(acc), "fl": flags, "red": red, "g": grade, "trap": trap}
 
 
+# ------------------------------------------------------------------ implied price (EPS x multiple)
+def val_raw(row: dict, det: dict) -> dict | None:
+    """Per-stock inputs for the implied-price gauge. Forward EPS = analysts' next-fiscal-year estimate (yfinance eps_trend '+1y')."""
+    if (row.get("set") or det.get("metric_set")) == "reit":
+        return None                                    # P/E isn't meaningful for REITs (the app scores them on P/FFO)
+    px = det.get("price") or (row.get("d") or {}).get("px")
+    a = det.get("analyst") or {}
+    et, ee = a.get("eps_trend") or {}, a.get("earnings_estimate") or {}
+    e1, e0 = (et.get("+1y") or {}).get("current"), (et.get("0y") or {}).get("current")
+    g = (ee.get("+1y") or {}).get("growth")
+    if g is None and e0 and e0 > 0 and e1 is not None:
+        g = e1 / e0 - 1
+    if g is not None:
+        g = max(-0.5, min(1.0, g))
+    pe = (row.get("m") or {}).get("pe")
+    ph = [v for v in ((det.get("metric_history") or {}).get("pe") or [])[-12:] if v is not None and v > 0]
+    fpe = px / e1 if (px and e1 and e1 > 0) else None
+    if fpe is not None and not (3 <= fpe <= 150):
+        fpe = None
+    return {"px": px, "e1": e1 if (e1 and e1 > 0) else None, "g": g, "fpe": fpe,
+            "pe": pe if (pe and pe > 0) else None, "ph": ph if len(ph) >= 6 else None, "sec": row.get("sec")}
+
+
+def val_build(raw: dict[str, dict]) -> tuple[dict, dict, dict]:
+    """Sector multiples, then per-stock implied price ranges from own history, sector, and a 50/50 blend."""
+    by_sec: dict[str, list[float]] = {}
+    for v in raw.values():
+        if v["fpe"] is not None:
+            by_sec.setdefault(v["sec"], []).append(v["fpe"])
+    all_f = [x for xs in by_sec.values() for x in xs]
+    q = lambda xs: [float(np.percentile(xs, p)) for p in (25, 50, 75)]
+    vsec = {}
+    for s, xs in by_sec.items():
+        use, whole = (xs, False) if len(xs) >= 8 else (all_f, True)
+        gs = [v["g"] for v in raw.values() if v["sec"] == s and v["g"] is not None and v["fpe"] is not None]
+        vsec[s] = {"n": len(xs), "fpe": [rnd(x, 1) for x in q(use)], "g": rnd(float(np.median(gs)), 3) if gs else None, "all": whole}
+    V, pts = {}, {}
+    for t, v in raw.items():
+        sec = vsec.get(v["sec"])
+        own = sc = None
+        if v["pe"] and v["ph"] and v["px"]:
+            own = [v["px"] * x / v["pe"] for x in q(v["ph"])]            # today's price scaled by (typical own P/E / current P/E)
+        if v["e1"] and sec:
+            sc = [v["e1"] * x for x in sec["fpe"]]
+        if own and sc:
+            bl = [(a + b) / 2 for a, b in zip(own, sc)]
+        else:
+            bl = own or sc
+        if not (own or sc):
+            continue
+        V[t] = {"e": rnd(v["e1"], 2), "g": rnd(v["g"], 3), "fpe": rnd(v["fpe"], 1), "pe": rnd(v["pe"], 1),
+                "ownpe": [rnd(x, 1) for x in q(v["ph"])] if v["ph"] else None,
+                "own": [rnd(x, 2) for x in own] if own else None, "sec": [rnd(x, 2) for x in sc] if sc else None,
+                "bl": [rnd(x, 2) for x in bl]}
+        if v["fpe"] is not None and v["g"] is not None and v["fpe"] <= 80:
+            pts.setdefault(v["sec"], []).append([t, rnd(v["fpe"], 1), rnd(v["g"], 3)])
+    return V, vsec, pts
+
+
 # ------------------------------------------------------------------ insider cluster score
 def insider_cluster(row: dict, det: dict, asof: date) -> dict | None:
     tr = (det.get("insiders") or {}).get("trades") or []
@@ -282,7 +341,7 @@ def main():
     C = np.full((len(tick), nD), np.nan)
     SQ = np.full((7, len(tick), len(hist_dates)), np.nan)        # overall + 6 categories at quarter ends
     SW = np.full((2, len(tick), len(bt_dates)), np.nan)          # rally, trend weekly
-    Q, IC, short_hist = {}, {}, 0
+    Q, IC, short_hist, VR = {}, {}, 0, {}
     for f in sorted(glob.glob(str(root / "detail" / "*.json"))):
         for t, det in json.loads(Path(f).read_text()).items():
             if t not in rows:
@@ -309,6 +368,10 @@ def main():
             c = insider_cluster(r, det, asof)
             if c:
                 IC[t] = c
+            vr = val_raw(r, det)
+            if vr:
+                VR[t] = vr
+    VAL, VSEC, VPTS = val_build(VR)
 
     def entry_after(d):          # first trading day strictly after d
         for k, x in enumerate(dates):
@@ -361,10 +424,11 @@ def main():
 
     out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "asof": dates[-1], "card": card,
            "weights": mult, "weights_note": "0.5x-1.5x tilt from each category's 3- and 6-month report-card t-stat; in-sample, thin evidence",
-           "honesty": honesty, "q": Q, "ic": IC, "ow": OW, "runtime_s": round(time.time() - t0, 1)}
+           "honesty": honesty, "q": Q, "ic": IC, "ow": OW, "val": VAL, "vsec": VSEC, "vpts": VPTS,
+           "runtime_s": round(time.time() - t0, 1)}
     dst = Path(a.out) if a.out else root / "insights.json"
     dst.write_text(json.dumps(out, separators=(",", ":")))
-    print(f"insights: {len(Q)} quality, {len(IC)} insider clusters, {len(OW)} weighted overall, {card['n_tests']} tests, "
+    print(f"insights: {len(Q)} quality, {len(IC)} insider clusters, {len(OW)} weighted overall, {len(VAL)} implied prices, {card['n_tests']} tests, "
           f"luck bar t={card['luck_t']}, {dst.stat().st_size / 1e6:.2f} MB, {out['runtime_s']}s", file=sys.stderr)
 
 

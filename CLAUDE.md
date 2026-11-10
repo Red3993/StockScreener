@@ -290,6 +290,12 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   Style pass (Tom picked "B + C"): uppercase tracked nav/tab/page titles + brand, half-pixel hairlines on retina, bigger hero numbers,
   tab slide/fade (`enter`), sliding indicators (`moveTabInd`, `moveDtInd`), count-up (`countUp`), skeleton loaders (`skel`). Colours,
   tables, cards unchanged. (Went live as v3 the same evening, see the entry above.)
+- 2026-11-10 (Tom, from a Facebook reel on "expected price from earnings and the multiplier"): **P/E-implied price on the Analysts tab**, built on
+  branch `dev-analysts-valuation` for the dev artifact first. `insights.py` adds `val` (per stock), `vsec` (sector forward-P/E quartiles + median growth)
+  and `vpts` (peer dots): own-history = price x (own 12-quarter P/E quartile / current P/E); sector = next-year EPS estimate (yfinance `+1y`) x the sector's
+  forward-P/E quartile (falls back to all stocks under 8 peers; includes small caps, so large caps often sit above it); blend = average. REITs skipped.
+  Page: `valuationCard` (Blend / Own 3-yr / Sector toggle, P/E range bar beside the analyst low-high bar and mean, verdict badge) and `sectorCard`
+  (SVG scatter, sector median P/E vs expected EPS growth, stock as a diamond, peer dots toggle). Not yet backtested; candidate for the report card.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
