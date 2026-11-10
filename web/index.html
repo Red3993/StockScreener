@@ -603,7 +603,7 @@ const Store = {
     }, 350);
   },
   async getDoc(key) {
-    if (this.db) { try { const s = await this.db.doc("app/" + key).get(); return s.exists ? s.data() : null; } catch (e) { return null; } }
+    if (this.db) { try { const s = await this.db.doc("app/" + key).get(); return s.exists ? JSON.parse(JSON.stringify(s.data())) : null; } catch (e) { return null; } }
     try { return JSON.parse(localStorage.getItem("ss-" + key) || "null"); } catch (e) { return null; }
   },
   async setDoc(key, body) {
@@ -612,7 +612,7 @@ const Store = {
   },
   async getSyn(t) {
     const key = "syn_" + t.replace(/[^A-Za-z0-9_.-]/g, "_");
-    if (this.db) { try { const s = await this.db.doc("app/" + key).get(); return s.exists ? s.data() : null; } catch (e) { return null; } }
+    if (this.db) { try { const s = await this.db.doc("app/" + key).get(); return s.exists ? JSON.parse(JSON.stringify(s.data())) : null; } catch (e) { return null; } }
     try { return JSON.parse(localStorage.getItem("ss-" + key) || "null"); } catch (e) { return null; }
   },
   async setSyn(t, body) {
@@ -2188,10 +2188,10 @@ function opportunity(r) {
 const sizeOf = r => r.ix?.includes("IVV") ? "Large cap" : r.ix?.includes("IJH") ? "Mid cap" : r.ix?.includes("IJR") ? "Small cap" : (r.mc || 0) >= 1e10 ? "Large cap" : (r.mc || 0) >= 2e9 ? "Mid cap" : "Small cap";
 // One ranking across all sizes (no size slots). At most 10 per sector so one cheap sector can't fill the pool.
 const PICKS_N = 25;
-function candidates(n = 45) {
+function candidates(n = 100) {
   const ranked = ROWS.filter(r => inScopeIdeas(r) && !partial(r)).map(r => ({s: r, o: opportunity(r), size: sizeOf(r)})).sort((a, b) => b.o.score - a.o.score);
   const per = {}, out = [];
-  for (const x of ranked) { if (out.length >= n) break; if ((per[x.s.sec] = (per[x.s.sec] || 0) + 1) <= 10) out.push(x); }
+  for (const x of ranked) { if (out.length >= n) break; if ((per[x.s.sec] = (per[x.s.sec] || 0) + 1) <= 20) out.push(x); }
   return out;
 }
 const inScopeIdeas = r => (UI.ideasScope || "all") === "all" || r.ix?.includes(UI.ideasScope);
@@ -2205,8 +2205,8 @@ function pickStatusHTML() {
   if (r.phase === "done") return `<div class="pstat ok" role="status"><b>✓ Claude’s picks updated</b><span class="small">${r.n} picks saved ${esc(new Date(r.at).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}))}${r.where === "local" ? " · on this device only (couldn’t reach the shared database)" : ""}${r.added != null ? ` · ${r.added} new, ${r.dropped} dropped` : ""}. Took ${mmss}.</span></div>`;
   if (r.phase === "error" || r.phase === "stopped") return `<div class="pstat ${r.phase === "error" ? "bad" : ""}" role="status"><b>${r.phase === "error" ? "Refresh didn’t finish" : "Refresh stopped"}</b><span class="small">${esc(r.msg || "")} Your previous picks are unchanged.</span></div>`;
   return `<div class="pstat run" role="status" aria-live="polite"><div style="display:flex;align-items:baseline;gap:8px"><b>Refreshing Claude’s picks…</b><span class="num faint small" style="margin-left:auto">${mmss}</span></div>
-    <ol class="psteps">${steps.map(([k, l], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">${i < at ? "✓" : i === at ? "<i class=\"spin\"></i>" : "○"} ${l}${k === "load" && i === at && r.total ? ` <span class="faint">(${r.loaded}/${r.total})</span>` : ""}${k === "ai" && i === at ? ` <span class="faint">usually 1–3 min</span>` : ""}</li>`).join("")}</ol>
-    <div class="pbar"><i style="width:${r.phase === "load" ? Math.round(15 * (r.loaded || 0) / (r.total || 1)) : r.phase === "ai" ? Math.min(90, 15 + Math.round(75 * el / 150)) : 95}%"></i></div></div>`;
+    <ol class="psteps">${steps.map(([k, l], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}">${i < at ? "✓" : i === at ? "<i class=\"spin\"></i>" : "○"} ${l}${k === "load" && i === at && r.total ? ` <span class="faint">(${r.loaded}/${r.total})</span>` : ""}${k === "ai" && i === at ? ` <span class="faint">usually 2–4 min</span>` : ""}</li>`).join("")}</ol>
+    <div class="pbar"><i style="width:${r.phase === "load" ? Math.round(15 * (r.loaded || 0) / (r.total || 1)) : r.phase === "ai" ? Math.min(90, 15 + Math.round(75 * el / 240)) : 95}%"></i></div></div>`;
 }
 function paintPickStatus() {
   const box = $("#pickStatus"); if (box) box.innerHTML = pickStatusHTML();
@@ -2322,7 +2322,7 @@ function renderPicks(week, key, cands) {
       ${dr.map(x => `<div class="droprow"><span>${tk(x.t)}</span><span class="muted" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(RB[x.t]?.n || "")} · last picked ${esc(fmtShort(x.lastPicked))}, dropped ${esc(fmtShort(x.droppedOn))}${RB[x.t] ? "" : " · no longer in the data"}</span><span class="num ${cls(x.chg)}">${x.chg != null ? pct(x.chg) : "—"}</span></div>`).join("")}</div>`; })()}
     <p class="faint small">Picked ${esc(new Date(st.generated).toLocaleString())} from data as of ${esc(fmtDate(st.dataAsof))}.${st.dataAsof !== DATA.lastDate ? " Newer data is available." : ""}</p>
     <div class="bar" style="margin:0"><button class="btn small" id="pickGo">Refresh picks</button><button class="btn small" id="pickStop" hidden>Stop</button></div>`
-    : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks the top ${PICKS_N} regardless of company size and explains why each is worth a look. It uses your Claude usage and takes about a minute.</p>
+    : `<p class="muted" style="margin-top:0">Claude reviews the ${cands.length} candidates below, with their scores, valuation history, momentum, insider and congressional activity and this week’s headlines, then picks the top ${PICKS_N} regardless of company size and explains why each is worth a look. It uses your Claude usage and takes a few minutes.</p>
        <div class="bar" style="margin:0"><button class="btn primary" id="pickGo">Pick this week’s tickers</button><button class="btn small" id="pickStop" hidden>Stop</button></div><div id="pickOut"></div>`);
   $("#pickGo").onclick = () => runPicks(week, key, cands);
   $("#pickGo2") && ($("#pickGo2").onclick = () => runPicks(week, key, cands));
@@ -2338,12 +2338,12 @@ async function runPicks(week, key, cands) {
   const finish = () => { Ideas.busy = false; clearInterval(Ideas.timer); Ideas.timer = null; paintPickStatus(); };
   paintPickStatus(); $("#pickStatus")?.scrollIntoView({behavior: "smooth", block: "nearest"});
   try { await Promise.all(cands.map(c => getDetail(c.s.t).then(x => { Ideas.run.loaded++; return x; }))); }
-  catch (e) { Ideas.run = {...Ideas.run, phase: "error", msg: "Couldn’t load stock details. Try again."}; finish(); return; }
+  catch (e) { Ideas.run = {...Ideas.run, phase: "error", msg: "Couldn’t load stock details. Try again. [" + (e?.message || String(e)) + "]"}; finish(); return; }
   cands = cands.map(c => ({s: BY[c.s.t], o: c.o, size: c.size || sizeOf(c.s)})).filter(c => c.s);
   Ideas.run.phase = "ai"; paintPickStatus();
   const block = ({s, o, size}) => { const d = DER[s.ticker];
     const val = (s.categories?.Valuation?.metrics || []).filter(m => m.value != null).map(m => `${lab(m)} ${fmtMetric(m.key, m.value)} (sector ${ord(m.pct_peer)} pct${m.pct_own != null ? `, own-history ${ord(m.pct_own)} pct = ${m.pct_own > 60 ? "cheap" : m.pct_own < 40 ? "expensive" : "average"} vs its 3y range` : ""})`).join("; ");
-    const news = (s.news || []).slice(0, 5).map(n => `  - ${n.date}: ${n.title}`).join("\n");
+    const news = (s.news || []).slice(0, 3).map(n => `  - ${n.date}: ${n.title}`).join("\n");
     const cg = (s.congress || []).filter(t => t.relevant).slice(0, 4).map(t => `${t.date} ${t.name} ${t.type} ${amtRange(t)}${t.committees?.[0] ? " (" + t.committees[0] + ")" : t.tracked ? " (tracked)" : ""}`).join("; ");
     return `### ${s.ticker} — ${s.name} (${s.sector}; ${size}, market cap ${fmtBig(s.mcap)})
 Opportunity score ${Math.round(o.score)} (${o.why.join("; ")}).
@@ -2380,7 +2380,7 @@ ${cands.map(block).join("\n\n")}`;
     const where = await Store.setDoc(key, body);
     if (!where) throw {code: "save_failed"};
     Ideas.state = body;
-    await PickLog.add(body, week);
+    try { await PickLog.add(body, week); } catch (e) { toast("Picks saved, but the scoreboard log couldn’t be updated."); }
     const prevT = new Set(old?.result?.picks?.map(p => p.ticker) || []), curT = result.picks.map(p => p.ticker);
     Ideas.run = {...Ideas.run, phase: "done", at: Date.now(), n: curT.length, where,
                  added: old?.result ? curT.filter(t => !prevT.has(t)).length : null, dropped: old?.result ? [...prevT].filter(t => !curT.includes(t)).length : null};
@@ -2388,7 +2388,7 @@ ${cands.map(block).join("\n\n")}`;
     if (UI.tab === "ideas") renderPicks(week, key, cands);
   } catch (e) {
     Ideas.run = {...Ideas.run, phase: e?.code === "cancelled" ? "stopped" : "error",
-                 msg: e?.code === "cancelled" ? "" : e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : e?.code === "save_failed" ? "Claude finished, but the picks couldn’t be saved. Try again." : AI.errText(e)};
+                 msg: e?.code === "cancelled" ? "" : e?.code === "invalid_json" ? "Claude’s answer couldn’t be read. Try again." : e?.code === "save_failed" ? "Claude finished, but the picks couldn’t be saved. Try again." : AI.errText(e) + " [" + (e?.code || e?.message || String(e)) + "]"};
   } finally { finish(); if (UI.tab === "ideas" && Ideas.run?.phase !== "done") renderPicks(week, key, cands); $("#pickStatus")?.scrollIntoView({behavior: "smooth", block: "nearest"}); }
 }
 
