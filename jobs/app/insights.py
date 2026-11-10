@@ -134,7 +134,7 @@ def val_raw(row: dict, det: dict) -> dict | None:
     if fpe is not None and not (3 <= fpe <= 150):
         fpe = None
     return {"px": px, "e1": e1 if (e1 and e1 > 0) else None, "g": g, "fpe": fpe,
-            "pe": pe if (pe and pe > 0) else None, "ph": ph if len(ph) >= 6 else None, "sec": row.get("sec")}
+            "pe": pe if (pe and pe > 0) else None, "ph": ph if len(ph) >= 6 else None, "sec": row.get("sec"), "ind": row.get("ind")}
 
 
 def val_build(raw: dict[str, dict]) -> tuple[dict, dict, dict]:
@@ -169,7 +169,7 @@ def val_build(raw: dict[str, dict]) -> tuple[dict, dict, dict]:
                 "own": [rnd(x, 2) for x in own] if own else None, "sec": [rnd(x, 2) for x in sc] if sc else None,
                 "bl": [rnd(x, 2) for x in bl]}
         if v["fpe"] is not None and v["g"] is not None and v["fpe"] <= 80:
-            pts.setdefault(v["sec"], []).append([t, rnd(v["fpe"], 1), rnd(v["g"], 3)])
+            pts.setdefault(v["sec"], []).append([t, rnd(v["fpe"], 1), rnd(v["g"], 3), v.get("ind")])
     return V, vsec, pts
 
 

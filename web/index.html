@@ -190,6 +190,13 @@ tr:last-child td{border-bottom:0}
 .rangebar .band{position:absolute;top:10px;height:12px;border-radius:6px;background:var(--accent-soft);border:1px solid var(--accent);box-sizing:border-box}
 .rangebar .base{position:absolute;top:6px;width:2px;height:20px;margin-left:-1px;background:var(--accent)}
 .rangebar.an .band{background:var(--sunk);border-color:var(--line)}
+.gh{position:relative;height:20px;margin:4px 4px 0}
+.gtoday{position:absolute;transform:translateX(-50%);font:600 11px var(--f-mono);color:var(--fg);white-space:nowrap}
+.grow{margin-top:6px}
+.gcap{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}
+.gcap b{font-weight:600}
+.rangebar.gb{margin:4px 4px 8px}
+.vsel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:var(--sunk);border-radius:8px}
 .vrow{font-size:12px;color:var(--muted);margin:10px 0 0}
 .vsw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .feed{display:grid;gap:0;max-height:340px;overflow-y:auto}
@@ -1709,7 +1716,7 @@ const Sheet = {
     $$(".cat", el).forEach(b => b.onclick = () => { const st = el.scrollTop; UI.openCat = UI.openCat === b.dataset.cat ? null : b.dataset.cat; this.body(); el.scrollTop = st; });
     $$("#congF button", el).forEach(b => b.onclick = () => { UI.congAll = b.dataset.f === "all"; const st = el.scrollTop; this.body(); el.scrollTop = st; });
     $$("#vmode button", el).forEach(b => b.onclick = () => { UI.valMode = b.dataset.vm; saveUI(); const st = el.scrollTop; this.body(); el.scrollTop = st; });
-    $("#vpeers") && ($("#vpeers").onclick = () => { UI.valPeers = UI.valPeers === false; saveUI(); const st = el.scrollTop; this.body(); el.scrollTop = st; });
+    bindSector(s);
     $$("#insF button", el).forEach(b => b.onclick = () => { UI.insiderFilter = b.dataset.f; saveUI(); const st = el.scrollTop; this.body(); el.scrollTop = st; });
     $$("[data-goto]", el).forEach(b => b.onclick = () => { UI.dtab = b.dataset.goto; if (b.dataset.cat) UI.openCat = b.dataset.cat; $$("[data-dt]", el).forEach(x => x.setAttribute("aria-selected", x.dataset.dt === UI.dtab)); this.body(); el.scrollTop = 0; moveDtInd(); enter($("#dbody")); countUp($("#dbody")); });
     $$("[data-rc]", el).forEach(b => b.onclick = () => { UI.tab = "research"; UI.resView = "lab"; UI.labMode = "card"; saveUI(); history.back(); });
@@ -1996,20 +2003,26 @@ function valuationCard(s) {
   const v = INS.val?.[s.ticker];
   if (!v) return `<div class="card">${head}<p class="muted">${s.metric_set === "reit" ? "P/E isn’t meaningful for REITs; the app scores them on P/FFO." : "N/A: needs positive earnings, plus 6+ quarters of P/E history or an analyst EPS estimate."}</p></div>`;
   const mode = UI.valMode && v[UI.valMode] ? UI.valMode : v.bl ? "bl" : (VMODES.find(([k]) => v[k]) || [])[0];
-  const [lo, base, hi] = v[mode], px = DER[s.ticker].price, t = s.analyst?.targets;
-  const marks = [px, lo, hi, t?.low, t?.high].filter(x => x != null);
-  let mn = Math.min(...marks), mx = Math.max(...marks); const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad;
+  const [lo, base, hi] = v[mode], d = DER[s.ticker], px = d.price, t = s.analyst?.targets;
+  const lo52 = d.lo52, hi52 = d.hi52, has52 = lo52 != null && hi52 != null;
+  const hasT = t && t.low != null && t.high != null && t.mean != null;
+  const marks = [px, lo, hi, base, has52 ? lo52 : null, has52 ? hi52 : null, hasT ? t.low : null, hasT ? t.high : null].filter(x => x != null && isFinite(x));
+  let mn = Math.min(...marks), mx = Math.max(...marks); const pad = (mx - mn) * 0.06 || 1; mn = Math.max(0, mn - pad); mx += pad;
   const N = x => (x - mn) / (mx - mn) * 100, P = x => N(x).toFixed(1) + "%", Wd = (a, b) => (N(b) - N(a)).toFixed(1) + "%";
+  const up = x => `<span class="${cls(x / px - 1)}">${pct(x / px - 1, 0)}</span>`;
+  const row = (title, text, a, b, extra) => `<div class="grow"><div class="gcap"><b>${title}</b><span class="num">${text}</span></div>
+    <div class="rangebar gb"><div class="track"></div><div class="band" style="left:${P(a)};width:${Wd(a, b)}"></div>${extra}<div class="mark" style="left:${P(px)}" title="Today’s price"></div></div></div>`;
   const sec = INS.vsec?.[s.sector];
-  const verdict = t?.mean == null ? null : t.mean > hi ? ["Analyst mean above the P/E range", "warn"] : t.mean < lo ? ["Analyst mean below the P/E range", "warn"] : ["Analyst mean inside the P/E range", "good"];
+  const verdict = !hasT ? null : t.mean > hi ? ["Analyst mean above the P/E range", "warn"] : t.mean < lo ? ["Analyst mean below the P/E range", "warn"] : ["Analyst mean inside the P/E range", "good"];
+  const tl = Math.min(92, Math.max(8, N(px))).toFixed(1) + "%";
   return `<div class="card">${head}
-    <div class="seg" id="vmode" style="margin-bottom:6px">${VMODES.filter(([k]) => v[k]).map(([k, l]) => `<button data-vm="${k}" aria-pressed="${k === mode}">${l}</button>`).join("")}</div>
-    <div class="label" style="margin-top:8px">Implied by EPS × multiple <span class="num">${fmtMoney(lo, 0)}–${fmtMoney(hi, 0)}</span> · base ${fmtMoney(base)} <span class="${cls(base / px - 1)}">(${pct(base / px - 1)})</span></div>
-    <div class="rangebar" style="margin-bottom:32px"><div class="track"></div><div class="band" style="left:${P(lo)};width:${Wd(lo, hi)}" title="P/E-implied range"></div><div class="base" style="left:${P(base)}" title="Base case"></div><div class="mark" style="left:${P(px)}" title="Current price"></div><span class="tick" style="left:${P(lo)}">${fmtMoney(lo, 0)}</span><span class="tick" style="left:${P(hi)}">${fmtMoney(hi, 0)}</span></div>
-    ${t && t.low != null && t.high != null ? `<div class="label" style="margin-top:4px">Analyst targets <span class="num">${fmtMoney(t.low, 0)}–${fmtMoney(t.high, 0)}</span> · mean ${fmtMoney(t.mean)} <span class="${cls(t.mean / px - 1)}">(${pct(t.mean / px - 1)})</span></div>
-    <div class="rangebar an" style="margin-bottom:32px"><div class="track"></div><div class="band" style="left:${P(t.low)};width:${Wd(t.low, t.high)}" title="Analyst target range"></div><div class="mean" style="left:${P(t.mean)}" title="Mean target"></div><div class="mark" style="left:${P(px)}" title="Current price"></div><span class="tick" style="left:${P(t.low)}">${fmtMoney(t.low, 0)}</span><span class="tick" style="left:${P(t.high)}">${fmtMoney(t.high, 0)}</span></div>` : `<p class="muted small">No analyst price targets for comparison.</p>`}
-    <div class="vrow"><span class="vsw" style="background:var(--accent-soft);border:1px solid var(--accent)"></span>P/E range &nbsp;<span class="vsw" style="background:var(--accent);width:3px"></span>base &nbsp;<span class="vsw" style="background:var(--fg);width:3px"></span>price today &nbsp;<span class="vsw" style="background:var(--accent);border-radius:50%"></span>analyst mean</div>
-    ${verdict ? `<div style="margin-top:10px"><span class="badge ${verdict[1]}">${verdict[0]}</span>${t.mean ? ` <span class="faint small">P/E base is ${pct(base / t.mean - 1)} vs the analyst mean</span>` : ""}</div>` : ""}
+    <div class="seg" id="vmode" style="margin-bottom:10px">${VMODES.filter(([k]) => v[k]).map(([k, l]) => `<button data-vm="${k}" aria-pressed="${k === mode}">${l}</button>`).join("")}</div>
+    <div class="gh"><span class="gtoday" style="left:${tl}">Today ${fmtMoney(px)}</span></div>
+    ${has52 ? row("52-week range", `Low ${fmtMoney(lo52, 0)} · High ${fmtMoney(hi52, 0)}`, lo52, hi52, "") : ""}
+    ${hasT ? row("Analyst targets", `Low ${fmtMoney(t.low, 0)} · Mean ${fmtMoney(t.mean, 0)} ${up(t.mean)} · High ${fmtMoney(t.high, 0)}`, t.low, t.high, `<div class="mean" style="left:${P(t.mean)}" title="Mean target"></div>`) : `<p class="muted small" style="margin:10px 0 0">No analyst price targets for comparison.</p>`}
+    ${row("P/E-implied price", `Low ${fmtMoney(lo, 0)} · Base ${fmtMoney(base, 0)} ${up(base)} · High ${fmtMoney(hi, 0)}`, lo, hi, `<div class="base" style="left:${P(base)}" title="Base case"></div>`)}
+    <div class="vrow"><span class="vsw" style="background:var(--fg);width:3px"></span>today &nbsp;<span class="vsw" style="background:var(--accent);border-radius:50%"></span>analyst mean &nbsp;<span class="vsw" style="background:var(--accent);width:3px"></span>P/E base &nbsp;<span class="vsw" style="background:var(--accent-soft);border:1px solid var(--accent)"></span>P/E range</div>
+    ${verdict ? `<div style="margin-top:10px"><span class="badge ${verdict[1]}">${verdict[0]}</span> <span class="faint small">P/E base is ${pct(base / t.mean - 1)} vs the analyst mean</span></div>` : ""}
     <dl class="kv" style="margin-top:12px">
       ${v.e != null ? `<dt>Next-year EPS est.</dt><dd>${fmtMoney(v.e)}${v.g != null ? ` <span class="${cls(v.g)}">${pct(v.g)}</span>` : ""}</dd>` : ""}
       <dt>P/E now</dt><dd>${v.pe != null ? v.pe.toFixed(1) + "×" : "—"}${v.fpe != null ? ` <span class="faint">(${v.fpe.toFixed(1)}× fwd)</span>` : ""}</dd>
@@ -2019,35 +2032,75 @@ function valuationCard(s) {
     <p class="faint" style="font-size:11.5px;margin:8px 0 0">Own history = today’s price × (typical P/E ÷ current P/E), 25th–75th percentile of up to 12 quarter-ends. Sector = next-year EPS estimate × the sector’s forward P/E, 25th–75th percentile${sec ? ` across ${sec.all ? "all stocks (few peers)" : sec.n + " stocks"}` : ""} (includes small caps, so big names often sit above it). Blend = average of the two. Prices and estimates as of ${esc(fmtDate(INS.val_asof || INS.asof))}. A yardstick, not a price forecast.</p></div>`;
 }
 const SECSHORT = {"Information Technology": "Tech", "Consumer Discretionary": "Disc", "Consumer Staples": "Staples", "Health Care": "Health", "Communication": "Comm", "Real Estate": "RE", "Financials": "Fin", "Industrials": "Ind", "Materials": "Mat", "Energy": "Energy", "Utilities": "Util"};
+let VSEL = null;
+const qtile = (a, p) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.min(b.length - 1, Math.max(0, Math.floor(p * (b.length - 1))))] : 0; };
 function sectorCard(s) {
-  const head = `<h3>${esc(s.sector)} vs other sectors <span class="label">P/E vs expected EPS growth</span></h3>`;
   if (!INS?.vsec) return "";
-  const v = INS.val?.[s.ticker], peers = UI.valPeers !== false, W = 340, H = 260, L = 46, R = 10, T = 10, B = 32, XM = 45, YL = -0.2, YH = 0.6;
+  const v = INS.val?.[s.ticker], all = INS.vpts?.[s.sector] || [], ind = RB[s.ticker]?.ind || s.profile?.industry || null;
+  const inInd = ind ? all.filter(p => p[3] === ind) : [], auto = inInd.length >= 8 ? "ind" : "sec";
+  const scope = UI.valScope === "sec" || (UI.valScope === "ind" && inInd.length >= 3) ? UI.valScope : auto;
+  const pts = scope === "ind" ? inInd : all, over = !!UI.valOverlay, sName = SECSHORT[s.sector] || s.sector;
+  const title = scope === "ind" ? ind : s.sector;
+  const head = `<h3>${esc(title)} peers <span class="label">P/E vs expected EPS growth</span></h3>`;
+  const meds = over ? Object.entries(INS.vsec).filter(([k, d]) => d.g != null && SECSHORT[k]) : [];
+  const xs = pts.map(p => p[1]).concat(meds.map(([, d]) => d.fpe[1])), ys = pts.map(p => p[2]).concat(meds.map(([, d]) => d.g));
+  if (v?.fpe != null) xs.push(v.fpe);
+  if (v?.g != null) ys.push(v.g);
+  const XM = Math.min(80, Math.max(20, Math.ceil(qtile(xs, 0.95) * 1.1 / 10) * 10, v?.fpe != null ? Math.ceil(v.fpe * 1.1 / 10) * 10 : 0));
+  const YL = Math.max(-0.5, Math.min(0, Math.floor(qtile(ys, 0.05) * 10) / 10, v?.g != null ? Math.floor(v.g * 10) / 10 : 0));
+  const YH = Math.min(1, Math.max(0.2, Math.ceil(qtile(ys, 0.95) * 10) / 10, v?.g != null ? Math.ceil(v.g * 10) / 10 : 0));
+  const W = 340, H = 270, L = 46, R = 12, T = 12, B = 32;
+  const inb = (x, y) => x >= 0 && x <= XM && y >= YL && y <= YH;
   const X = x => L + Math.min(Math.max(x, 0), XM) / XM * (W - L - R), Y = y => T + (YH - Math.min(Math.max(y, YL), YH)) / (YH - YL) * (H - T - B);
-  const grid = [0, 10, 20, 30, 40].map(x => `<line x1="${X(x)}" x2="${X(x)}" y1="${T}" y2="${H - B}" stroke="var(--line)" stroke-width="0.5"/><text x="${X(x)}" y="${H - B + 13}" font-size="10" text-anchor="middle" fill="var(--muted)">${x}×</text>`).join("")
-    + [-0.2, 0, 0.2, 0.4, 0.6].map(y => `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="${y === 0 ? "var(--faint)" : "var(--line)"}" stroke-width="${y === 0 ? 1 : 0.5}"/><text x="${L - 5}" y="${Y(y) + 3}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(y * 100)}%</text>`).join("");
-  const dots = peers ? (INS.vpts?.[s.sector] || []).filter(p => p[1] <= XM && p[2] >= YL && p[2] <= YH && p[0] !== s.ticker).map(p => `<circle cx="${X(p[1]).toFixed(1)}" cy="${Y(p[2]).toFixed(1)}" r="2" fill="var(--faint)" opacity=".5"><title>${esc(p[0])}: ${p[1]}× forward P/E, ${pct(p[2])} EPS growth</title></circle>`).join("") : "";
+  const xStep = XM <= 30 ? 5 : 10, yStep = (YH - YL) <= 0.6 ? 0.1 : 0.2, xt = [], yt = [];
+  for (let x = 0; x <= XM; x += xStep) xt.push(x);
+  for (let y = YL; y <= YH + 1e-9; y += yStep) yt.push(Math.round(y * 100) / 100);
+  const grid = xt.map(x => `<line x1="${X(x)}" x2="${X(x)}" y1="${T}" y2="${H - B}" stroke="var(--line)" stroke-width="0.5"/><text x="${X(x)}" y="${H - B + 13}" font-size="10" text-anchor="middle" fill="var(--muted)">${x}×</text>`).join("")
+    + yt.map(y => `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="${y === 0 ? "var(--faint)" : "var(--line)"}" stroke-width="${y === 0 ? 1 : 0.5}"/><text x="${L - 5}" y="${Y(y) + 3}" font-size="10" text-anchor="end" fill="var(--muted)">${Math.round(y * 100)}%</text>`).join("");
+  const mx = pts.length ? qtile(pts.map(p => p[1]), 0.5) : null, my = pts.length ? qtile(pts.map(p => p[2]), 0.5) : null;
+  const cross = mx == null ? "" : `<line x1="${X(mx)}" x2="${X(mx)}" y1="${T}" y2="${H - B}" stroke="var(--faint)" stroke-width="1" stroke-dasharray="4 3"/><line x1="${L}" x2="${W - R}" y1="${Y(my)}" y2="${Y(my)}" stroke="var(--faint)" stroke-width="1" stroke-dasharray="4 3"/>`;
   const placed = [], clash = (x0, y0, x1, y1) => placed.some(q => x0 < q[2] && x1 > q[0] && y0 < q[3] && y1 > q[1]);
-  const ents = Object.entries(INS.vsec).filter(([k, d]) => d.g != null && SECSHORT[k]).sort((p, q) => (p[0] === s.sector ? -1 : 0) - (q[0] === s.sector ? -1 : 0));
-  const meds = ents.map(([k, d]) => { const me = k === s.sector, x = X(d.fpe[1]), y = Y(d.g), lab = SECSHORT[k], w = lab.length * 5.6 + 2;
-    const cands = [[9, 3, "start"], [-9, 3, "end"], [0, -9, "middle"], [0, 16, "middle"], [9, -8, "start"], [-9, 12, "end"]];
-    let pick = cands[0];
-    for (const c of cands) { const x0 = c[2] === "start" ? x + c[0] : c[2] === "end" ? x + c[0] - w : x - w / 2; if (!clash(x0, y + c[1] - 9, x0 + w, y + c[1] + 2)) { pick = c; break; } }
-    const x0 = pick[2] === "start" ? x + pick[0] : pick[2] === "end" ? x + pick[0] - w : x - w / 2; placed.push([x0, y + pick[1] - 9, x0 + w, y + pick[1] + 2]);
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${me ? 6 : 4.5}" fill="${me ? "var(--accent)" : "var(--muted)"}" stroke="var(--surface)" stroke-width="1.5"><title>${esc(k)} median: ${d.fpe[1]}× forward P/E, ${pct(d.g)} EPS growth</title></circle><text x="${(x + pick[0]).toFixed(1)}" y="${(y + pick[1]).toFixed(1)}" text-anchor="${pick[2]}" font-size="10" fill="${me ? "var(--accent)" : "var(--muted)"}" font-weight="${me ? 700 : 500}">${lab}</text>`; }).join("");
-  let me = "", line = "";
-  if (v && v.fpe != null && v.g != null) { const x = X(v.fpe), y = Y(v.g), sd = INS.vsec[s.sector];
-    me = `<polygon points="${x},${y - 7} ${x + 7},${y} ${x},${y + 7} ${x - 7},${y}" fill="var(--warn)" stroke="var(--surface)" stroke-width="1.5"><title>${esc(s.ticker)}: ${v.fpe}× forward P/E, ${pct(v.g)} EPS growth</title></polygon><text x="${(x + 10).toFixed(1)}" y="${(y - 7).toFixed(1)}" font-size="10.5" font-weight="700" fill="var(--warn)">${esc(s.ticker)}</text>`;
-    if (sd) line = `<p class="small" style="margin:8px 0 0">${esc(s.ticker)} trades at <b>${v.fpe}×</b> forward earnings vs a ${esc(s.sector)} median of ${sd.fpe[1]}× (${v.fpe < sd.fpe[1] ? "cheaper" : "richer"}), with expected EPS growth of <b>${pct(v.g)}</b> vs ${sd.g != null ? pct(sd.g) : "—"} for the sector.</p>`; }
-  else line = `<p class="muted small" style="margin:8px 0 0">${esc(s.ticker)} has no usable forward P/E or growth estimate, so it isn’t plotted.</p>`;
-  return `<div class="card">${head}
-    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Scatterplot of sector median forward P/E against expected EPS growth">${grid}${dots}${meds}${me}
+  const label = (x, y, txt, fill, weight) => { const w = String(txt).length * 5.8 + 2, cands = [[9, 3, "start"], [-9, 3, "end"], [0, -10, "middle"], [0, 17, "middle"], [9, -8, "start"], [-9, 13, "end"]];
+    let pick = cands[0]; const x0f = c => c[2] === "start" ? x + c[0] : c[2] === "end" ? x + c[0] - w : x - w / 2;
+    for (const c of cands) { const x0 = x0f(c); if (x0 >= 0 && x0 + w <= W && !clash(x0, y + c[1] - 9, x0 + w, y + c[1] + 2)) { pick = c; break; } }
+    const x0 = x0f(pick); placed.push([x0, y + pick[1] - 9, x0 + w, y + pick[1] + 2]);
+    return `<text x="${(x + pick[0]).toFixed(1)}" y="${(y + pick[1]).toFixed(1)}" text-anchor="${pick[2]}" font-size="10.5" fill="${fill}" font-weight="${weight}" style="paint-order:stroke;stroke:var(--surface);stroke-width:3px">${esc(txt)}</text>`; };
+  const peers = pts.filter(p => p[0] !== s.ticker), shown = peers.filter(p => inb(p[1], p[2])), off = peers.length - shown.length;
+  const sel = VSEL && shown.find(p => p[0] === VSEL) || null;
+  let me = "", lbl = "";
+  if (v && v.fpe != null && v.g != null && inb(v.fpe, v.g)) { const x = X(v.fpe), y = Y(v.g);
+    me = `<polygon points="${x},${y - 7} ${x + 7},${y} ${x},${y + 7} ${x - 7},${y}" fill="var(--warn)" stroke="var(--surface)" stroke-width="1.5"><title>${esc(s.ticker)}: ${v.fpe}× forward P/E, ${pct(v.g)} EPS growth</title></polygon>`;
+    lbl += label(x, y, s.ticker, "var(--warn)", 700); }
+  const medDots = meds.map(([k, d]) => { const me2 = k === s.sector, x = X(d.fpe[1]), y = Y(d.g);
+    lbl += label(x, y, SECSHORT[k], me2 ? "var(--accent)" : "var(--muted)", me2 ? 700 : 500);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${me2 ? 6 : 5}" fill="${me2 ? "var(--accent)" : "none"}" stroke="${me2 ? "var(--surface)" : "var(--muted)"}" stroke-width="${me2 ? 1.5 : 2}"><title>${esc(k)} median: ${d.fpe[1]}× forward P/E, ${pct(d.g)} EPS growth</title></circle>`; }).join("");
+  if (sel) lbl += label(X(sel[1]), Y(sel[2]), sel[0], "var(--accent)", 700);
+  else if (shown.length <= 14) shown.forEach(p => { lbl += label(X(p[1]), Y(p[2]), p[0], "var(--muted)", 500); });
+  const dots = shown.map(p => `<circle cx="${X(p[1]).toFixed(1)}" cy="${Y(p[2]).toFixed(1)}" r="${sel && sel[0] === p[0] ? 6 : 3.8}" fill="${sel && sel[0] === p[0] ? "var(--accent)" : "var(--muted)"}" opacity="${sel && sel[0] !== p[0] ? 0.5 : 0.85}" pointer-events="none"/>`).join("");
+  const hits = shown.map(p => `<circle data-vp="${esc(p[0])}" cx="${X(p[1]).toFixed(1)}" cy="${Y(p[2]).toFixed(1)}" r="11" fill="transparent" style="cursor:pointer"><title>${esc(p[0])}: ${p[1]}× forward P/E, ${pct(p[2])} EPS growth</title></circle>`).join("");
+  const nm = t => RB[t]?.n || "";
+  const info = sel ? `<div class="vsel"><div><b>${esc(sel[0])}</b> <span class="muted">${esc(nm(sel[0]))}</span></div><div class="num small">${sel[1]}× fwd P/E · ${pct(sel[2])} EPS growth</div><button class="btn small" data-vopen="${esc(sel[0])}">Open ${esc(sel[0])}</button></div>`
+    : `<p class="faint small" style="margin:8px 0 0">Tap a dot to see which stock it is.</p>`;
+  const cmp = v && v.fpe != null && mx != null ? `<p class="small" style="margin:8px 0 0">${esc(s.ticker)} trades at <b>${v.fpe}×</b> forward earnings vs a peer median of ${mx.toFixed(1)}× (${v.fpe < mx ? "cheaper" : "richer"})${v.g != null ? `, with expected EPS growth of <b>${pct(v.g)}</b> vs ${pct(my)}` : ""}.</p>`
+    : `<p class="muted small" style="margin:8px 0 0">${esc(s.ticker)} has no usable forward P/E or growth estimate, so it isn’t plotted.</p>`;
+  return `<div class="card" id="sectorCard">${head}
+    ${ind && inInd.length >= 3 ? `<div class="seg" id="vscope" style="margin-bottom:8px"><button data-vs="ind" aria-pressed="${scope === "ind"}">${esc(ind)} · ${inInd.length}</button><button data-vs="sec" aria-pressed="${scope === "sec"}">${esc(sName)} · ${all.length}</button></div>` : `<p class="faint small" style="margin:0 0 8px">Few stocks share this industry, so the whole ${esc(s.sector)} sector is shown.</p>`}
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Scatterplot of peer forward P/E against expected EPS growth">${grid}${cross}${dots}${medDots}${me}${lbl}${hits}
       <text x="${(L + (W - L - R) / 2)}" y="${H - 3}" font-size="10.5" text-anchor="middle" fill="var(--muted)">Forward P/E</text>
       <text transform="translate(9 ${T + (H - T - B) / 2}) rotate(-90)" font-size="10.5" text-anchor="middle" fill="var(--muted)">Expected EPS growth, next year</text></svg>
-    <div class="legend"><span><i style="background:var(--muted);border-radius:50%"></i>Sector median</span><span><i style="background:var(--accent);border-radius:50%"></i>${esc(SECSHORT[s.sector] || s.sector)}</span><span><i style="background:var(--warn)"></i>${esc(s.ticker)}</span>${peers ? `<span><i style="background:var(--faint);border-radius:50%"></i>Stocks in sector</span>` : ""}</div>
-    <div style="margin-top:8px"><button class="btn small" id="vpeers">${peers ? "Hide" : "Show"} stocks in ${esc(SECSHORT[s.sector] || s.sector)}</button></div>
-    ${line}
-    <p class="faint" style="font-size:11.5px;margin:6px 0 0">Up and left = cheaper for its growth. Medians across every stock in the app’s universe with an analyst estimate; dots past the axes aren’t drawn.</p></div>`;
+    <div class="legend"><span><i style="background:var(--muted);border-radius:50%"></i>Peers</span><span><i style="background:var(--warn)"></i>${esc(s.ticker)}</span><span><i style="background:none;border-top:2px dashed var(--faint);height:0"></i>Peer median</span>${over ? `<span><i style="background:none;border:2px solid var(--muted);border-radius:50%;width:9px;height:9px"></i>Sector medians</span>` : ""}</div>
+    ${info}
+    <div style="margin-top:8px"><button class="btn small" id="vover" aria-pressed="${over}">${over ? "Hide other sectors" : "Overlay other sectors"}</button></div>
+    ${cmp}
+    <p class="faint" style="font-size:11.5px;margin:6px 0 0">Up and left = cheaper for its growth. Peers are stocks with an analyst estimate in the app’s universe${off ? `; ${off} outside the axes aren’t drawn` : ""}.</p></div>`;
+}
+function bindSector(s) {
+  const card = $("#sectorCard"); if (!card) return;
+  const repaint = () => { const sh = $("#sheet"), st = sh.scrollTop; $("#sectorCard").outerHTML = sectorCard(s); bindSector(s); sh.scrollTop = st; };
+  $$("[data-vp]", card).forEach(c => c.onclick = () => { VSEL = c.dataset.vp === VSEL ? null : c.dataset.vp; repaint(); });
+  $$("#vscope button", card).forEach(b => b.onclick = () => { UI.valScope = b.dataset.vs; VSEL = null; saveUI(); repaint(); });
+  const ov = $("#vover", card); if (ov) ov.onclick = () => { UI.valOverlay = !UI.valOverlay; saveUI(); repaint(); };
+  const op = $("[data-vopen]", card); if (op) op.onclick = () => { VSEL = null; Sheet.open(op.dataset.vopen); };
 }
 function insiderCard(s) {
   const ins = s.insiders || {}, all = ins.trades || [], sm = ins.summary || {}, F = UI.insiderFilter;
