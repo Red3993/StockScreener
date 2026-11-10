@@ -265,7 +265,14 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   (4+ analysts +3, else -3) + net upgrades 90d - falling knife; at most 8 per sector / 5 per industry. `long_only: true` in arena.yaml
   is code-enforced in apply (`LONG_ONLY`). Packets now show "(gap +X%)" after each target. Joins the desk via ensure_traders (fresh $100k).
   Page bot icon `analyst` (target) published to v2. Arena round task prompt updated to nine traders.
-- 2026-11-09 (Tom; on branch `dev`, NOT merged to main, shown only on the new dev artifact "StockScreener Dev" WpBXXhbJEMQfWPvjKKDwiY: own db seeded from v2 on 2026-11-09, no mcp capability, data is a one-off snapshot not refreshed nightly):
+- 2026-11-09 evening **v3 is the live app** (Tom: "name it v3, update that going forward, archive v2"). Live artifact = "StockScreener v3"
+  https://claude.ai/artifact/KcAjmHWy26an6NMwyLbjH9 (capabilities db owner-only, mcp Claude Code Remote fire_trigger, sample, user). Its db was
+  copied from v2 after the Nov 9 nightly run. Both scheduled tasks (nightly publish, Arena round) now point at v3 and the nightly publishes
+  `insights.json` (builds it itself if the build didn't). `dev` was merged into `main`. v2 (PNfLwPEaHXADtqegzd8mXm) is archived: retitled,
+  banner, Arena button disconnected, NOT deleted; nothing writes to it. "StockScreener Dev" WpBXXhbJEMQfWPvjKKDwiY stays as the sandbox for
+  trying page changes first (own db, no mcp, ARENA_TRIGGER null, data not refreshed nightly). Page extras added the same evening: starfield
+  loading screen + star sweep between tabs (`Space.boot`, `Space.warp`). The Nov 9 Arena round did not run (account usage limit reached).
+- 2026-11-09 (Tom; built on branch `dev`, first shown on the dev artifact):
   `web/index.html` re-synced from the published v2 page (v2 had changes that were never committed), then:
   **Insights layer** `jobs/app/insights.py` (docstring explains; runs after build_all on its output, no network, ~2 s) → `insights.json`
   beside index.json; the page loads it optionally (`INS`, `loadInsights`) and hides every feature below without it.
@@ -282,8 +289,7 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   can be point-in-time. Market-regime panel: declined by Tom as noise; regime only appears as the breadth split inside the report card.
   Style pass (Tom picked "B + C"): uppercase tracked nav/tab/page titles + brand, half-pixel hairlines on retina, bigger hero numbers,
   tab slide/fade (`enter`), sliding indicators (`moveTabInd`, `moveDtInd`), count-up (`countUp`), skeleton loaders (`skel`). Colours,
-  tables, cards unchanged. Go-live checklist: merge dev → main (app-build then writes insights.json), add `insights.json` to the
-  nightly publish task's second `files` list, publish web/index.html to v2 (the dev build only swaps the title and nulls ARENA_TRIGGER).
+  tables, cards unchanged. (Went live as v3 the same evening, see the entry above.)
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
