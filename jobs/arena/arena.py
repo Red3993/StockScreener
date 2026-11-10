@@ -160,6 +160,18 @@ LAB_FACTORS = {   # live versions of the Strategy Lab factors, from index.json r
 }
 
 
+def trader_min_mcap(tid: str) -> float:
+    """Market-cap floor: the trader's own `min_mcap` in arena.yaml, else $300M for YOLO, else the house floor."""
+    own = next((t.get("min_mcap") for t in CFG["traders"] if t["id"] == tid), None)
+    return own if own else (CFG["limits"]["yolo_min_mcap"] if tid == "yolo" else CFG["limits"]["min_mcap"])
+
+
+def trader_stop_long(tid: str) -> float:
+    """Automatic stop for longs: the trader's own `stop_long` in arena.yaml, else the house stop."""
+    own = next((t.get("stop_long") for t in CFG["traders"] if t["id"] == tid), None)
+    return own if own is not None else CFG["stops"]["long"]
+
+
 LONG_ONLY = {t["id"] for t in CFG["traders"] if t.get("long_only")}   # code-enforced: these traders never short
 SIGNALS: dict | None = None    # signals.json from the Signal Lab (set by cmd_prepare)
 SMART = ("ins_buy", "ins_cluster", "ins_ceo", "cong_buy", "cong_rel")
@@ -263,7 +275,7 @@ def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], l
     if strat:
         ranked = strategy_rank(mk, strat)
         return [t for t, _ in ranked[:30]], []
-    minc = lim["yolo_min_mcap"] if tid == "yolo" else lim["min_mcap"]
+    minc = trader_min_mcap(tid)
     R = [r for r in mk.rows.values() if (r.get("mc") or 0) >= minc and (r.get("d") or {}).get("px")]
     g = lambda r, k, sub=None, dflt=0: ((r.get(k) or {}).get(sub) if sub else r.get(k)) or dflt   # noqa: E731
     cs = lambda r, i: (r.get("cs") or [None] * 7)[i] or 0   # noqa: E731
@@ -300,6 +312,30 @@ def shortlist(mk: Market, tid: str, research: dict | None) -> tuple[list[str], l
             return 1 if ed and mk.date < ed <= f"{mk.date[:8]}{min(28, int(mk.date[8:]) + 10):02d}" else 0
         long = sorted(R, key=lambda r: -((g(r, "mo", "si") or 0) * 20 + (g(r, "ry", "r") or 0) + abs(g(r, "d", "r21") or 0) * 15 + 3 * soon(r)))
         short = sorted(R, key=lambda r: -((g(r, "mo", "st") or 0) / 8 + (g(r, "d", "r63") or 0) * 8 - cs(r, 1)))
+    elif tid == "dividend":
+        # Big-name income (Tom, 2026-11-10): $50B+, yield 2.5-8%, affordable payout, a growth streak. Long only, low turnover.
+        def mm(r, k):
+            return (r.get("m") or {}).get(k)
+        D = []
+        for r in R:
+            y, pe, pf, st_ = mm(r, "div_yield"), mm(r, "payout_earnings"), mm(r, "payout_fcf"), mm(r, "div_growth_streak")
+            if y is None or not (0.025 <= y <= 0.08) or (st_ or 0) < 5:
+                continue
+            if (pe is not None and pe > 0.85) and (pf is None or pf > 0.9):
+                continue   # payout not covered by earnings or free cash flow
+            if g(r, "mo", "rg") == "Falling knife":
+                continue
+            D.append(r)
+        def dscore(r):
+            y, pe, st_ = mm(r, "div_yield"), mm(r, "payout_earnings"), mm(r, "div_growth_streak")
+            return (min(y, 0.06) * 100 + min(st_ or 0, 25) / 3 + cs(r, 4) + cs(r, 2) / 2 + cs(r, 1) / 2
+                    - (max(0.0, (pe or 0.5) - 0.7) * 10) - (max(0.0, y - 0.06) * 100))
+        long, per = [], {}
+        for r in sorted(D, key=lambda r: -dscore(r)):   # spread: at most 6 per sector
+            if per.get(r["sec"], 0) < 6:
+                long.append(r)
+                per[r["sec"]] = per.get(r["sec"], 0) + 1
+        short = []
     elif tid == "analyst":
         # Wall Street's favourites (Tom, 2026-11-04): Strong Buy consensus, big gap to the mean target, preferably 4+ analysts. Long only.
         def gap(r):
@@ -537,7 +573,7 @@ def cmd_apply(a) -> int:
                 entry["decision"], note = "reject", "This trader is long-only."
             elif r.get("decision") in ("approve", "resize"):
                 w = abs(float(r.get("weight") if r.get("weight") is not None else x.get("weight") or 0))
-                minc = lim["yolo_min_mcap"] if tid == "yolo" else lim["min_mcap"]
+                minc = trader_min_mcap(tid)
                 if act in ("buy", "short") and (mk.rows[t].get("mc") or 0) < minc:
                     entry["decision"], note = "reject", "Below the market-cap floor."
                 else:
@@ -664,7 +700,7 @@ def cmd_mark(a) -> int:
             if p["shares"] < 0 and last_mark != d:
                 tr["cash"] -= abs(p["shares"] * px) * CFG["borrow_rate"] * days / 365
             move = px / p["entry"] - 1
-            if (p["shares"] > 0 and move <= CFG["stops"]["long"]) or (p["shares"] < 0 and move >= CFG["stops"]["short"]):
+            if (p["shares"] > 0 and move <= trader_stop_long(tid)) or (p["shares"] < 0 and move >= CFG["stops"]["short"]):
                 pnl = p["shares"] * (px - p["entry"])
                 tr["cash"] += p["shares"] * px - abs(p["shares"] * px) * cost
                 tr["realized"] += pnl
