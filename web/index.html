@@ -2901,13 +2901,19 @@ const VL_SIZES = ["Large cap", "Mid cap", "Small cap"];
 const vlMed = a => { a = a.filter(x => x != null && isFinite(x)).sort((x, y) => x - y); return a.length ? a[a.length >> 1] : null; };
 function valRows() {
   const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", minU = UI.vMin;
-  const out = [];
+  const safe = UI.vSafe !== false, minN = UI.vNA ?? 3, cap = UI.vCap ?? 300;
+  const out = []; out.hidden = 0;
   for (const r of ROWS) {
     const v = INS.val?.[r.t]; if (!v || !v[mode]) continue;
     if (sec && r.sec !== sec) continue;
     if (size && sizeOf(r) !== size) continue;
     const px = r.d?.px; if (!px) continue;
     const [lo, base, hi] = v[mode], up = base / px - 1;
+    if (safe) {   // reliability filters: thin coverage, near-zero or extreme earnings, implausible implied prices
+      const on = v.ownpe?.[1];
+      const bad = (r.a?.n ?? 0) < minN || v.pe == null || v.pe < 3 || v.pe > 100 || (mode !== "sec" && on != null && (on < 3 || on > 100)) || up * 100 > cap || up < -0.9;
+      if (bad) { out.hidden++; continue; }
+    }
     if (minU != null && up * 100 < minU) continue;
     out.push({r, v, px, lo, base, hi, up, au: r.m?.target_upside ?? null});
   }
@@ -2952,7 +2958,7 @@ function valGauges(rows) {
   const row = o => {
     const l = pc(o.lo, o.px), b = pc(o.base, o.px), h = pc(o.hi, o.px), a = o.au != null ? (1 + o.au) * 100 : null;
     const off = h > max ? " ›" : "";
-    return `<div class="grow" data-vlopen="${esc(o.r.t)}" style="cursor:pointer"><div class="gcap"><span><b>${esc(o.r.t)}</b> <span class="muted small">${esc(o.r.n)}</span></span><span class="num small">Implied <span class="${cls(o.up)}">${pct(o.up, 0)}</span>${o.au != null ? ` · Analysts <span class="${cls(o.au)}">${pct(o.au, 0)}</span>` : ""}</span></div>
+    return `<div class="grow" data-vlopen="${esc(o.r.t)}" style="cursor:pointer"><div class="gcap"><span><b>${esc(o.r.t)}</b> <span class="muted small">${esc(o.r.n)}</span></span><span class="num small">Implied <span class="${cls(o.up)}">${pct(o.up, 0)}</span>${o.au != null ? ` · Analysts <span class="${cls(o.au)}">${pct(o.au, 0)}</span> · Gap <span class="${cls(o.up - o.au)}">${pct(o.up - o.au, 0)}</span>` : ""}${o.r.a?.n ? ` <span class="faint">(${o.r.a.n} analysts)</span>` : ""}</span></div>
       <div class="rangebar gb"><div class="track"></div><div class="band" style="left:${P(l)}%;width:${Math.max(0.8, P(h) - P(l))}%"></div><div class="base" style="left:${P(b)}%" title="P/E base ${b.toFixed(0)}% of today"></div>${a != null ? `<div class="mean" style="left:${P(a)}%" title="Analyst mean ${a.toFixed(0)}% of today"></div>` : ""}<div class="mark" style="left:${P(100)}%" title="Today’s price = 100%"></div></div>
       <div class="faint small num" style="margin:-4px 0 0">P/E range ${l.toFixed(0)}%–${h.toFixed(0)}%${off} of today’s price</div></div>`;
   };
@@ -2965,7 +2971,7 @@ function valGauges(rows) {
 }
 function valView() {
   if (!INS?.val) return `<div class="card"><h3>Valuation</h3><p class="muted">Needs the nightly insights file, which isn’t loaded.</p></div>`;
-  const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", max = Math.max(120, UI.vMax || 200);
+  const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", max = Math.max(120, UI.vMax || 200), safe = UI.vSafe !== false;
   const rows = valRows();
   const secs = [...new Set(ROWS.map(r => r.sec).filter(Boolean))].sort();
   const mu = vlMed(rows.map(o => o.up)), ma = vlMed(rows.map(o => o.au));
@@ -2974,6 +2980,9 @@ function valView() {
     <div class="bar"><div class="seg" id="vlmode">${VMODES.map(([k, l]) => `<button data-vlm="${k}" aria-pressed="${mode === k}">${l}</button>`).join("")}</div></div>
     <div class="bar"><span class="faint small">Bar max</span><div class="seg">${[150, 200, 300, 500].map(x => `<button data-vlx="${x}" aria-pressed="${max === x}">${x}%</button>`).join("")}</div>
       <input class="sel" id="vlmax" type="number" min="120" max="2000" step="50" value="${max}" style="width:84px" aria-label="Custom bar maximum, percent of today’s price"><span class="faint small">% of price</span></div>
+    <div class="bar"><div class="seg" id="vlsafe"><button data-vsafe="1" aria-pressed="${safe}">Reliability filter on</button><button data-vsafe="0" aria-pressed="${!safe}">Off</button></div></div>
+    ${safe ? `<div class="bar"><span class="faint small">Min analysts</span><input class="sel" id="vlna" type="number" min="0" max="50" step="1" value="${UI.vNA ?? 3}" style="width:64px" aria-label="Minimum number of analysts"><span class="faint small">Max implied upside</span><input class="sel" id="vlcap" type="number" min="50" step="50" value="${UI.vCap ?? 300}" style="width:84px" aria-label="Maximum implied upside, percent"><span class="faint small">%</span></div>
+    <p class="faint small" style="margin:-4px 0 10px">Also hides stocks whose current P/E is under 3× or over 100× (earnings near zero), whose own-history typical P/E is outside 3–100×, or that are implied to lose over 90%.${rows.hidden ? ` <b>${rows.hidden} hidden.</b>` : ""}</p>` : ""}
     <div class="bar" style="margin-bottom:0"><span class="faint small">Only implied upside ≥</span><input class="sel" id="vlmin" type="number" step="10" placeholder="any" value="${UI.vMin ?? ""}" style="width:84px" aria-label="Minimum implied upside, percent"><span class="faint small">%</span></div>
     <p class="small" style="margin:10px 0 0">${rows.length} stocks · median implied <b class="${cls(mu)}">${mu == null ? "—" : pct(mu, 0)}</b> · median analyst upside <b class="${cls(ma)}">${ma == null ? "—" : pct(ma, 0)}</b></p></div>`;
   return `${ctl}<div class="grid2" style="margin-top:12px;align-items:start">${valScatter(rows)}${valGauges(rows)}</div>
@@ -2988,6 +2997,9 @@ function bindVal() {
   $$("[data-vlx]").forEach(b => b.onclick = () => set("vMax", +b.dataset.vlx));
   $("#vlmax") && ($("#vlmax").onchange = e => { const n = +e.target.value; set("vMax", isFinite(n) ? Math.min(2000, Math.max(120, n)) : 200); });
   $("#vlmin") && ($("#vlmin").onchange = e => set("vMin", e.target.value === "" || !isFinite(+e.target.value) ? null : +e.target.value));
+  $$("[data-vsafe]").forEach(b => b.onclick = () => set("vSafe", b.dataset.vsafe === "1"));
+  $("#vlna") && ($("#vlna").onchange = e => set("vNA", Math.max(0, Math.min(50, Math.round(+e.target.value) || 0))));
+  $("#vlcap") && ($("#vlcap").onchange = e => set("vCap", Math.max(50, +e.target.value || 300)));
   $("#vlsort") && ($("#vlsort").onchange = e => { UI.vSort = e.target.value; saveUI(); rr(); });
   $("#vlmore") && ($("#vlmore").onclick = () => { VLN += 25; rr(); });
   $$("[data-vlopen]").forEach(b => b.onclick = () => { UI.dtab = "analysts"; Sheet.open(b.dataset.vlopen); });
