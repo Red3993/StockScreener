@@ -2016,7 +2016,7 @@ function valuationCard(s) {
       ${v.ownpe ? `<dt>Own typical P/E</dt><dd>${v.ownpe[1]}× <span class="faint">(${v.ownpe[0]}–${v.ownpe[2]}×)</span></dd>` : ""}
       ${sec ? `<dt>${esc(SECSHORT[s.sector] || s.sector)} fwd P/E</dt><dd>${sec.fpe[1]}× <span class="faint">(${sec.fpe[0]}–${sec.fpe[2]}×)</span></dd>` : ""}
     </dl>
-    <p class="faint" style="font-size:11.5px;margin:8px 0 0">Own history = today’s price × (typical P/E ÷ current P/E), 25th–75th percentile of up to 12 quarter-ends. Sector = next-year EPS estimate × the sector’s forward P/E, 25th–75th percentile${sec ? ` across ${sec.all ? "all stocks (few peers)" : sec.n + " stocks"}` : ""} (includes small caps, so big names often sit above it). Blend = average of the two. A yardstick, not a price forecast.</p></div>`;
+    <p class="faint" style="font-size:11.5px;margin:8px 0 0">Own history = today’s price × (typical P/E ÷ current P/E), 25th–75th percentile of up to 12 quarter-ends. Sector = next-year EPS estimate × the sector’s forward P/E, 25th–75th percentile${sec ? ` across ${sec.all ? "all stocks (few peers)" : sec.n + " stocks"}` : ""} (includes small caps, so big names often sit above it). Blend = average of the two. Prices and estimates as of ${esc(fmtDate(INS.val_asof || INS.asof))}. A yardstick, not a price forecast.</p></div>`;
 }
 const SECSHORT = {"Information Technology": "Tech", "Consumer Discretionary": "Disc", "Consumer Staples": "Staples", "Health Care": "Health", "Communication": "Comm", "Real Estate": "RE", "Financials": "Fin", "Industrials": "Ind", "Materials": "Mat", "Energy": "Energy", "Utilities": "Util"};
 function sectorCard(s) {

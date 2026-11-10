@@ -424,7 +424,7 @@ def main():
 
     out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "asof": dates[-1], "card": card,
            "weights": mult, "weights_note": "0.5x-1.5x tilt from each category's 3- and 6-month report-card t-stat; in-sample, thin evidence",
-           "honesty": honesty, "q": Q, "ic": IC, "ow": OW, "val": VAL, "vsec": VSEC, "vpts": VPTS,
+           "honesty": honesty, "q": Q, "ic": IC, "ow": OW, "val": VAL, "vsec": VSEC, "vpts": VPTS, "val_asof": dates[-1],
            "runtime_s": round(time.time() - t0, 1)}
     dst = Path(a.out) if a.out else root / "insights.json"
     dst.write_text(json.dumps(out, separators=(",", ":")))
