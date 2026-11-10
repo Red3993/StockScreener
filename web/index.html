@@ -2903,7 +2903,9 @@ function valRows() {
   const mode = UI.vMode || "bl", sec = UI.vSec || "", size = UI.vSize || "", minU = UI.vMin;
   const safe = UI.vSafe !== false, minN = UI.vNA ?? 3, cap = UI.vCap ?? 300;
   const out = []; out.hidden = 0;
+  const wl = UI.vWl, wset = wl ? new Set(lists().filter(l => wl === "*" || l.id === wl).flatMap(l => l.items.map(i => i.ticker))) : null;
   for (const r of ROWS) {
+    if (wset && !wset.has(r.t)) continue;
     const v = INS.val?.[r.t]; if (!v || !v[mode]) continue;
     if (sec && r.sec !== sec) continue;
     if (size && sizeOf(r) !== size) continue;
@@ -2937,13 +2939,14 @@ function valScatter(rows) {
   const col = o => o.up >= 0.25 ? "var(--up)" : o.up <= -0.25 ? "var(--down)" : "var(--muted)";
   const r0 = shown.length > 600 ? 2.2 : 3.2;
   const dots = shown.map(o => `<circle cx="${X(o.v.fpe).toFixed(1)}" cy="${Y(o.v.g).toFixed(1)}" r="${r0}" fill="${col(o)}" opacity="${VLSEL && VLSEL !== o.r.t ? 0.35 : 0.75}"/>`).join("");
+  const wlab = shown.length <= 40 ? shown.map(o => `<text x="${Math.min(W - 24, X(o.v.fpe) + 6).toFixed(1)}" y="${(Y(o.v.g) - 5).toFixed(1)}" font-size="9.5" fill="var(--muted)" style="paint-order:stroke;stroke:var(--surface);stroke-width:3px">${esc(o.r.t)}</text>`).join("") : "";
   const so = VLSEL && shown.find(o => o.r.t === VLSEL);
   const sel = so ? `<circle cx="${X(so.v.fpe)}" cy="${Y(so.v.g)}" r="6" fill="none" stroke="var(--fg)" stroke-width="2"/><text x="${Math.min(W - 30, X(so.v.fpe) + 9)}" y="${Y(so.v.g) - 8}" font-size="11" font-weight="700" fill="var(--fg)" style="paint-order:stroke;stroke:var(--surface);stroke-width:3px">${esc(so.r.t)}</text>` : "";
   const mx = vlMed(pts.map(o => o.v.fpe)), my = vlMed(pts.map(o => o.v.g));
   const cross = mx == null ? "" : `<line x1="${X(mx)}" x2="${X(mx)}" y1="${T}" y2="${H - B}" stroke="var(--faint)" stroke-dasharray="4 3"/><line x1="${L}" x2="${W - R}" y1="${Y(my)}" y2="${Y(my)}" stroke="var(--faint)" stroke-dasharray="4 3"/>`;
   const info = so ? `<div class="vsel"><div><b>${esc(so.r.t)}</b> <span class="muted">${esc(so.r.n)}</span></div><div class="num small">${so.v.fpe}× fwd P/E · ${pct(so.v.g)} EPS growth · implied ${pct(so.up, 0)}</div><button class="btn small" data-vlopen="${esc(so.r.t)}">Open ${esc(so.r.t)}</button></div>` : `<p class="faint small" style="margin:8px 0 0">Tap a dot to see which stock it is.</p>`;
   return `<div class="card"><h3>P/E vs expected EPS growth <span class="label">${pts.length} stocks</span></h3>
-    <svg viewBox="0 0 ${W} ${H}" class="chart" id="vlsvg" style="cursor:pointer" role="img" aria-label="Scatterplot of forward P/E against expected EPS growth">${grid}${cross}${dots}${sel}
+    <svg viewBox="0 0 ${W} ${H}" class="chart" id="vlsvg" style="cursor:pointer" role="img" aria-label="Scatterplot of forward P/E against expected EPS growth">${grid}${cross}${dots}${wlab}${sel}
       <text x="${L + (W - L - R) / 2}" y="${H - 3}" font-size="10.5" text-anchor="middle" fill="var(--muted)">Forward P/E</text>
       <text transform="translate(9 ${T + (H - T - B) / 2}) rotate(-90)" font-size="10.5" text-anchor="middle" fill="var(--muted)">Expected EPS growth, next year</text></svg>
     <div class="legend"><span><i style="background:var(--up);border-radius:50%"></i>Implied upside ≥ 25%</span><span><i style="background:var(--muted);border-radius:50%"></i>Within ±25%</span><span><i style="background:var(--down);border-radius:50%"></i>Implied ≤ −25%</span><span><i style="background:none;border-top:2px dashed var(--faint);height:0"></i>Median</span></div>
@@ -2976,6 +2979,7 @@ function valView() {
   const secs = [...new Set(ROWS.map(r => r.sec).filter(Boolean))].sort();
   const mu = vlMed(rows.map(o => o.up)), ma = vlMed(rows.map(o => o.au));
   const ctl = `<div class="card"><div class="bar"><select class="sel" id="vlsec" aria-label="Sector"><option value="">All sectors</option>${secs.map(x => `<option ${x === sec ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>
+      <select class="sel" id="vlwl" aria-label="Watchlist scope"><option value="">Whole universe</option><option value="*" ${UI.vWl === "*" ? "selected" : ""}>Any watchlist</option>${lists().map(l => `<option value="${esc(l.id)}" ${UI.vWl === l.id ? "selected" : ""}>Watchlist: ${esc(l.name)}</option>`).join("")}</select>
       <div class="seg" id="vlsize">${[["", "All sizes"], ...VL_SIZES.map(x => [x, x])].map(([k, l]) => `<button data-vls="${k}" aria-pressed="${size === k}">${l}</button>`).join("")}</div></div>
     <div class="bar"><div class="seg" id="vlmode">${VMODES.map(([k, l]) => `<button data-vlm="${k}" aria-pressed="${mode === k}">${l}</button>`).join("")}</div></div>
     <div class="bar"><span class="faint small">Bar max</span><div class="seg">${[150, 200, 300, 500].map(x => `<button data-vlx="${x}" aria-pressed="${max === x}">${x}%</button>`).join("")}</div>
@@ -2992,6 +2996,7 @@ function bindVal() {
   const rr = () => { const y = scrollY; viewResearch(); scrollTo(0, y); };
   const set = (k, v) => { UI[k] = v; VLN = 25; VLSEL = null; saveUI(); rr(); };
   $("#vlsec") && ($("#vlsec").onchange = e => set("vSec", e.target.value));
+  $("#vlwl") && ($("#vlwl").onchange = e => set("vWl", e.target.value));
   $$("[data-vls]").forEach(b => b.onclick = () => set("vSize", b.dataset.vls));
   $$("[data-vlm]").forEach(b => b.onclick = () => set("vMode", b.dataset.vlm));
   $$("[data-vlx]").forEach(b => b.onclick = () => set("vMax", +b.dataset.vlx));
