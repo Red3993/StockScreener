@@ -83,7 +83,7 @@ class Market:
 
 # ------------------------------------------------------------------ state
 def personas() -> list:
-    return [{k: t.get(k) for k in ("id", "name", "color", "style", "blurb", "strategy")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"], "color": CFG["manager"].get("color"), "blurb": CFG["manager"].get("blurb")}]
+    return [{k: t.get(k) for k in ("id", "name", "color", "style", "blurb", "strategy", "count_dividends")} for t in CFG["traders"]] + [{"id": "manager", "name": CFG["manager"]["name"], "color": CFG["manager"].get("color"), "blurb": CFG["manager"].get("blurb")}]
 
 
 def new_account() -> dict:
@@ -170,6 +170,9 @@ def trader_stop_long(tid: str) -> float:
     """Automatic stop for longs: the trader's own `stop_long` in arena.yaml, else the house stop."""
     own = next((t.get("stop_long") for t in CFG["traders"] if t["id"] == tid), None)
     return own if own is not None else CFG["stops"]["long"]
+
+
+COUNT_DIVIDENDS = {t["id"] for t in CFG["traders"] if t.get("count_dividends")}   # only these traders are credited dividend income
 
 
 LONG_ONLY = {t["id"] for t in CFG["traders"] if t.get("long_only")}   # code-enforced: these traders never short
@@ -699,6 +702,14 @@ def cmd_mark(a) -> int:
             p["last"] = px
             if p["shares"] < 0 and last_mark != d:
                 tr["cash"] -= abs(p["shares"] * px) * CFG["borrow_rate"] * days / 365
+            if p["shares"] > 0 and tid in COUNT_DIVIDENDS and last_mark != d:
+                # estimated dividend income: trailing yield from the index row, accrued daily and paid to cash (only traders with count_dividends)
+                y = ((mk.rows.get(t) or {}).get("m") or {}).get("div_yield")
+                if y and 0 < y <= 0.15:
+                    inc = p["shares"] * px * y * days / 365
+                    tr["cash"] += inc
+                    tr["dividends"] = round(tr.get("dividends", 0.0) + inc, 2)
+                    p["div"] = round(p.get("div", 0.0) + inc, 2)
             move = px / p["entry"] - 1
             if (p["shares"] > 0 and move <= trader_stop_long(tid)) or (p["shares"] < 0 and move >= CFG["stops"]["short"]):
                 pnl = p["shares"] * (px - p["entry"])
