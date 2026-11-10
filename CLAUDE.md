@@ -296,6 +296,12 @@ Built a working prototype ahead of Supabase/Vercel (no signups needed):
   forward-P/E quartile (falls back to all stocks under 8 peers; includes small caps, so large caps often sit above it); blend = average. REITs skipped.
   Page: `valuationCard` (Blend / Own 3-yr / Sector toggle, P/E range bar beside the analyst low-high bar and mean, verdict badge) and `sectorCard`
   (SVG scatter, sector median P/E vs expected EPS growth, stock as a diamond, peer dots toggle). Not yet backtested; candidate for the report card.
+- 2026-11-10 (Tom): **Research → Valuation** (`valView` in web/index.html): universe scatter (fwd P/E vs expected EPS growth, tap a dot) + implied-price
+  gauges as % of today's price (today = 100%, bar max 150/200/300/500 or custom up to 2000%, off-scale flagged ›). Filters: sector, size, watchlist scope
+  (whole universe / any / one list), Blend/Own/Sector mode, min implied upside, sort. **Reliability filter** (on by default, toggle): >= N analysts (3),
+  current P/E 3-100x, own-history typical P/E 3-100x, implied upside <= cap (300%) and > -90%. Merged to `main`, live as v3 version 10 (insights.json
+  carries val/vsec/vpts until the nightly run regenerates it). Live page edits that were never committed (db JSON clone, 100 candidates, error text)
+  were synced back into web/index.html first.
 - Known gaps: Telegram (on hold), analyst track records (firm upgrade outcomes) not built.
   Latest session: 3y download can miss it (99% NaN on 2026-10-26) → build now fills the last 2 weeks from a 10d download.
   19 foreign/IFRS filers have no us-gaap facts (SPOT, NU, ONON, …) → N/A fundamentals.
