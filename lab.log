@@ -1,0 +1,123 @@
+[11:53:37] volume 200/2963
+[11:53:49] volume 400/2963
+[11:54:01] volume 600/2963
+[11:54:14] volume 800/2963
+[11:54:26] volume 1000/2963
+[11:54:38] volume 1200/2963
+[11:54:50] volume 1400/2963
+[11:54:58] volume 1600/2963
+[11:55:06] volume 1800/2963
+[11:55:15] volume 2000/2963
+[11:55:23] volume 2200/2963
+[11:55:32] volume 2400/2963
+[11:55:40] volume 2600/2963
+[11:55:49] volume 2800/2963
+[11:55:56] volume 2963/2963
+[11:55:56] volume: 2963 stocks with data
+  r1 = c / prev(c) - 1
+  r1 = c / prev(c) - 1
+  r5 = c / np.vstack([np.full((5, N), np.nan), c[:-5]]) - 1
+[11:56:09] signals: 26 built; events golden 4650, death 5064, x200up 14738, x200dn 14969, x50up 37742, macd_bull 54673, macd_bull_low 34570, macd_bear 54820, macd_zero 30111, rsi_lt30 15013, rsi_exit30 15562, rsi_gt70 21715, hi52 13985, lo52 7787, bb_break 17535, bb_low 34671, drop10 28272, jump8 21157, rsi_div 9683, vol_spike 15655, breakaway 16198, ins_buy 2505, ins_cluster 399, ins_ceo 805, cong_buy 1430, cong_rel 483
+  f = np.clip(x / e - 1, -0.9, 3.0)
+  return fnb._ureduce(a, func=_nanmedian, keepdims=keepdims,
+[11:56:10] combos: 16,426 (26 signals, 22 filters, 325 pairs, 2529 triples)
+[11:56:10] tested 0/16,426 combinations (1 with enough events), 167s
+[11:56:13] tested 500/16,426 combinations (372 with enough events), 170s
+[11:56:16] tested 1,000/16,426 combinations (782 with enough events), 173s
+[11:56:20] tested 1,500/16,426 combinations (1,254 with enough events), 177s
+[11:56:24] tested 2,000/16,426 combinations (1,742 with enough events), 181s
+[11:56:27] tested 2,500/16,426 combinations (2,165 with enough events), 184s
+[11:56:30] tested 3,000/16,426 combinations (2,587 with enough events), 188s
+[11:56:34] tested 3,500/16,426 combinations (2,952 with enough events), 191s
+[11:56:37] tested 4,000/16,426 combinations (3,398 with enough events), 194s
+[11:56:40] tested 4,500/16,426 combinations (3,878 with enough events), 198s
+[11:56:44] tested 5,000/16,426 combinations (4,354 with enough events), 201s
+[11:56:47] tested 5,500/16,426 combinations (4,796 with enough events), 204s
+[11:56:49] tested 6,000/16,426 combinations (5,090 with enough events), 207s
+[11:56:52] tested 6,500/16,426 combinations (5,391 with enough events), 209s
+[11:56:55] tested 7,000/16,426 combinations (5,685 with enough events), 212s
+[11:56:58] tested 7,500/16,426 combinations (6,068 with enough events), 215s
+[11:57:00] tested 8,000/16,426 combinations (6,497 with enough events), 218s
+[11:57:03] tested 8,500/16,426 combinations (6,928 with enough events), 220s
+[11:57:06] tested 9,000/16,426 combinations (7,365 with enough events), 224s
+[11:57:10] tested 9,500/16,426 combinations (7,833 with enough events), 227s
+[11:57:13] tested 10,000/16,426 combinations (8,293 with enough events), 230s
+[11:57:16] tested 10,500/16,426 combinations (8,758 with enough events), 233s
+[11:57:19] tested 11,000/16,426 combinations (9,187 with enough events), 236s
+[11:57:21] tested 11,500/16,426 combinations (9,548 with enough events), 238s
+[11:57:24] tested 12,000/16,426 combinations (9,922 with enough events), 241s
+[11:57:27] tested 12,500/16,426 combinations (10,280 with enough events), 244s
+[11:57:30] tested 13,000/16,426 combinations (10,678 with enough events), 247s
+[11:57:32] tested 13,500/16,426 combinations (11,010 with enough events), 249s
+[11:57:35] tested 14,000/16,426 combinations (11,236 with enough events), 252s
+[11:57:38] tested 14,500/16,426 combinations (11,488 with enough events), 255s
+[11:57:42] tested 15,000/16,426 combinations (11,867 with enough events), 259s
+[11:57:46] tested 15,500/16,426 combinations (12,271 with enough events), 263s
+[11:57:49] tested 16,000/16,426 combinations (12,615 with enough events), 266s
+[11:57:52] tested 16,426; 12,809 had 40+ events
+  d1 = c[1:] / c[:-1] - 1
+  d1 = c[1:] / c[:-1] - 1
+[11:58:00] wrote /tmp/signals.json (4.38 MB) in 277s
+[11:58:02] panel: 2963 stocks, 753 days, insiders since 2025-11-28
+[11:58:08] rally backtest 0/99
+[11:58:15] rally backtest 20/99
+[11:58:23] rally backtest 40/99
+[11:58:30] rally backtest 60/99
+[11:58:37] rally backtest 80/99
+[11:58:44] rally: live 2887 stocks, 278 tens
+[11:58:45] panel: 24 monthly rebalances 2024-11-29 .. 2026-10-30
+[11:58:46] all: month 1/24 (2024-11-29), 16,383 strategies, 1s
+[11:58:47] all: month 2/24 (2024-12-31), 16,383 strategies, 2s
+[11:58:48] all: month 3/24 (2025-01-31), 16,383 strategies, 3s
+[11:58:49] all: month 4/24 (2025-02-28), 16,383 strategies, 5s
+[11:58:51] all: month 5/24 (2025-03-31), 16,383 strategies, 6s
+[11:58:52] all: month 6/24 (2025-04-30), 16,383 strategies, 7s
+[11:58:53] all: month 7/24 (2025-05-30), 16,383 strategies, 8s
+[11:58:54] all: month 8/24 (2025-06-30), 16,383 strategies, 9s
+[11:58:55] all: month 9/24 (2025-07-31), 16,383 strategies, 10s
+[11:58:56] all: month 10/24 (2025-08-29), 16,383 strategies, 12s
+[11:58:58] all: month 11/24 (2025-09-30), 16,383 strategies, 13s
+[11:58:59] all: month 12/24 (2025-10-31), 16,383 strategies, 14s
+[11:59:00] all: month 13/24 (2025-11-28), 16,383 strategies, 15s
+[11:59:01] all: month 14/24 (2025-12-31), 16,383 strategies, 16s
+[11:59:02] all: month 15/24 (2026-01-30), 16,383 strategies, 18s
+[11:59:03] all: month 16/24 (2026-02-27), 16,383 strategies, 19s
+[11:59:05] all: month 17/24 (2026-03-31), 16,383 strategies, 20s
+[11:59:06] all: month 18/24 (2026-04-30), 16,383 strategies, 21s
+[11:59:07] all: month 19/24 (2026-05-29), 16,383 strategies, 22s
+[11:59:08] all: month 20/24 (2026-06-30), 16,383 strategies, 24s
+[11:59:10] all: month 21/24 (2026-07-31), 16,383 strategies, 25s
+[11:59:11] all: month 22/24 (2026-08-31), 16,383 strategies, 26s
+[11:59:12] all: month 23/24 (2026-09-30), 16,383 strategies, 27s
+[11:59:13] all: month 24/24 (2026-10-30), 16,383 strategies, 28s
+  m_tr = np.nanmean(tr, 1)
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+[11:59:14] all: done; train/test rank corr -0.02
+[11:59:14] sp500: month 1/24 (2024-11-29), 16,383 strategies, 0s
+[11:59:15] sp500: month 2/24 (2024-12-31), 16,383 strategies, 1s
+[11:59:15] sp500: month 3/24 (2025-01-31), 16,383 strategies, 1s
+[11:59:15] sp500: month 4/24 (2025-02-28), 16,383 strategies, 1s
+[11:59:16] sp500: month 5/24 (2025-03-31), 16,383 strategies, 1s
+[11:59:16] sp500: month 6/24 (2025-04-30), 16,383 strategies, 2s
+[11:59:16] sp500: month 7/24 (2025-05-30), 16,383 strategies, 2s
+[11:59:16] sp500: month 8/24 (2025-06-30), 16,383 strategies, 2s
+[11:59:17] sp500: month 9/24 (2025-07-31), 16,383 strategies, 2s
+[11:59:17] sp500: month 10/24 (2025-08-29), 16,383 strategies, 3s
+[11:59:17] sp500: month 11/24 (2025-09-30), 16,383 strategies, 3s
+[11:59:17] sp500: month 12/24 (2025-10-31), 16,383 strategies, 3s
+[11:59:18] sp500: month 13/24 (2025-11-28), 16,383 strategies, 4s
+[11:59:18] sp500: month 14/24 (2025-12-31), 16,383 strategies, 4s
+[11:59:18] sp500: month 15/24 (2026-01-30), 16,383 strategies, 4s
+[11:59:19] sp500: month 16/24 (2026-02-27), 16,383 strategies, 4s
+[11:59:19] sp500: month 17/24 (2026-03-31), 16,383 strategies, 5s
+[11:59:19] sp500: month 18/24 (2026-04-30), 16,383 strategies, 5s
+[11:59:19] sp500: month 19/24 (2026-05-29), 16,383 strategies, 5s
+[11:59:20] sp500: month 20/24 (2026-06-30), 16,383 strategies, 6s
+[11:59:20] sp500: month 21/24 (2026-07-31), 16,383 strategies, 6s
+[11:59:20] sp500: month 22/24 (2026-08-31), 16,383 strategies, 6s
+[11:59:21] sp500: month 23/24 (2026-09-30), 16,383 strategies, 6s
+[11:59:21] sp500: month 24/24 (2026-10-30), 16,383 strategies, 7s
+  m_tr = np.nanmean(tr, 1)
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+[11:59:21] sp500: done; train/test rank corr 0.01
+[11:59:21] wrote /tmp/lab.json (0.12 MB) in 80s
