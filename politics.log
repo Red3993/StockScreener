@@ -1,0 +1,6 @@
+[    0.1s] cache: 1449 filings, 17498 trades
+[    3.3s] 2024: 451 PTR filings in index
+[    3.4s] 2025: 515 PTR filings in index
+[    3.4s] 2026: 483 PTR filings in index
+[    3.4s] senate: merged 3467 trades (file generated 2026-11-28T03:30:09+00:00)
+[    3.5s] wrote politics.json: {'filings': 1449, 'paper_skipped': 181, 'errors': 0, 'trades': 17492, 'with_ticker': 14794, 'new_this_run': 0, 'senate': {'trades': 3467, 'generated': '2026-11-28T03:30:09+00:00', 'reports': 394, 'source': 'kadoa-org/congress-trading-monitor (2026-11-27T19:07:42+01:00 Daily refresh: 2026-11-27)', 'matched': 3041}, 'coverage': 'House + Senate'}
